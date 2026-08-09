@@ -1,0 +1,9 @@
+{
+  "name": "CreatorOS",
+  "description": "The operating system for creators. Go from zero to your first dollar with AI coaching, branding, scene planning, retention optimization, and content automation.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
