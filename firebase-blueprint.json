@@ -1,0 +1,172 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Core user account information and status.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "avatarType": { "type": "string", "enum": ["uploaded", "ai_generated"] },
+        "activeAvatarId": { "type": "string" },
+        "accountProvider": { "type": "string", "enum": ["google", "password"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastLogin": { "type": "string", "format": "date-time" },
+        "subscriptionTier": { "type": "string", "enum": ["free", "pro", "elite"] },
+        "accountStatus": { "type": "string", "enum": ["active", "suspended"] },
+        "onboardingAnswers": {
+          "type": "object",
+          "properties": {
+            "niche": { "type": "string" },
+            "audience": { "type": "string" },
+            "vibe": { "type": "string" },
+            "summary": { "type": "string" }
+          }
+        }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "Avatar": {
+      "title": "AI Avatar",
+      "description": "Metadata for a generated or uploaded avatar.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "url": { "type": "string", "format": "uri" },
+        "prompt": { "type": "string" },
+        "generationType": { "type": "string", "enum": ["text", "photo_transform"] },
+        "styleType": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["userId", "url", "createdAt"]
+    },
+    "UserPreferences": {
+      "title": "User Preferences",
+      "description": "UI and application settings for the user.",
+      "type": "object",
+      "properties": {
+        "theme": { "type": "string", "enum": ["light", "dark", "system"] },
+        "language": { "type": "string" },
+        "notifications": {
+          "type": "object",
+          "properties": {
+            "email": { "type": "boolean" },
+            "push": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "Project": {
+      "title": "Creator Project",
+      "description": "A project containing generated content, brand kits, or workflows.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner of the project" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["brand_kit", "content", "tutorial", "workflow"] },
+        "data": { "type": "object", "description": "The actual project payload (JSON)" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "type", "createdAt"]
+    },
+    "Prompt": {
+      "title": "Generated Prompt",
+      "description": "A generated perfect prompt history item.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "input": { "type": "string" },
+        "result": { "type": "string" },
+        "rating": { "type": "number" },
+        "tag": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "input", "result", "timestamp"]
+    },
+    "PromptTemplate": {
+      "title": "Generated Prompt Template",
+      "description": "Dynamic prompt templates generated per platform.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "platform": { "type": "string" },
+        "page": { "type": "number" },
+        "templates": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "platform", "page", "templates", "timestamp"]
+    },
+    "SupportTicket": {
+      "title": "Support Ticket",
+      "description": "A support request submitted by a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "resolved"] },
+        "userData": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "resolvedAt": { "type": "string", "format": "date-time" },
+        "resolvedBy": { "type": "string" }
+      },
+      "required": ["userId", "subject", "message", "status", "createdAt"]
+    },
+    "AppLog": {
+      "title": "Application Log",
+      "description": "Captured client-side runtime error logs for production debugging.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "message": { "type": "string" },
+        "stack": { "type": "string" },
+        "url": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["message", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/preferences/{userId}": {
+      "schema": "UserPreferences",
+      "description": "User specific settings"
+    },
+    "/avatars/{avatarId}": {
+      "schema": "Avatar",
+      "description": "User avatars (AI generated or uploaded)"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "User projects and assets"
+    },
+    "/prompts/{promptId}": {
+      "schema": "Prompt",
+      "description": "Generated prompt histories"
+    },
+    "/prompt_templates/{templateId}": {
+      "schema": "PromptTemplate",
+      "description": "Generated prompt templates"
+    },
+    "/support_tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Support tickets for user assistance"
+    },
+    "/app_logs/{logId}": {
+      "schema": "AppLog",
+      "description": "Captured client-side error and diagnostic logs"
+    }
+  }
+}
