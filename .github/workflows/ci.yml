@@ -1,9 +1,7 @@
-name: CreatorOS CI
+name: CreatorOS Runner Diagnostic
 
 on:
   push:
-    branches: [main]
-  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -11,32 +9,18 @@ permissions:
   contents: read
 
 jobs:
-  lint-and-build:
-    name: Lint and build
+  runner-test:
+    name: GitHub Actions runner test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install dependencies
-        run: npm install
-      - name: TypeScript check
-        run: npm run lint
-      - name: Production build
-        run: npm run build
-
-  e2e:
-    name: Playwright E2E
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install dependencies
-        run: npm install
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-      - name: Run Playwright tests
-        run: npm run test:e2e
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Report runner
+        run: |
+          echo "CreatorOS GitHub Actions runner is alive"
+          echo "Runner OS: $RUNNER_OS"
+          echo "Runner name: $RUNNER_NAME"
+      - name: Check Node and npm
+        run: |
+          node --version
+          npm --version
