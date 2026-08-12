@@ -1,31 +1,17 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, User as FirebaseUser } from 'firebase/auth';
-import { 
-  getFirestore, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  serverTimestamp,
-  getDocFromServer
+import {
+  getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot,
+  addDoc, updateDoc, deleteDoc, serverTimestamp, getDocFromServer
 } from 'firebase/firestore';
 // Storage not available
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-// storage not available
 export const googleProvider = new GoogleAuthProvider();
 
-// Auth Helpers
 export const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
 export const loginWithEmail = (email: string, pass: string) => signInWithEmailAndPassword(auth, email, pass);
 export const registerWithEmail = (email: string, pass: string) => createUserWithEmailAndPassword(auth, email, pass);
@@ -42,12 +28,10 @@ export async function compressBase64Image(base64Str: string, maxWidth = 800, qua
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-
       if (width > maxWidth) {
         height = Math.round((height * maxWidth) / width);
         width = maxWidth;
       }
-
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
@@ -55,16 +39,13 @@ export async function compressBase64Image(base64Str: string, maxWidth = 800, qua
         reject(new Error('Failed to get canvas context'));
         return;
       }
-
       ctx.drawImage(img, 0, 0, width, height);
-      // Use image/jpeg for better compression than image/png
       resolve(canvas.toDataURL('image/jpeg', quality));
     };
     img.onerror = (err) => reject(err);
   });
 }
 
-// Error Handling Helper
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -90,7 +71,7 @@ export interface FirestoreErrorInfo {
       email: string | null;
       photoUrl: string | null;
     }[];
-  }
+  };
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
@@ -116,30 +97,25 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Connection Test
 async function testConnection() {
   try {
-    // Try to get a non-existent doc to test connectivity
     await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("Firestore connection established successfully.");
+    console.log('Firestore connection established successfully.');
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('the client is offline') || error.message.includes('unavailable')) {
-        console.error("Firestore connection failed: The client is offline or the service is unavailable. Please check your Firebase configuration and internet connection.");
+        console.error('Firestore connection failed: The client is offline or the service is unavailable. Please check your Firebase configuration and internet connection.');
       } else if (error.message.toLowerCase().includes('permission') || (error as any).code === 'permission-denied') {
-        // Permission denied is actually a good sign - it means we reached the server
-        console.log("Firestore connection established (Permission Denied as expected).");
+        console.log('Firestore connection established (Permission Denied as expected).');
       } else {
-        console.error("Firestore connection error:", error.message);
+        console.error('Firestore connection error:', error.message);
       }
     }
   }
 }
 testConnection();
 
-/**
- * Helper to perform fetch requests with the current user's ID token.
- */
+/** Helper for authenticated API calls. */
 export async function authorizedFetch(url: string, options: RequestInit = {}) {
   let user = auth.currentUser;
   if (!user) {
@@ -155,38 +131,19 @@ export async function authorizedFetch(url: string, options: RequestInit = {}) {
     });
     user = auth.currentUser;
   }
-
   if (!user) throw new Error('User not authenticated');
 
-  let token = '';
-  try {
-    token = await user.getIdToken();
-  } catch {
-    token = await user.getIdToken(true);
+  const token = await user.getIdToken();
+  const cleanToken = token.replace(/[\r\n\t]/g, '').trim();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (options.headers instanceof Headers) {
+    options.headers.forEach((value, key) => { headers[key] = value; });
+  } else if (Array.isArray(options.headers)) {
+    options.headers.forEach(([key, value]) => { headers[key] = value; });
+  } else if (options.headers && typeof options.headers === 'object') {
+    Object.assign(headers, options.headers);
   }
-
-  const cleanToken = (token || '').replace(/[\r\n\t]/g, '').trim();
-
-  let customHeaders: Record<string, string> = {};
-  if (options.headers) {
-    if (options.headers instanceof Headers) {
-      options.headers.forEach((value, key) => {
-        customHeaders[key] = value;
-      });
-    } else if (Array.isArray(options.headers)) {
-      options.headers.forEach(([key, value]) => {
-        customHeaders[key] = value;
-      });
-    } else if (typeof options.headers === 'object') {
-      customHeaders = { ...options.headers };
-    }
-  }
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...customHeaders,
-    'Authorization': `Bearer ${cleanToken}`
-  };
+  headers.Authorization = `Bearer ${cleanToken}`;
 
   const response = await fetch(url, { ...options, headers });
   if (!response.ok) {
@@ -194,6 +151,32 @@ export async function authorizedFetch(url: string, options: RequestInit = {}) {
     throw new Error(errorData.error || `Request failed with status ${response.status}`);
   }
   return response.json();
+}
+
+/**
+ * Gemini routes are authenticated server-side. Existing CreatorOS service
+ * functions use fetch() directly, so install a narrow browser interceptor that
+ * attaches the current Firebase ID token only to /api/gemini/* requests.
+ */
+if (typeof window !== 'undefined') {
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    if (!requestUrl.startsWith('/api/gemini/')) {
+      return nativeFetch(input, init);
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const token = (await user.getIdToken()).replace(/[\r\n\t]/g, '').trim();
+    const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+    headers.set('Authorization', `Bearer ${token}`);
+
+    return nativeFetch(input, { ...init, headers });
+  };
 }
 
 export { onAuthStateChanged, serverTimestamp, updateProfile };
