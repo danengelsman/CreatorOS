@@ -1,66 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: users
-    // Document ID: {userId}
-    // Fields:
-    //   - email: string (required, email)
-    //   - displayName: string
-    //   - photoURL: string (url)
-    //   - accountProvider: string (google|password)
-    //   - createdAt: timestamp (required)
-    //   - lastLogin: timestamp
-    //   - subscriptionTier: string (free|pro|elite)
-    //   - accountStatus: string (active|suspended)
-    //
-    // Collection: preferences
-    // Document ID: {userId}
-    // Fields:
-    //   - theme: string
-    //   - language: string
-    //   - notifications: map
-    //
-    // Collection: projects
-    // Document ID: {projectId}
-    // Fields:
-    //   - userId: string (required, owner)
-    //   - name: string (required)
-    //   - type: string (required)
-    //   - data: map
-    //   - createdAt: timestamp (required)
-    //   - updatedAt: timestamp
-    //
-    // Collection: avatars
-    // Document ID: {avatarId}
-    // Fields:
-    //   - userId: string (required, owner)
-    //   - url: string (required, url)
-    //   - prompt: string
-    //   - generationType: string (text|photo_transform)
-    //   - styleType: string
-    //   - createdAt: timestamp (required)
-    //   - isActive: bool
-    //
-    // ===============================================================
 
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    
     function isAuthenticated() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    function isDocOwner() {
-      return isAuthenticated() && request.auth.uid == resource.data.userId;
     }
 
     function isAdmin() {
@@ -73,70 +20,76 @@ service cloud.firestore {
     }
 
     function isValidUrl(url) {
-      return url is string && (url.matches("^https://.*") || url.matches("^http://.*") || url.matches("^data:image/.*"));
+      return url is string &&
+        (url.matches("^https://.*") || url.matches("^http://.*") || url.matches("^data:image/.*"));
     }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
 
     function isValidUser(data) {
       return data.keys().hasAll(['email', 'createdAt']) &&
-             isValidEmail(data.email) &&
-             data.createdAt is timestamp &&
-             (!('photoURL' in data) || data.photoURL == null || isValidUrl(data.photoURL)) &&
-             (!('avatarType' in data) || data.avatarType == null || data.avatarType in ['uploaded', 'ai_generated']);
+        isValidEmail(data.email) &&
+        data.createdAt is timestamp &&
+        (!('photoURL' in data) || data.photoURL == null || isValidUrl(data.photoURL)) &&
+        (!('avatarType' in data) || data.avatarType == null || data.avatarType in ['uploaded', 'ai_generated']);
     }
 
     function isValidProject(data) {
       return data.keys().hasAll(['userId', 'name', 'type', 'createdAt']) &&
-             data.userId == request.auth.uid &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.type in ['brand_kit', 'content', 'tutorial', 'workflow'] &&
-             data.createdAt is timestamp;
+        data.userId == request.auth.uid &&
+        data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+        data.type in ['brand_kit', 'content', 'tutorial', 'workflow'] &&
+        data.createdAt is timestamp;
     }
 
     function isValidAvatar(data) {
       return data.keys().hasAll(['userId', 'url', 'createdAt']) &&
-             data.userId == request.auth.uid &&
-             isValidUrl(data.url) &&
-             data.createdAt is timestamp &&
-             (!('generationType' in data) || data.generationType == null || data.generationType in ['text', 'photo_transform']);
+        data.userId == request.auth.uid &&
+        isValidUrl(data.url) &&
+        data.createdAt is timestamp &&
+        (!('generationType' in data) || data.generationType == null || data.generationType in ['text', 'photo_transform']);
     }
 
     function isValidSupportTicket(data) {
       return data.keys().hasAll(['userId', 'subject', 'message', 'status', 'createdAt']) &&
-             data.subject is string && data.subject.size() > 0 && data.subject.size() <= 200 &&
-             data.message is string && data.message.size() > 0 && data.message.size() <= 5000 &&
-             data.status in ['open', 'resolved'] &&
-             data.createdAt is timestamp &&
-             (!('resolvedAt' in data) || data.resolvedAt == null || data.resolvedAt is timestamp) &&
-             (!('resolvedBy' in data) || data.resolvedBy == null || data.resolvedBy is string);
+        data.subject is string && data.subject.size() > 0 && data.subject.size() <= 200 &&
+        data.message is string && data.message.size() > 0 && data.message.size() <= 5000 &&
+        data.status in ['open', 'resolved'] &&
+        data.createdAt is timestamp &&
+        (!('resolvedAt' in data) || data.resolvedAt == null || data.resolvedAt is timestamp) &&
+        (!('resolvedBy' in data) || data.resolvedBy == null || data.resolvedBy is string);
     }
 
     function isValidAppLog(data) {
       return data.keys().hasAll(['message', 'timestamp']) &&
-             data.message is string && data.message.size() <= 10000 &&
-             data.timestamp is timestamp &&
-             (!('userId' in data) || data.userId == null || (data.userId is string && data.userId.size() <= 128)) &&
-             (!('stack' in data) || data.stack == null || (data.stack is string && data.stack.size() <= 50000)) &&
-             (!('url' in data) || data.url == null || (data.url is string && data.url.size() <= 2048)) &&
-             (!('userAgent' in data) || data.userAgent == null || (data.userAgent is string && data.userAgent.size() <= 1024));
+        data.message is string && data.message.size() <= 10000 &&
+        data.timestamp is timestamp &&
+        (!('userId' in data) || data.userId == null || (data.userId is string && data.userId.size() <= 128)) &&
+        (!('stack' in data) || data.stack == null || (data.stack is string && data.stack.size() <= 50000)) &&
+        (!('url' in data) || data.url == null || (data.url is string && data.url.size() <= 2048)) &&
+        (!('userAgent' in data) || data.userAgent == null || (data.userAgent is string && data.userAgent.size() <= 1024));
     }
 
-    // ===============================================================
-    // Rules
-    // ===============================================================
+    function isUnchangedOwner() {
+      return request.resource.data.userId == resource.data.userId;
+    }
 
     match /test/{docId} {
       allow read: if isAuthenticated();
     }
 
     match /users/{userId} {
-      // PII Protection: Only owner or admin can read
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+
+      // Subscription/account-status/admin-controlled fields are server-owned.
+      // A normal user may only edit profile metadata and lastLogin.
+      allow update: if isAdmin() || (
+        isOwner(userId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName', 'photoURL', 'lastLogin'
+        ]) &&
+        isValidUser(request.resource.data)
+      );
+
       allow delete: if isAdmin();
     }
 
@@ -147,16 +100,22 @@ service cloud.firestore {
     match /projects/{projectId} {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidProject(request.resource.data);
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.userId == request.auth.uid && isUnchangedOwner())
+      );
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     match /avatars/{avatarId} {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidAvatar(request.resource.data);
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.userId == request.auth.uid && isUnchangedOwner())
+      );
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
@@ -164,7 +123,10 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.userId == request.auth.uid && isUnchangedOwner())
+      );
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
@@ -172,7 +134,10 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.userId == request.auth.uid && isUnchangedOwner())
+      );
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
@@ -180,35 +145,42 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.userId == request.auth.uid && isUnchangedOwner())
+      );
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     match /support_tickets/{ticketId} {
-      // Users can only see their own tickets, admins see all
       allow list: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
-      
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidSupportTicket(request.resource.data);
-      
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidSupportTicket(request.resource.data);
+
       allow update: if isAuthenticated() && (
-        // Admin resolving ticket
-        (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolvedAt', 'resolvedBy']) && isValidSupportTicket(request.resource.data)) ||
-        // User updating content (if allowed)
-        (resource.data.userId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subject', 'message']) && isValidSupportTicket(request.resource.data))
+        (isAdmin() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolvedAt', 'resolvedBy']) &&
+          isValidSupportTicket(request.resource.data)) ||
+        (resource.data.userId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subject', 'message']) &&
+          isValidSupportTicket(request.resource.data))
       );
-      
+
       allow delete: if isAdmin();
     }
 
     match /app_logs/{logId} {
       allow get, list: if isAdmin();
-      allow create: if (isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidAppLog(request.resource.data)) ||
-                   (!isAuthenticated() && (!('userId' in request.resource.data) || request.resource.data.userId == null) && isValidAppLog(request.resource.data));
+      // Logs are never anonymous. A caller may only create a log attributed to itself.
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidAppLog(request.resource.data);
       allow update, delete: if false;
     }
 
-    // Default deny
     match /{document=**} {
       allow read, write: if false;
     }
