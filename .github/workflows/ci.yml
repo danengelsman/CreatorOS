@@ -22,12 +22,41 @@ jobs:
         with:
           node-version: '20.x'
           cache: npm
+      - name: Environment diagnostics
+        run: |
+          node --version | tee node-version.txt
+          npm --version | tee npm-version.txt
+          npm config get registry | tee npm-registry.txt
       - name: Install dependencies
-        run: npm install
+        run: npm install 2>&1 | tee npm-install.log
       - name: TypeScript check
-        run: npm run lint
+        id: lint
+        continue-on-error: true
+        run: npm run lint 2>&1 | tee lint.log
       - name: Production build
-        run: npm run build
+        id: build
+        continue-on-error: true
+        run: npm run build 2>&1 | tee build.log
+      - name: Upload lint/build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: lint-build-diagnostics
+          path: |
+            node-version.txt
+            npm-version.txt
+            npm-registry.txt
+            npm-install.log
+            lint.log
+            build.log
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Fail if lint or build failed
+        if: steps.lint.outcome == 'failure' || steps.build.outcome == 'failure'
+        run: |
+          echo "Lint outcome: ${{ steps.lint.outcome }}"
+          echo "Build outcome: ${{ steps.build.outcome }}"
+          exit 1
 
   e2e:
     name: Playwright E2E
@@ -40,19 +69,33 @@ jobs:
         with:
           node-version: '20.x'
           cache: npm
+      - name: Environment diagnostics
+        run: |
+          node --version | tee node-version.txt
+          npm --version | tee npm-version.txt
       - name: Install dependencies
-        run: npm install
+        run: npm install 2>&1 | tee npm-install.log
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: npx playwright install --with-deps 2>&1 | tee playwright-install.log
       - name: Run Playwright tests
-        run: npm run test:e2e
-      - name: Upload Playwright report
+        id: e2e
+        continue-on-error: true
+        run: npm run test:e2e 2>&1 | tee e2e.log
+      - name: Capture Playwright process diagnostics
+        if: always()
+        run: |
+          mkdir -p ci-diagnostics
+          cp node-version.txt npm-version.txt npm-install.log playwright-install.log e2e.log ci-diagnostics/ 2>/dev/null || true
+          cp -r playwright-report ci-diagnostics/playwright-report 2>/dev/null || true
+          cp -r test-results ci-diagnostics/test-results 2>/dev/null || true
+      - name: Upload Playwright diagnostics
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
-          if-no-files-found: ignore
-          retention-days: 7
+          name: playwright-diagnostics
+          path: ci-diagnostics/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Fail if E2E failed
+        if: steps.e2e.outcome == 'failure'
+        run: exit 1
