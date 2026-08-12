@@ -3,13 +3,7 @@ import admin from 'firebase-admin';
 import fs from 'fs';
 import path from 'path';
 
-/**
- * Security bootstrap for the CreatorOS HTTP API.
- *
- * This wraps Gemini routes before server.ts registers them, so the existing
- * application code does not need to expose the Gemini credential to callers.
- */
-
+/** Security bootstrap for CreatorOS Gemini API routes. */
 let projectId = 'gen-lang-client-0282443702';
 try {
   const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
@@ -21,8 +15,6 @@ try {
   console.error('Security bootstrap: failed to read Firebase config:', error);
 }
 
-// Use a named Firebase Admin app so server.ts can still initialize its own
-// default Admin app without colliding with this verifier.
 const securityApp = admin.apps.find((app) => app?.name === 'creatoros-security')
   ?? admin.initializeApp({ projectId }, 'creatoros-security');
 const securityAuth = admin.auth(securityApp);
@@ -35,17 +27,13 @@ const limits: Record<string, number> = {
   '/api/gemini/video-status': 60,
   '/api/gemini/video-download': 10,
 };
-
+const MAX_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024;
 const buckets = new Map<string, { count: number; resetAt: number }>();
-
-function rateLimitKey(userId: string, route: string) {
-  return `${route}:${userId}`;
-}
 
 function consumeRateLimit(userId: string, route: string) {
   const now = Date.now();
   const limit = limits[route] ?? 30;
-  const key = rateLimitKey(userId, route);
+  const key = `${route}:${userId}`;
   const current = buckets.get(key);
 
   if (!current || current.resetAt <= now) {
@@ -54,10 +42,7 @@ function consumeRateLimit(userId: string, route: string) {
   }
 
   if (current.count >= limit) {
-    return {
-      allowed: false,
-      retryAfter: Math.max(1, Math.ceil((current.resetAt - now) / 1000)),
-    };
+    return { allowed: false, retryAfter: Math.max(1, Math.ceil((current.resetAt - now) / 1000)) };
   }
 
   current.count += 1;
@@ -66,11 +51,9 @@ function consumeRateLimit(userId: string, route: string) {
 
 function isAllowedGeminiUri(value: unknown) {
   if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return false;
-
   try {
     const url = new URL(value);
     if (url.protocol !== 'https:') return false;
-
     const hostname = url.hostname.toLowerCase();
     return hostname === 'generativelanguage.googleapis.com'
       || hostname.endsWith('.googleapis.com')
@@ -98,7 +81,6 @@ async function protectGeminiRoute(req: any, res: any, next: any) {
     const rate = consumeRateLimit(decodedToken.uid, route);
     res.setHeader('X-RateLimit-Route', route);
     res.setHeader('X-RateLimit-Reset', String(rate.retryAfter));
-
     if (!rate.allowed) {
       res.setHeader('Retry-After', String(rate.retryAfter));
       return res.status(429).json({
@@ -107,7 +89,6 @@ async function protectGeminiRoute(req: any, res: any, next: any) {
       });
     }
 
-    // /generate is intentionally restricted to the model CreatorOS currently uses.
     if (route === '/api/gemini/generate') {
       const requestedModel = req.body?.model;
       if (requestedModel && requestedModel !== 'gemini-2.5-flash') {
@@ -115,12 +96,17 @@ async function protectGeminiRoute(req: any, res: any, next: any) {
       }
     }
 
+    if (route === '/api/gemini/analyze-video') {
+      const contentLength = Number(req.headers['content-length'] || 0);
+      if (contentLength > MAX_VIDEO_UPLOAD_BYTES) {
+        return res.status(413).json({ error: 'Video upload exceeds the 50 MB limit.' });
+      }
+    }
+
     // Never allow callers to make the server fetch arbitrary URLs with the
     // Gemini API key. Only Google-hosted Gemini resource URLs are accepted.
-    if (route === '/api/gemini/video-download') {
-      if (!isAllowedGeminiUri(req.body?.uri)) {
-        return res.status(400).json({ error: 'Invalid video resource URI.' });
-      }
+    if (route === '/api/gemini/video-download' && !isAllowedGeminiUri(req.body?.uri)) {
+      return res.status(400).json({ error: 'Invalid video resource URI.' });
     }
 
     next();
@@ -132,20 +118,15 @@ async function protectGeminiRoute(req: any, res: any, next: any) {
 
 function protectGeminiRegistration() {
   const originalPost = express.application.post;
-
   express.application.post = function patchedPost(pathOrPaths: any, ...handlers: any[]) {
     const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
     const hasGeminiRoute = paths.some((value) => typeof value === 'string' && limits[value] !== undefined);
-
     if (hasGeminiRoute) {
       return originalPost.call(this, pathOrPaths, protectGeminiRoute, ...handlers);
     }
-
     return originalPost.call(this, pathOrPaths, ...handlers);
   } as typeof express.application.post;
 }
 
 protectGeminiRegistration();
-
-// Import only after the Express route registration hook is installed.
 await import('./server.ts');
