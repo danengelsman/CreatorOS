@@ -80,12 +80,11 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
 
-      // Subscription/account-status/admin-controlled fields are server-owned.
-      // A normal user may only edit profile metadata and lastLogin.
+      // Subscription tier and account status remain server/admin controlled.
       allow update: if isAdmin() || (
         isOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'displayName', 'photoURL', 'lastLogin'
+          'displayName', 'photoURL', 'avatarType', 'lastLogin', 'updatedAt'
         ]) &&
         isValidUser(request.resource.data)
       );
@@ -101,10 +100,8 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && isValidProject(request.resource.data);
-      allow update: if isAuthenticated() && (
-        isAdmin() ||
-        (resource.data.userId == request.auth.uid && isUnchangedOwner())
-      );
+      allow update: if isAuthenticated() && (isAdmin() ||
+        (resource.data.userId == request.auth.uid && isUnchangedOwner()));
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
@@ -112,10 +109,8 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && isValidAvatar(request.resource.data);
-      allow update: if isAuthenticated() && (
-        isAdmin() ||
-        (resource.data.userId == request.auth.uid && isUnchangedOwner())
-      );
+      allow update: if isAuthenticated() && (isAdmin() ||
+        (resource.data.userId == request.auth.uid && isUnchangedOwner()));
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
@@ -123,10 +118,8 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (
-        isAdmin() ||
-        (resource.data.userId == request.auth.uid && isUnchangedOwner())
-      );
+      allow update: if isAuthenticated() && (isAdmin() ||
+        (resource.data.userId == request.auth.uid && isUnchangedOwner()));
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
@@ -134,10 +127,8 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (
-        isAdmin() ||
-        (resource.data.userId == request.auth.uid && isUnchangedOwner())
-      );
+      allow update: if isAuthenticated() && (isAdmin() ||
+        (resource.data.userId == request.auth.uid && isUnchangedOwner()));
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
@@ -145,39 +136,25 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (
-        isAdmin() ||
-        (resource.data.userId == request.auth.uid && isUnchangedOwner())
-      );
+      allow update: if isAuthenticated() && (isAdmin() ||
+        (resource.data.userId == request.auth.uid && isUnchangedOwner()));
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     match /support_tickets/{ticketId} {
       allow list: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
-
-      allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid &&
-        isValidSupportTicket(request.resource.data);
-
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidSupportTicket(request.resource.data);
       allow update: if isAuthenticated() && (
-        (isAdmin() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolvedAt', 'resolvedBy']) &&
-          isValidSupportTicket(request.resource.data)) ||
-        (resource.data.userId == request.auth.uid &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subject', 'message']) &&
-          isValidSupportTicket(request.resource.data))
+        (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolvedAt', 'resolvedBy']) && isValidSupportTicket(request.resource.data)) ||
+        (resource.data.userId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subject', 'message']) && isValidSupportTicket(request.resource.data))
       );
-
       allow delete: if isAdmin();
     }
 
     match /app_logs/{logId} {
       allow get, list: if isAdmin();
-      // Logs are never anonymous. A caller may only create a log attributed to itself.
-      allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid &&
-        isValidAppLog(request.resource.data);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidAppLog(request.resource.data);
       allow update, delete: if false;
     }
 
