@@ -5,8 +5,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "start": "node server.ts",
+    "dev": "tsx security-entry.ts",
+    "start": "tsx security-entry.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
