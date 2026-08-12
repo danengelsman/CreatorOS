@@ -15,85 +15,28 @@ jobs:
     name: Lint and build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
-      - name: Environment diagnostics
-        run: |
-          node --version | tee node-version.txt
-          npm --version | tee npm-version.txt
-          npm config get registry | tee npm-registry.txt
+          node-version: 20
       - name: Install dependencies
-        run: npm install 2>&1 | tee npm-install.log
+        run: npm install
       - name: TypeScript check
-        id: lint
-        continue-on-error: true
-        run: npm run lint 2>&1 | tee lint.log
+        run: npm run lint
       - name: Production build
-        id: build
-        continue-on-error: true
-        run: npm run build 2>&1 | tee build.log
-      - name: Upload lint/build diagnostics
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: lint-build-diagnostics
-          path: |
-            node-version.txt
-            npm-version.txt
-            npm-registry.txt
-            npm-install.log
-            lint.log
-            build.log
-          if-no-files-found: warn
-          retention-days: 14
-      - name: Fail if lint or build failed
-        if: steps.lint.outcome == 'failure' || steps.build.outcome == 'failure'
-        run: |
-          echo "Lint outcome: ${{ steps.lint.outcome }}"
-          echo "Build outcome: ${{ steps.build.outcome }}"
-          exit 1
+        run: npm run build
 
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
-      - name: Environment diagnostics
-        run: |
-          node --version | tee node-version.txt
-          npm --version | tee npm-version.txt
+          node-version: 20
       - name: Install dependencies
-        run: npm install 2>&1 | tee npm-install.log
+        run: npm install
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps 2>&1 | tee playwright-install.log
+        run: npx playwright install --with-deps
       - name: Run Playwright tests
-        id: e2e
-        continue-on-error: true
-        run: npm run test:e2e 2>&1 | tee e2e.log
-      - name: Capture Playwright process diagnostics
-        if: always()
-        run: |
-          mkdir -p ci-diagnostics
-          cp node-version.txt npm-version.txt npm-install.log playwright-install.log e2e.log ci-diagnostics/ 2>/dev/null || true
-          cp -r playwright-report ci-diagnostics/playwright-report 2>/dev/null || true
-          cp -r test-results ci-diagnostics/test-results 2>/dev/null || true
-      - name: Upload Playwright diagnostics
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: playwright-diagnostics
-          path: ci-diagnostics/
-          if-no-files-found: warn
-          retention-days: 14
-      - name: Fail if E2E failed
-        if: steps.e2e.outcome == 'failure'
-        run: exit 1
+        run: npm run test:e2e
