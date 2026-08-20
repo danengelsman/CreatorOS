@@ -365,7 +365,7 @@ export default function SupportHub({ user }: { user: any }) {
                     <div className="p-6 bg-[var(--bg-primary)] rounded-2xl border border-[var(--separator)] space-y-4">
                       <div className="flex items-center justify-between border-b border-[var(--separator)]/50 pb-4">
                          <div className="flex items-center gap-3">
-                            <img src={selectedTicket.userData?.photoURL} alt="" className="w-10 h-10 rounded-full grayscale opacity-50 animate-fade-in" />
+                            <img loading="lazy" src={selectedTicket.userData?.photoURL} alt="" className="w-10 h-10 rounded-full grayscale opacity-50 animate-fade-in" />
                             <div>
                               <p className="text-[13px] font-bold">{selectedTicket.userData?.displayName}</p>
                               <p className="text-[11px] text-[var(--label-secondary)]">{selectedTicket.userData?.email}</p>

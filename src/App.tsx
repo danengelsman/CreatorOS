@@ -33,31 +33,31 @@ import { auth, onAuthStateChanged, db, logout, FirebaseUser, handleFirestoreErro
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
 
 // Components
-import Dashboard from './components/Dashboard';
-import ContentStudio from './components/ContentStudio';
-import ContentRepurposer from './components/ContentRepurposer';
-import BrandingEngine from './components/BrandingEngine';
-import VideoIdeas from './components/VideoIdeas';
-import Roadmap from './components/Roadmap';
-import Community from './components/Community';
-import Reports from './components/Reports';
-import PerfectPromptCopilot from './components/PerfectPromptCopilot';
-import Profile from './components/Profile';
-import Login from './components/Login';
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
+const ContentStudio = React.lazy(() => import('./components/ContentStudio'));
+const ContentRepurposer = React.lazy(() => import('./components/ContentRepurposer'));
+const BrandingEngine = React.lazy(() => import('./components/BrandingEngine'));
+const VideoIdeas = React.lazy(() => import('./components/VideoIdeas'));
+const Roadmap = React.lazy(() => import('./components/Roadmap'));
+const Community = React.lazy(() => import('./components/Community'));
+const Reports = React.lazy(() => import('./components/Reports'));
+const PerfectPromptCopilot = React.lazy(() => import('./components/PerfectPromptCopilot'));
+const Profile = React.lazy(() => import('./components/Profile'));
+const Login = React.lazy(() => import('./components/Login'));
 import LoadingScreen from './components/LoadingScreen';
 import BrandIcon from './components/BrandIcon';
 // Remove IdentityIcons to use Phosphor directly
-import Onboarding from './components/Onboarding';
-import PrivacyPolicy from './components/PrivacyPolicy';
-import TermsOfService from './components/TermsOfService';
-import LandingPage from './components/LandingPage';
-import HelpCenter from './components/HelpCenter';
-import HelpArticle from './components/HelpArticle';
-import CreatorHub from './components/CreatorHub';
-import SupportHub from './components/SupportHub';
-import FirstDollarDashboard from './components/FirstDollarDashboard';
-import RetentionHookLab from './components/RetentionHookLab';
-import VideoAnalyzer from './components/VideoAnalyzer';
+const Onboarding = React.lazy(() => import('./components/Onboarding'));
+const PrivacyPolicy = React.lazy(() => import('./components/PrivacyPolicy'));
+const TermsOfService = React.lazy(() => import('./components/TermsOfService'));
+const LandingPage = React.lazy(() => import('./components/LandingPage'));
+const HelpCenter = React.lazy(() => import('./components/HelpCenter'));
+const HelpArticle = React.lazy(() => import('./components/HelpArticle'));
+const CreatorHub = React.lazy(() => import('./components/CreatorHub'));
+const SupportHub = React.lazy(() => import('./components/SupportHub'));
+const FirstDollarDashboard = React.lazy(() => import('./components/FirstDollarDashboard'));
+const RetentionHookLab = React.lazy(() => import('./components/RetentionHookLab'));
+const VideoAnalyzer = React.lazy(() => import('./components/VideoAnalyzer'));
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 const NAV_ITEMS = [

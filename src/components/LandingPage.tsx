@@ -22,8 +22,14 @@ import {
   Clock,
   ArrowCircleUp,
   User,
-  CaretDown,
-  Envelope
+  Plus,
+  Envelope,
+  Code,
+  CookingPot,
+  ChartLineUp,
+  Drop,
+  PaintBrush,
+  GraduationCap
 } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import BrandIcon from './BrandIcon';
@@ -153,6 +159,9 @@ interface LandingPageProps {
 }
 
 export default function LandingPage({ navigate }: LandingPageProps) {
+  // A/B test state for headline (50/50 split)
+  const [headlineVariant] = useState<'A' | 'B'>(() => Math.random() > 0.5 ? 'B' : 'A');
+
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -178,7 +187,29 @@ export default function LandingPage({ navigate }: LandingPageProps) {
       setIsScrolled(window.scrollY > 20);
     };
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    // Smooth scroll for anchor links
+    const handleAnchorClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a[href^="#"]');
+      if (anchor) {
+        e.preventDefault();
+        const targetId = anchor.getAttribute('href');
+        if (targetId && targetId !== '#') {
+          const targetElement = document.querySelector(targetId);
+          if (targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth' });
+            setIsMobileMenuOpen(false);
+          }
+        }
+      }
+    };
+    document.addEventListener('click', handleAnchorClick);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('click', handleAnchorClick);
+    };
   }, []);
 
   const handleSignIn = () => {
@@ -217,7 +248,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
       <nav className={cn(
         "fixed top-0 left-0 right-0 z-[100] transition-all duration-300 px-6 h-16 flex items-center",
         isScrolled 
-          ? "bg-[var(--bg-material-thick)] backdrop-blur-xl border-b border-[var(--separator)] shadow-sm" 
+          ? "bg-[var(--bg-primary)]/70 backdrop-blur-2xl border-b border-[var(--separator)] shadow-sm saturate-150" 
           : "bg-transparent border-b border-transparent"
       )}>
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
@@ -357,7 +388,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
       </AnimatePresence>
 
       {/* Hero Section */}
-      <section className="relative pt-36 pb-20 px-6 overflow-hidden">
+      <section className="relative pt-[160px] pb-[100px] px-6 overflow-hidden">
         {/* Abstract Glowing ambient orbs */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[var(--accent)] rounded-full filter blur-[150px] opacity-[0.08] pointer-events-none" />
         <div className="absolute top-10 right-10 w-[300px] h-[300px] bg-[#5856D6] rounded-full filter blur-[120px] opacity-[0.06] pointer-events-none" />
@@ -380,10 +411,19 @@ export default function LandingPage({ navigate }: LandingPageProps) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-serif text-[48px] sm:text-[76px] md:text-[104px] font-extrabold tracking-[-0.03em] text-[var(--label-primary)] leading-[1.0] text-balance"
+            className="font-serif text-[48px] sm:text-[76px] md:text-[104px] font-extrabold tracking-[-0.03em] text-[var(--label-primary)] leading-[1.05] text-balance"
           >
-            Plan, write, and <br className="hidden sm:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent)] via-[#5856D6] to-[var(--accent)]">grow your channel</span>.
+            {headlineVariant === 'A' ? (
+              <>
+                Plan, write, and <br className="hidden sm:block" />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-amber-400 animate-gradient-x">grow your channel</span>.
+              </>
+            ) : (
+              <>
+                The AI studio behind <br className="hidden sm:block" />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-amber-400 animate-gradient-x">1.2M scripts</span>.
+              </>
+            )}
           </motion.h1>
 
           <motion.p 
@@ -444,13 +484,14 @@ export default function LandingPage({ navigate }: LandingPageProps) {
       </section>
 
       {/* Interactive Style Planner Sandbox */}
-      <section id="sandbox" className="py-24 px-6 bg-[var(--bg-secondary)]/40 relative border-y border-[var(--separator)]">
-        <div className="max-w-7xl mx-auto">
+      <section id="sandbox" className="pt-[140px] pb-[100px] px-6 bg-[var(--bg-secondary)]/40 relative border-y border-[var(--separator)] overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[var(--accent)] rounded-full filter blur-[200px] opacity-[0.08] pointer-events-none" />
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
             <span className="inline-block px-3 py-1 bg-[var(--accent)]/10 text-[var(--accent)] text-xs font-bold rounded-full uppercase tracking-widest">
               Live Style Planner
             </span>
-            <h2 className="font-serif text-[38px] sm:text-[54px] md:text-[64px] font-extrabold tracking-[-0.03em] leading-[1.05] text-[var(--label-primary)]">
+            <h2 className="font-serif text-[38px] sm:text-[54px] md:text-[64px] font-extrabold tracking-[-0.03em] leading-[1.1] text-[var(--label-primary)]">
               Find your video style in seconds.
             </h2>
             <p className="text-[16px] sm:text-[18px] text-[var(--label-secondary)] font-medium leading-relaxed">
@@ -468,9 +509,9 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                   </label>
                   <div className="grid grid-cols-1 gap-2.5">
                     {[
-                      { id: 'tech', label: '💻 Technology & Coding Tips' },
-                      { id: 'cooking', label: '🍳 Cooking & Delicious Recipes' },
-                      { id: 'finance', label: '📈 Personal Finance & Savings' }
+                      { id: 'tech', label: 'Technology & Coding Tips', icon: <Code size={18} className="mr-2" /> },
+                      { id: 'cooking', label: 'Cooking & Delicious Recipes', icon: <CookingPot size={18} className="mr-2" /> },
+                      { id: 'finance', label: 'Personal Finance & Savings', icon: <ChartLineUp size={18} className="mr-2" /> }
                     ].map(niche => (
                       <button
                         key={niche.id}
@@ -482,7 +523,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                             : "bg-[var(--bg-secondary)] text-[var(--label-primary)] border-[var(--separator)] hover:bg-[var(--bg-secondary)]/80"
                         )}
                       >
-                        <span>{niche.label}</span>
+                        <span className="flex items-center">{niche.icon}{niche.label}</span>
                         {selectedNiche === niche.id && <Check size={16} weight="bold" />}
                       </button>
                     ))}
@@ -495,20 +536,21 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                   </label>
                   <div className="flex flex-wrap gap-2.5">
                     {[
-                      { id: 'calm', label: '🧘 Soft & Peaceful' },
-                      { id: 'bold', label: '🎭 Bright & Bold' },
-                      { id: 'educational', label: '🎓 Simple & Educational' }
+                      { id: 'calm', label: 'Soft & Peaceful', icon: <Drop size={16} className="mr-1 inline" /> },
+                      { id: 'bold', label: 'Bright & Bold', icon: <PaintBrush size={16} className="mr-1 inline" /> },
+                      { id: 'educational', label: 'Simple & Educational', icon: <GraduationCap size={16} className="mr-1 inline" /> }
                     ].map(vibe => (
                       <button
                         key={vibe.id}
                         onClick={() => handleSandboxChange(selectedNiche, vibe.id)}
                         className={cn(
-                          "px-5 py-3 rounded-xl text-[14px] font-semibold border transition-all flex-1 text-center whitespace-nowrap",
+                          "px-5 py-3 rounded-xl text-[14px] font-semibold border transition-all flex-1 text-center whitespace-nowrap flex justify-center items-center",
                           selectedVibe === vibe.id
                             ? "bg-[var(--label-primary)] text-[var(--bg-primary)] border-[var(--label-primary)]"
                             : "bg-[var(--bg-secondary)] text-[var(--label-secondary)] border-[var(--separator)] hover:bg-[var(--bg-secondary)]/80"
                         )}
                       >
+                        {vibe.icon}
                         {vibe.label}
                       </button>
                     ))}
@@ -533,7 +575,14 @@ export default function LandingPage({ navigate }: LandingPageProps) {
 
             {/* Sandbox Live Mockup Card (Right) */}
             <div className="lg:col-span-7 flex flex-col justify-center">
-              <div className="bg-[var(--bg-tertiary)] p-6 sm:p-8 rounded-[32px] border border-[var(--separator)] shadow-xl relative overflow-hidden min-h-[500px] flex flex-col justify-between">
+              <div className="bg-[var(--bg-tertiary)] pt-14 p-6 sm:p-8 rounded-[32px] border border-[var(--separator)] shadow-xl relative overflow-hidden min-h-[500px] flex flex-col justify-between">
+                
+                {/* macOS Window Chrome Dots */}
+                <div className="absolute top-5 left-6 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]" />
+                  <div className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]" />
+                  <div className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]" />
+                </div>
                 
                 {/* Loader overlay */}
                 <AnimatePresence>
@@ -632,13 +681,15 @@ export default function LandingPage({ navigate }: LandingPageProps) {
       </section>
 
       {/* Detailed Bento Features Grid */}
-      <section id="features" className="py-24 px-6 relative">
-        <div className="max-w-7xl mx-auto">
+      <section id="features" className="pt-[140px] pb-[100px] px-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[var(--accent)] rounded-full filter blur-[150px] opacity-[0.08] pointer-events-none translate-x-1/3 -translate-y-1/3" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-[var(--accent)] rounded-full filter blur-[150px] opacity-[0.08] pointer-events-none -translate-x-1/3 translate-y-1/3" />
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center max-w-3xl mx-auto mb-20 space-y-4">
             <span className="inline-block px-3 py-1 bg-[#5856D6]/10 text-[#5856D6] text-xs font-bold rounded-full uppercase tracking-widest">
               Everything You Need
             </span>
-            <h2 className="font-serif text-[38px] sm:text-[54px] md:text-[64px] font-extrabold tracking-[-0.03em] leading-[1.05] text-[var(--label-primary)]">
+            <h2 className="font-serif text-[38px] sm:text-[54px] md:text-[64px] font-extrabold tracking-[-0.03em] leading-[1.1] text-[var(--label-primary)]">
               Built to make video creation simple.
             </h2>
             <p className="text-[16px] sm:text-[18px] text-[var(--label-secondary)] font-medium leading-relaxed">
@@ -649,7 +700,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             
             {/* Feature 1: Identity Architect */}
-            <div className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] shadow-sm hover:shadow-md transition-all group">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Palette size={24} weight="duotone" />
@@ -664,10 +715,10 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={handleSignIn}>
                 Learn how it works <ChevronRight size={12} weight="bold" />
               </div>
-            </div>
+            </motion.div>
 
             {/* Feature 2: Studio Workflow & Script Scoring */}
-            <div className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] shadow-sm hover:shadow-md transition-all group">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Sparkle size={24} weight="duotone" />
@@ -682,10 +733,10 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={handleSignIn}>
                 View writing features <ChevronRight size={12} weight="bold" />
               </div>
-            </div>
+            </motion.div>
 
             {/* Feature 3: Habit Tracking & 30-Day challenge */}
-            <div className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] shadow-sm hover:shadow-md transition-all group">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Clock size={24} weight="duotone" />
@@ -700,10 +751,10 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={() => navigate?.('/roadmap')}>
                 Explore the challenge <ChevronRight size={12} weight="bold" />
               </div>
-            </div>
+            </motion.div>
 
             {/* Feature 4: Centralized Creator Hub */}
-            <div className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] shadow-sm hover:shadow-md transition-all group">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-sky-500/10 text-sky-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Globe size={24} weight="duotone" />
@@ -718,10 +769,10 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={handleSignIn}>
                 Learn about calendars <ChevronRight size={12} weight="bold" />
               </div>
-            </div>
+            </motion.div>
 
             {/* Feature 5: Real-time Analytics Intelligence */}
-            <div className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] shadow-sm hover:shadow-md transition-all group">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <TrendingUp size={24} weight="duotone" />
@@ -736,10 +787,10 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={handleSignIn}>
                 View progress features <ChevronRight size={12} weight="bold" />
               </div>
-            </div>
+            </motion.div>
 
             {/* Feature 6: Interactive Prompt Architect */}
-            <div className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] shadow-sm hover:shadow-md transition-all group">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-[#5856D6]/10 text-[#5856D6] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <ChatCircleText size={24} weight="duotone" />
@@ -754,20 +805,21 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={handleSignIn}>
                 Try writing settings <ChevronRight size={12} weight="bold" />
               </div>
-            </div>
+            </motion.div>
 
           </div>
         </div>
       </section>
 
       {/* Interactive Pricing Grid */}
-      <section id="pricing" className="py-24 px-6 border-t border-[var(--separator)]">
-        <div className="max-w-6xl mx-auto">
+      <section id="pricing" className="pt-[140px] pb-[100px] px-6 border-t border-[var(--separator)] relative overflow-hidden">
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[500px] bg-[var(--accent)] rounded-[100%] filter blur-[150px] opacity-[0.08] pointer-events-none" />
+        <div className="max-w-6xl mx-auto relative z-10">
           <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
             <span className="inline-block px-3 py-1 bg-emerald-500/10 text-emerald-500 text-xs font-bold rounded-full uppercase tracking-widest">
               Friendly Plans
             </span>
-            <h2 className="font-serif text-[38px] sm:text-[54px] md:text-[64px] font-extrabold tracking-[-0.03em] leading-[1.05] text-[var(--label-primary)]">
+            <h2 className="font-serif text-[38px] sm:text-[54px] md:text-[64px] font-extrabold tracking-[-0.03em] leading-[1.1] text-[var(--label-primary)]">
               Simple plans for every writer.
             </h2>
             <p className="text-[16px] sm:text-[18px] text-[var(--label-secondary)] font-medium leading-relaxed">
@@ -959,13 +1011,13 @@ export default function LandingPage({ navigate }: LandingPageProps) {
       </section>
 
       {/* FAQ Accordion Section */}
-      <section className="py-24 px-6 bg-[var(--bg-secondary)]/20 border-t border-[var(--separator)]">
+      <section className="pt-[140px] pb-[100px] px-6 bg-[var(--bg-secondary)]/20 border-t border-[var(--separator)]">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16 space-y-3">
             <span className="inline-block px-3 py-1 bg-amber-500/10 text-amber-500 text-xs font-bold rounded-full uppercase tracking-widest">
               Common Questions
             </span>
-            <h2 className="font-serif text-[38px] sm:text-[54px] md:text-[64px] font-extrabold tracking-[-0.03em] leading-[1.05] text-[var(--label-primary)]">
+            <h2 className="font-serif text-[38px] sm:text-[54px] md:text-[64px] font-extrabold tracking-[-0.03em] leading-[1.1] text-[var(--label-primary)]">
               Frequently Asked Questions
             </h2>
             <p className="text-[16px] text-[var(--label-secondary)] font-medium">
@@ -986,11 +1038,11 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                       {faq.q}
                     </span>
                     <motion.div
-                      animate={{ rotate: isExpanded ? 180 : 0 }}
+                      animate={{ rotate: isExpanded ? 45 : 0 }}
                       transition={{ type: "spring", stiffness: 300, damping: 20 }}
                       className="text-[var(--label-tertiary)] flex-shrink-0"
                     >
-                      <CaretDown size={18} weight="bold" />
+                      <Plus size={18} weight="bold" />
                     </motion.div>
                   </button>
 
@@ -1000,7 +1052,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.25, ease: "easeInOut" }}
+                        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                         className="overflow-hidden bg-[var(--bg-secondary)]/20"
                       >
                         <p className="p-6 pt-0 text-[15px] text-[var(--label-secondary)] leading-relaxed font-medium">
@@ -1017,7 +1069,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
       </section>
 
       {/* Pre-sales Guest Support Form */}
-      <section className="py-24 px-6 border-t border-[var(--separator)]">
+      <section className="pt-[140px] pb-[100px] px-6 border-t border-[var(--separator)]">
         <div className="max-w-3xl mx-auto">
           <div className="bg-[var(--bg-tertiary)] rounded-[40px] border border-[var(--separator)] p-8 sm:p-12 shadow-xl relative overflow-hidden">
             <div className="absolute -top-12 -right-12 w-32 h-32 bg-[var(--accent)] rounded-full filter blur-[50px] opacity-15 pointer-events-none" />
@@ -1026,7 +1078,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               <div className="w-12 h-12 bg-[var(--accent)]/10 text-[var(--accent)] rounded-2xl flex items-center justify-center mx-auto">
                 <Envelope size={24} weight="duotone" />
               </div>
-              <h3 className="font-serif text-[32px] sm:text-[38px] font-extrabold tracking-[-0.03em] leading-[1.05]">Have a question?</h3>
+              <h3 className="font-serif text-[32px] sm:text-[38px] font-extrabold tracking-[-0.03em] leading-[1.1]">Have a question?</h3>
               <p className="text-[15px] text-[var(--label-secondary)] font-medium">
                 We are here to help! Our team typically replies within an hour. Send us your question below.
               </p>

@@ -50,6 +50,22 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+
+function formatGeminiError(error) {
+  let errorMessage = error.message || 'Unknown API Error';
+  try {
+    const parsed = JSON.parse(errorMessage);
+    if (parsed.error && parsed.error.message) {
+      errorMessage = parsed.error.message;
+    }
+  } catch (e) {}
+
+  if (errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('prepayment credits are depleted') || error.status === 429) {
+    return 'Your API credits are depleted. Please go to AI Studio to manage your billing settings.';
+  }
+  return errorMessage;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -191,7 +207,7 @@ async function startServer() {
       res.json({ text: response.text });
     } catch (error: any) {
       console.error('Video Analysis Error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: formatGeminiError(error) });
     }
   });
 
@@ -206,7 +222,39 @@ async function startServer() {
       res.json({ text: response.text, candidates: response.candidates });
     } catch (error: any) {
       console.error('Gemini Generate Error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: formatGeminiError(error) });
+    }
+  });
+
+  app.post("/api/gemini/generate-image", async (req: any, res) => {
+    try {
+      const { prompt, aspectRatio } = req.body;
+      const response = await (await getAI()).models.generateContent({
+        model: 'gemini-3.1-flash-lite-image',
+        contents: {
+          parts: [{ text: prompt }]
+        },
+        config: {
+          imageConfig: {
+            aspectRatio: aspectRatio || "1:1",
+          }
+        }
+      });
+      let base64EncodeString = '';
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          base64EncodeString = part.inlineData.data;
+          break;
+        }
+      }
+      if (!base64EncodeString) {
+        throw new Error('No image generated');
+      }
+      const imageUrl = `data:image/png;base64,${base64EncodeString}`;
+      res.json({ imageUrl });
+    } catch (error: any) {
+      console.error('Gemini Generate Image Error:', error);
+      res.status(500).json({ error: formatGeminiError(error) });
     }
   });
 
@@ -272,7 +320,7 @@ async function startServer() {
       res.json(JSON.parse(response.text));
     } catch (error: any) {
       console.error('Onboarding Chat Error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: formatGeminiError(error) });
     }
   });
 
@@ -335,7 +383,7 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
       res.json(JSON.parse(response.text));
     } catch (error: any) {
       console.error('Generate Brand kit Error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: formatGeminiError(error) });
     }
   });
 
@@ -359,7 +407,7 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
       res.json({ operationName: interaction.id });
     } catch (error: any) {
       console.error('Video Generation Error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: formatGeminiError(error) });
     }
   });
 
@@ -393,7 +441,7 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
       });
     } catch (error: any) {
       console.error('Video Status Error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: formatGeminiError(error) });
     }
   });
 
@@ -413,7 +461,7 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
       );
     } catch (error: any) {
       console.error('Video Download Error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: formatGeminiError(error) });
     }
   });
 

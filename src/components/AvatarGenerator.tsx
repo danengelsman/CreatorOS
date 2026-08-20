@@ -261,7 +261,7 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
                   >
                     {referenceImage ? (
                       <>
-                        <img src={referenceImage} alt="Reference" className="w-full h-full object-cover" />
+                        <img loading="lazy" src={referenceImage} alt="Reference" className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <RefreshCw className="w-8 h-8 text-white" strokeWidth={1.5} />
                         </div>
@@ -374,7 +374,7 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
                       animate={{ opacity: 1, scale: 1 }}
                       className="group relative aspect-square rounded-[32px] overflow-hidden bg-[var(--bg-primary)] shadow-sm hover:shadow-xl transition-all border border-[var(--separator)]"
                     >
-                      <img src={avatar.url} alt="AI Avatar" className="w-full h-full object-cover" />
+                      <img loading="lazy" src={avatar.url} alt="AI Avatar" className="w-full h-full object-cover" />
                       
                       {avatar.isActive && (
                         <div className="absolute top-4 right-4 px-3 py-1 bg-[var(--system-green)] text-white text-[10px] font-bold rounded-full shadow-lg flex items-center gap-1">

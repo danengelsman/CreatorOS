@@ -646,6 +646,30 @@ Draft Hook / Intro Script to Analyze:
 };
 
 
+export const generateBrandLogo = async (prompt: string, aspectRatio: string = "1:1") => {
+  const response = await fetch('/api/gemini/generate-image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt,
+      aspectRatio
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    try {
+      const errJson = JSON.parse(errText);
+      throw new Error(errJson.error || 'Failed to generate image');
+    } catch (e) {
+      throw new Error(errText);
+    }
+  }
+
+  const data = await response.json();
+  return data.imageUrl;
+};
+
 export const analyzeVideo = async (file: File, analysisType: 'summary' | 'flashcards' | 'marketing') => {
   let prompt = '';
   if (analysisType === 'summary') {
@@ -668,6 +692,43 @@ export const analyzeVideo = async (file: File, analysisType: 'summary' | 'flashc
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(errorData.error || 'Failed to analyze video');
+  }
+
+  const data = await response.json();
+  return data.text;
+};
+
+export const generateStyleGuideSummary = async (brandData: any) => {
+  const prompt = `You are an expert Brand Architect. Based on the following brand kit data, write a beautifully formatted, concise PDF-style Brand Guidelines document in Markdown.
+
+Brand Name: ${brandData.name}
+Tagline: ${brandData.tagline}
+Archetype: ${brandData.archetype}
+Personality: ${brandData.personality}
+Visual Style: ${brandData.visual_style}
+Colors: Primary (${brandData.colors?.primary}), Secondary (${brandData.colors?.secondary}), Accent (${brandData.colors?.accent}), Background (${brandData.colors?.background})
+Typography: Heading (${brandData.typography?.heading}), Body (${brandData.typography?.body})
+
+Structure it professionally with these sections:
+1. Brand Core (Mission & Personality)
+2. Visual Identity (Colors & Typography instructions)
+3. Voice & Tone (How to speak to the audience)
+4. Usage Guidelines (Best practices)
+
+Keep it highly scannable, elegant, and ready to be used as a source of truth by designers and writers.`;
+
+  const response = await fetch('/api/gemini/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to generate style guide summary');
   }
 
   const data = await response.json();
