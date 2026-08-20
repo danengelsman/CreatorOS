@@ -1,3 +1,4 @@
+import { apiFetch } from "../firebase";
 import React, { useState, useRef, useEffect } from 'react';
 import { PaperPlaneRight as Send, CheckCircle as CheckCircle2, ArrowsClockwise as RefreshCw, TextT as Type, Hash, Image as ImageIcon, CaretRight as ChevronRight, DownloadSimple as Download, Microphone as Mic, SpeakerHigh as Volume2, SpeakerSlash, Rewind, FastForward, VideoCamera as VideoIcon, Play, CircleNotch as Loader2, FloppyDisk as Save, Sparkle as Sparkles, MagnifyingGlass as Search, GearSix as Settings, DotsThree as MoreHorizontal, Lightbulb, Article, FilmScript, LockKey, Plus, TrendUp, X, Lightning } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -123,9 +124,17 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
 
   const handleDownloadVideo = async (url: string, title: string) => {
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Video not found');
-      const blob = await response.blob();
+      let blob: Blob;
+      if (url.startsWith('local:')) {
+        const localBlob = await localforage.getItem<Blob>(url);
+        if (!localBlob) throw new Error('Local video not found');
+        blob = localBlob;
+      } else {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Video not found');
+        blob = await response.blob();
+      }
+      
       const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
@@ -277,7 +286,7 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
     setIsPolishing(true);
     showToast(`Formatting for ${label}...`);
     try {
-      const response = await fetch('/api/gemini/generate', {
+      const response = await apiFetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -302,7 +311,7 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
     setIsPolishing(true);
     showToast('Generating hashtags...');
     try {
-      const response = await fetch('/api/gemini/generate', {
+      const response = await apiFetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -338,7 +347,7 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
     reader.onloadend = async () => {
       const base64Image = (reader.result as string).split(',')[1];
       try {
-        const response = await fetch('/api/gemini/generate', {
+        const response = await apiFetch('/api/gemini/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -374,7 +383,7 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
     setIsPolishing(true);
     showToast('Generating detailed video script...');
     try {
-      const response = await fetch('/api/gemini/generate', {
+      const response = await apiFetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1098,7 +1107,7 @@ ${body}`
                     videoHistory.map(item => (
                        <div key={item.id} onClick={() => setActivePreviewVideo(item)} className="p-3 flex items-center gap-3 hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer group">
                           <div className="relative w-10 h-14 rounded bg-black/10 shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
-                              <video src={item.url} className="w-full h-full object-cover" />
+                              <video src={item.url || undefined} className="w-full h-full object-cover" />
                               <div className="absolute inset-0 bg-black/35 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                  <Play size={12} weight="fill" className="text-white" />
                               </div>

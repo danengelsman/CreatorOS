@@ -93,7 +93,7 @@ export default function Profile({ user, userData, brand }: { user: FirebaseUser,
             <div className="relative w-32 h-32 rounded-3xl overflow-hidden ios-elevated border-4 border-white/10 flex items-center justify-center bg-[var(--bg-tertiary)]">
               {(userData?.photoURL || user?.photoURL) ? (
                 <img 
-                  src={userData?.photoURL || user?.photoURL} 
+                  src={userData?.photoURL || user?.photoURL || undefined} 
                   alt={userData?.displayName || user?.displayName || 'User'} 
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"

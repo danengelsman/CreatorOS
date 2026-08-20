@@ -158,25 +158,22 @@ export async function authorizedFetch(url: string, options: RequestInit = {}) {
  * functions use fetch() directly, so install a narrow browser interceptor that
  * attaches the current Firebase ID token only to /api/gemini/* requests.
  */
-if (typeof window !== 'undefined') {
-  const nativeFetch = window.fetch.bind(window);
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-    if (!requestUrl.startsWith('/api/gemini/')) {
-      return nativeFetch(input, init);
-    }
+export async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+  if (!requestUrl.startsWith('/api/gemini/')) {
+    return fetch(input, init);
+  }
 
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
 
-    const token = (await user.getIdToken()).replace(/[\r\n\t]/g, '').trim();
-    const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
-    headers.set('Authorization', `Bearer ${token}`);
+  const token = (await user.getIdToken()).replace(/[\r\n\t]/g, '').trim();
+  const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+  headers.set('Authorization', `Bearer ${token}`);
 
-    return nativeFetch(input, { ...init, headers });
-  };
+  return fetch(input, { ...init, headers });
 }
 
 export { onAuthStateChanged, serverTimestamp, updateProfile };

@@ -134,8 +134,8 @@ export default function CreatorHub({ projects = [] }: { projects: any[] }) {
             </div>
 
             <div className="grid grid-cols-7 gap-1">
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
-                <div key={day} className="text-center text-[11px] font-bold text-[var(--label-tertiary)] pb-4">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                <div key={i} className="text-center text-[11px] font-bold text-[var(--label-tertiary)] pb-4">
                   {day}
                 </div>
               ))}
