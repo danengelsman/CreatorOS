@@ -21,7 +21,7 @@ export default function Community({ user, userData, setActiveTab }: { user: any,
           <section className="bg-[var(--bg-tertiary)] ios-card p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] overflow-hidden flex-shrink-0">
               {(userData?.photoURL || user?.photoURL) ? (
-                <img src={userData?.photoURL || user?.photoURL} alt={userData?.displayName || user?.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img loading="lazy" src={userData?.photoURL || user?.photoURL} alt={userData?.displayName || user?.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
                 <Users className="w-5 h-5 text-[var(--label-tertiary)] m-2.5" strokeWidth={1.5} />
               )}
@@ -92,7 +92,7 @@ export default function Community({ user, userData, setActiveTab }: { user: any,
                   <div key={i} className="p-4 flex items-center justify-between active:bg-[var(--separator)] transition-colors cursor-pointer">
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <img 
+                        <img loading="lazy" 
                           src={user.avatar} 
                           alt={user.name} 
                           className="w-10 h-10 rounded-full object-cover"

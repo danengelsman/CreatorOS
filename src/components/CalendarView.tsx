@@ -1124,7 +1124,7 @@ Return your response strictly in the following JSON format:
                 <div className="border-t border-[var(--separator)]/60 pt-6 space-y-4">
                   <div className="flex items-center gap-2">
                     <CloudUpload size={18} className="text-[var(--accent)]" />
-                    <h4 className="text-[15px] font-bold text-[var(--label-primary)]">🚀 Push and Sync to Connected Social Networks</h4>
+                    <h4 className="text-[15px] font-bold text-[var(--label-primary)]">Push and Sync to Connected Social Networks</h4>
                   </div>
                   <p className="text-[12px] text-[var(--label-secondary)] font-medium leading-relaxed">
                     Instantly push this scheduled content block to your connected social channels via OAuth.
@@ -1279,7 +1279,7 @@ Return your response strictly in the following JSON format:
                                         </div>
                                       ) : (
                                         <span className="text-red-500 font-bold flex items-center gap-1">
-                                          ❌ Failed: {res.message}
+                                          <AlertCircle size={12} /> Failed: {res.message}
                                         </span>
                                       )}
                                     </div>
@@ -1298,7 +1298,7 @@ Return your response strictly in the following JSON format:
                 <div className="border-t border-[var(--separator)]/60 pt-6 space-y-4">
                   <div className="flex items-center gap-2">
                     <Sparkles size={18} className="text-[var(--accent)]" />
-                    <h4 className="text-[15px] font-bold text-[var(--label-primary)]">✨ Reformat for Multiple Platforms with AI</h4>
+                    <h4 className="text-[15px] font-bold text-[var(--label-primary)]">Reformat for Multiple Platforms with AI</h4>
                   </div>
                   <p className="text-[12px] text-[var(--label-secondary)] font-medium leading-relaxed">
                     Instantly rewrite and format this content block into separate native drafts for your other social channels using Gemini.

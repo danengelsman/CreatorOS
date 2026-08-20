@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CircleNotch as Loader2, VideoCamera, Clock, User, Sparkle, Image as ImageIcon, TextAa, Faders, ClockCounterClockwise } from '@phosphor-icons/react';
+import { CircleNotch as Loader2, VideoCamera, Clock, User, Sparkle, Image as ImageIcon, TextAa, Faders, ClockCounterClockwise, Lightning } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import { generateVideo, getOperationStatus } from '../services/gemini';
 import CustomVideoPlayer from './CustomVideoPlayer';
@@ -324,8 +324,8 @@ export default function VideoStudio({ body, title, platform, brand, showToast, u
                     Reset to Auto
                   </button>
                 ) : (
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] font-medium">
-                    ⚡ Auto-Generated
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] font-medium flex items-center gap-1">
+                    <Lightning size={12} weight="fill" /> Auto-Generated
                   </span>
                 )}
               </div>

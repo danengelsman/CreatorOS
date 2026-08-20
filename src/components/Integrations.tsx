@@ -186,7 +186,7 @@ export default function Integrations() {
                   )}
                   {isVerified && (
                     <div className="w-10 h-10 rounded-full bg-[var(--bg-primary)] overflow-hidden border border-white/5">
-                      <img 
+                      <img loading="lazy" 
                         src={account?.profile?.picture || `https://ui-avatars.com/api/?name=${platform.name}`} 
                         alt="" 
                         className="w-full h-full object-cover"

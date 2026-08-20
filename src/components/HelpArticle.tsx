@@ -13,7 +13,7 @@ const ARTICLES: Record<string, { title: string; version: string; content: React.
         
         <div className="bg-[var(--bg-secondary)] rounded-2xl overflow-hidden border border-[var(--separator)]">
           <div className="aspect-video bg-black/5 flex flex-col items-center justify-center relative">
-            <img src="https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=800&q=80" alt="Getting Started Dashboard" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
+            <img loading="lazy" src="https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=800&q=80" alt="Getting Started Dashboard" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
             <PlayCircle size={48} className="text-[var(--accent)] z-10 cursor-pointer drop-shadow-md hover:scale-110 transition-transform" weight="fill" />
             <span className="mt-2 font-semibold text-[13px] z-10 text-[var(--label-primary)]">Watch: OS Setup Walkthrough (2:14)</span>
           </div>
@@ -49,7 +49,7 @@ const ARTICLES: Record<string, { title: string; version: string; content: React.
 
         <div className="bg-[var(--bg-secondary)] rounded-2xl overflow-hidden border border-[var(--separator)]">
           <div className="aspect-video bg-black/5 flex flex-col items-center justify-center relative">
-            <img src="https://images.unsplash.com/photo-1561070791-2526d30994b5?auto=format&fit=crop&w=800&q=80" alt="Branding Engine" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
+            <img loading="lazy" src="https://images.unsplash.com/photo-1561070791-2526d30994b5?auto=format&fit=crop&w=800&q=80" alt="Branding Engine" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
             <PlayCircle size={48} className="text-[var(--accent)] z-10 cursor-pointer drop-shadow-md hover:scale-110 transition-transform" weight="fill" />
             <span className="mt-2 font-semibold text-[13px] z-10 text-[var(--label-primary)]">Watch: Designing Your Digital DNA (3:45)</span>
           </div>
@@ -86,7 +86,7 @@ const ARTICLES: Record<string, { title: string; version: string; content: React.
 
         <div className="bg-[var(--bg-secondary)] rounded-2xl overflow-hidden border border-[var(--separator)]">
           <div className="aspect-video bg-black/5 flex flex-col items-center justify-center relative">
-            <img src="https://images.unsplash.com/photo-1542435503-956c469947f6?auto=format&fit=crop&w=800&q=80" alt="Content Studio" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
+            <img loading="lazy" src="https://images.unsplash.com/photo-1542435503-956c469947f6?auto=format&fit=crop&w=800&q=80" alt="Content Studio" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
             <PlayCircle size={48} className="text-[var(--accent)] z-10 cursor-pointer drop-shadow-md hover:scale-110 transition-transform" weight="fill" />
             <span className="mt-2 font-semibold text-[13px] z-10 text-[var(--label-primary)]">Watch: Writing Faster with AI (4:12)</span>
           </div>
@@ -127,7 +127,7 @@ const ARTICLES: Record<string, { title: string; version: string; content: React.
 
         <div className="bg-[var(--bg-secondary)] rounded-2xl overflow-hidden border border-[var(--separator)]">
           <div className="aspect-video bg-black/5 flex flex-col items-center justify-center relative">
-            <img src="https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=800&q=80" alt="Scene Planner" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
+            <img loading="lazy" src="https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=800&q=80" alt="Scene Planner" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
             <PlayCircle size={48} className="text-[var(--accent)] z-10 cursor-pointer drop-shadow-md hover:scale-110 transition-transform" weight="fill" />
             <span className="mt-2 font-semibold text-[13px] z-10 text-[var(--label-primary)]">Watch: Automated Shot Lists (2:50)</span>
           </div>
@@ -163,7 +163,7 @@ const ARTICLES: Record<string, { title: string; version: string; content: React.
 
         <div className="bg-[var(--bg-secondary)] rounded-2xl overflow-hidden border border-[var(--separator)]">
           <div className="aspect-video bg-black/5 flex flex-col items-center justify-center relative">
-            <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80" alt="Retention Lab" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
+            <img loading="lazy" src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80" alt="Retention Lab" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
             <PlayCircle size={48} className="text-[var(--accent)] z-10 cursor-pointer drop-shadow-md hover:scale-110 transition-transform" weight="fill" />
             <span className="mt-2 font-semibold text-[13px] z-10 text-[var(--label-primary)]">Watch: Fixing Your Hooks (5:10)</span>
           </div>
@@ -192,7 +192,7 @@ const ARTICLES: Record<string, { title: string; version: string; content: React.
 
         <div className="bg-[var(--bg-secondary)] rounded-2xl overflow-hidden border border-[var(--separator)]">
           <div className="aspect-video bg-black/5 flex flex-col items-center justify-center relative">
-            <img src="https://images.unsplash.com/photo-1600132806370-bf17e65e942f?auto=format&fit=crop&w=800&q=80" alt="Video Studio" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
+            <img loading="lazy" src="https://images.unsplash.com/photo-1600132806370-bf17e65e942f?auto=format&fit=crop&w=800&q=80" alt="Video Studio" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
             <PlayCircle size={48} className="text-[var(--accent)] z-10 cursor-pointer drop-shadow-md hover:scale-110 transition-transform" weight="fill" />
             <span className="mt-2 font-semibold text-[13px] z-10 text-[var(--label-primary)]">Watch: Prototyping a Video (6:22)</span>
           </div>
@@ -218,7 +218,7 @@ const ARTICLES: Record<string, { title: string; version: string; content: React.
 
         <div className="bg-[var(--bg-secondary)] rounded-2xl overflow-hidden border border-[var(--separator)]">
           <div className="aspect-video bg-black/5 flex flex-col items-center justify-center relative">
-            <img src="https://images.unsplash.com/photo-1553729459-efe14ef6055d?auto=format&fit=crop&w=800&q=80" alt="First Dollar" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
+            <img loading="lazy" src="https://images.unsplash.com/photo-1553729459-efe14ef6055d?auto=format&fit=crop&w=800&q=80" alt="First Dollar" className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay" />
             <PlayCircle size={48} className="text-[var(--accent)] z-10 cursor-pointer drop-shadow-md hover:scale-110 transition-transform" weight="fill" />
             <span className="mt-2 font-semibold text-[13px] z-10 text-[var(--label-primary)]">Watch: Monetizing Your Micro-Audience (4:05)</span>
           </div>

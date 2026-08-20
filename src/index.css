@@ -1,13 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   --font-serif: "Space Grotesk", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  ::selection {
+    background-color: rgba(244, 162, 97, 0.3);
+    color: inherit;
+  }
+
   :root {
     /* iOS Type Scale */
     --text-large-title: 34px;
@@ -19,43 +28,46 @@
     --text-footnote: 13px;
     --text-caption: 12px;
 
-    /* Light Mode Tokens */
-    --bg-primary: #F4EFE6;
-    --bg-secondary: #EBE3D5;
-    --bg-tertiary: #FFFFFF;
-    --label-primary: #2A1F17;
-    --label-secondary: rgba(42,31,23,0.62);
-    --label-tertiary: rgba(42,31,23,0.36);
-    --separator: rgba(42,31,23,0.10);
-    --accent: #B8542C;
-    --system-green: #6B8E4E;
-    --system-orange: #C77D3F;
-    --system-red: #A0432A;
+    /* Base Dark Mode Tokens */
+    --bg-primary: #050507;
+    --bg-secondary: #0c0c12;
+    --bg-tertiary: #161622;
+    --label-primary: #FFFFFF;
+    --label-secondary: rgba(255,255,255,0.7);
+    --label-tertiary: rgba(255,255,255,0.4);
+    --separator: rgba(255,255,255,0.12);
+    
+    /* System Colors */
+    --accent: rgba(244,162,97,1); /* Warm amber */
+    --system-green: #8FAA6E;
+    --system-orange: #D89B5C;
+    --system-red: #C5644A;
 
     /* Material Backgrounds */
-    --bg-material-thin: rgba(244,239,230,0.72);
-    --bg-material-regular: rgba(244,239,230,0.82);
-    --bg-material-thick: rgba(235,227,213,0.94);
+    --bg-material-thin: rgba(5,5,7,0.72);
+    --bg-material-regular: rgba(5,5,7,0.82);
+    --bg-material-thick: rgba(12,12,18,0.94);
   }
 
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg-primary: #1A1612;
-      --bg-secondary: #25201A;
-      --bg-tertiary: #2E2820;
-      --label-primary: #F4EFE6;
-      --label-secondary: rgba(244,239,230,0.62);
-      --label-tertiary: rgba(244,239,230,0.36);
-      --separator: rgba(244,239,230,0.10);
-      --accent: #D4754A;
+      --bg-primary: #050507;
+      --bg-secondary: #0c0c12;
+      --bg-tertiary: #161622;
+      --label-primary: #FFFFFF;
+      --label-secondary: rgba(255,255,255,0.7);
+      --label-tertiary: rgba(255,255,255,0.4);
+      --separator: rgba(255,255,255,0.12);
+      
+      --accent: rgba(244,162,97,1); /* Warm amber */
       --system-green: #8FAA6E;
       --system-orange: #D89B5C;
       --system-red: #C5644A;
 
       /* Dark Material Backgrounds */
-      --bg-material-thin: rgba(26,22,18,0.72);
-      --bg-material-regular: rgba(26,22,18,0.82);
-      --bg-material-thick: rgba(46,40,32,0.94);
+      --bg-material-thin: rgba(5,5,7,0.72);
+      --bg-material-regular: rgba(5,5,7,0.82);
+      --bg-material-thick: rgba(12,12,18,0.94);
     }
   }
 
@@ -127,6 +139,8 @@
   }
 
   .ios-button-filled {
+    position: relative;
+    overflow: hidden;
     background: linear-gradient(180deg, 
       color-mix(in srgb, var(--accent) 100%, white 8%) 0%, 
       var(--accent) 100%);
@@ -135,6 +149,23 @@
       0 1px 0 rgba(255,255,255,0.15) inset,
       0 1px 2px rgba(0,0,0,0.1);
     letter-spacing: -0.005em;
+  }
+  .ios-button-filled::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 200%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      rgba(255, 255, 255, 0.2) 50%, 
+      transparent 100%);
+    transform: skewX(-20deg);
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ios-button-filled:hover::after {
+    left: 100%;
   }
   .ios-button-filled:active {
     opacity: 0.8;
@@ -160,12 +191,31 @@
     background-color: var(--bg-tertiary);
     border-radius: 14px;
     border: 0.5px solid var(--separator);
+    position: relative;
+    overflow: hidden;
     box-shadow: 
       0 1px 0 rgba(255,255,255,0.04) inset,
       0 1px 3px rgba(0,0,0,0.06),
       0 8px 20px -8px rgba(0,0,0,0.08);
-    transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1),
-                box-shadow 220ms cubic-bezier(0.32, 0.72, 0, 1);
+    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ios-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 30%, transparent), transparent);
+    z-index: 10;
+  }
+  .ios-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 
+      0 1px 0 rgba(255,255,255,0.04) inset,
+      0 4px 12px rgba(0,0,0,0.08),
+      0 16px 32px -8px rgba(0,0,0,0.12);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -175,12 +225,21 @@
         0 1px 3px rgba(0,0,0,0.3),
         0 8px 20px -8px rgba(0,0,0,0.5);
     }
+    .ios-card:hover {
+      box-shadow: 
+        0 1px 0 rgba(255,255,255,0.03) inset,
+        0 4px 12px rgba(0,0,0,0.4),
+        0 16px 32px -8px rgba(0,0,0,0.7);
+    }
   }
 
   .ios-card-clickable {
     cursor: pointer;
-    transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1),
-                box-shadow 220ms cubic-bezier(0.32, 0.72, 0, 1);
+    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ios-card-clickable:hover {
+    transform: translateY(-4px);
   }
   .ios-card-clickable:active {
     transform: scale(0.992) translateY(1px);
@@ -228,7 +287,11 @@
 
 @layer utilities {
   .animate-fade-up {
-    animation: fadeUp 0.4s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+    animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .animate-gradient-x {
+    background-size: 200% auto;
+    animation: gradientX 4s linear infinite;
   }
   .stagger-1 { animation-delay: 100ms; }
   .stagger-2 { animation-delay: 200ms; }
@@ -237,6 +300,14 @@
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes gradientX {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
   }
 }
 
