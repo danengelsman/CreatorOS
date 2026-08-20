@@ -1,5 +1,6 @@
+import { apiFetch } from "../firebase";
 export const generateBrandKit = async (userInput: string) => {
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -71,7 +72,7 @@ export const generateBrandKit = async (userInput: string) => {
 };
 
 export const generateContentIdeas = async (brandData: any) => {
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -120,7 +121,7 @@ export const generateContentIdeas = async (brandData: any) => {
 };
 
 export const scoreContent = async (content: string, brandVoice: string) => {
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -159,7 +160,7 @@ export const scoreContent = async (content: string, brandVoice: string) => {
 };
 
 export const remixContent = async (content: string, instruction: string) => {
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -178,7 +179,7 @@ export const remixContent = async (content: string, instruction: string) => {
 };
 
 export const optimizeSearchTerms = async (content: string, tone: string, audience: string, goal: string) => {
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -201,7 +202,7 @@ export const optimizeSearchTerms = async (content: string, tone: string, audienc
 };
 
 export const quickPolish = async (content: string) => {
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -224,50 +225,48 @@ export const quickPolish = async (content: string) => {
 };
 
 export const repurposeContent = async (content: string) => {
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: "gemini-2.5-flash",
-      contents: `Analyze this content and generate ideas and drafts for repurposed content on TikTok, Twitter, and LinkedIn.
-      Adapt tone and format appropriately for each platform.
+      contents: `Analyze this published content and automatically suggest multiple ways to repurpose it for other platforms (e.g., TikTok, Twitter, LinkedIn).
+      Provide specific, actionable ideas for transforming the content.
+      Include suggested edits, format changes, platform-specific optimizations, and a draft for each idea.
       Content: ${content}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: "OBJECT",
           properties: {
-            tiktok: {
+            platforms: {
               type: "ARRAY",
               items: {
                 type: "OBJECT",
                 properties: {
-                  hook: { type: "STRING" },
-                  script: { type: "STRING" }
-                }
-              }
-            },
-            twitter: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: {
-                  tweet: { type: "STRING" }
-                }
-              }
-            },
-            linkedin: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: {
-                  title: { type: "STRING" },
-                  post: { type: "STRING" }
-                }
+                  platform: { type: "STRING", description: "Platform name (e.g. TikTok, Twitter, LinkedIn)" },
+                  icon: { type: "STRING", description: "A relevant single emoji for the platform" },
+                  color: { type: "STRING", description: "A hex color code associated with the platform brand" },
+                  ideas: {
+                    type: "ARRAY",
+                    items: {
+                      type: "OBJECT",
+                      properties: {
+                        title: { type: "STRING", description: "Catchy title for this repurposing idea" },
+                        transformation: { type: "STRING", description: "Specific actionable ideas for transforming the content (e.g., 'Extract the top 3 tips, cut the intro, reframe as a bold claim')" },
+                        format_changes: { type: "STRING", description: "Suggested format changes (e.g., 'Turn into a 60s fast-paced vertical video' or 'Carousel post with 5 slides')" },
+                        optimizations: { type: "STRING", description: "Platform-specific optimizations (e.g., specific hashtags, pacing, visual hooks, best times to post)" },
+                        draft: { type: "STRING", description: "The actual script, post text, or thread content draft" }
+                      },
+                      required: ["title", "transformation", "format_changes", "optimizations", "draft"]
+                    }
+                  }
+                },
+                required: ["platform", "icon", "color", "ideas"]
               }
             }
           },
-          required: ["tiktok", "twitter", "linkedin"]
+          required: ["platforms"]
         }
       }
     })
@@ -286,7 +285,7 @@ export const repurposeContent = async (content: string) => {
 };
 
 export const generateSpeech = async (text: string, voice: string = 'Kore') => {
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -317,7 +316,7 @@ export const generateSpeech = async (text: string, voice: string = 'Kore') => {
 };
 
 export const transcribeAudio = async (base64Audio: string, mimeType: string = "audio/wav") => {
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -353,7 +352,7 @@ export const generateVideo = async (prompt: string, aspectRatio: '16:9' | '9:16'
   if (videoLength.includes('10s')) durationSeconds = 10;
   if (videoLength.includes('5s')) durationSeconds = 5;
 
-  const response = await fetch('/api/gemini/generate-video', {
+  const response = await apiFetch('/api/gemini/generate-video', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, aspectRatio, durationSeconds })
@@ -363,7 +362,7 @@ export const generateVideo = async (prompt: string, aspectRatio: '16:9' | '9:16'
 };
 
 export const getOperationStatus = async (operation: any) => {
-  const response = await fetch('/api/gemini/video-status', {
+  const response = await apiFetch('/api/gemini/video-status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ operationName: operation.operationName || operation.name })
@@ -373,7 +372,7 @@ export const getOperationStatus = async (operation: any) => {
 };
 
 export const fetchVideoDownloadResponse = async (uri: string) => {
-  const response = await fetch('/api/gemini/video-download', {
+  const response = await apiFetch('/api/gemini/video-download', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ uri })
@@ -387,7 +386,7 @@ export const generateSmartSuggestions = async (brandData: any, existingContent: 
     ? existingContent.map(c => `Title: ${c.title || c.data?.title || 'Untitled'} | Platform: ${c.platform || c.data?.platform || 'N/A'} | Score: ${c.score || c.data?.score || 0}`).join('\n')
     : "No previous content created yet.";
 
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -476,7 +475,7 @@ Visual selection rules:
 Script to Plan into Visual Beats:
 ${scriptText}`;
 
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -567,7 +566,7 @@ Output strict raw JSON only matching the schema provided.`;
 Draft Hook / Intro Script to Analyze:
 "${scriptOrHookText}"`;
 
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -647,7 +646,7 @@ Draft Hook / Intro Script to Analyze:
 
 
 export const generateBrandLogo = async (prompt: string, aspectRatio: string = "1:1") => {
-  const response = await fetch('/api/gemini/generate-image', {
+  const response = await apiFetch('/api/gemini/generate-image', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -684,7 +683,7 @@ export const analyzeVideo = async (file: File, analysisType: 'summary' | 'flashc
   formData.append('video', file);
   formData.append('prompt', prompt);
 
-  const response = await fetch('/api/gemini/analyze-video', {
+  const response = await apiFetch('/api/gemini/analyze-video', {
     method: 'POST',
     body: formData,
   });
@@ -717,7 +716,7 @@ Structure it professionally with these sections:
 
 Keep it highly scannable, elegant, and ready to be used as a source of truth by designers and writers.`;
 
-  const response = await fetch('/api/gemini/generate', {
+  const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

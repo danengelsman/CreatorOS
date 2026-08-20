@@ -358,7 +358,7 @@ export default function App() {
               >
                 {userPhoto ? (
                   <img 
-                    src={userPhoto} 
+                    src={userPhoto || undefined} 
                     alt="" 
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"

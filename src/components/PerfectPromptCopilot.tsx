@@ -1,3 +1,4 @@
+import { apiFetch } from "../firebase";
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Copy, Check, Sparkle, Clock, Star, Tag, CaretLeft, CaretRight, MagicWand, Plus, ThumbsUp, X, ArrowRight, Play } from '@phosphor-icons/react';
@@ -172,7 +173,7 @@ function GeneratorView({ user, input, setInput }: { user: any, input: string, se
     setResult('');
     
     try {
-      const response = await fetch('/api/gemini/generate', {
+      const response = await apiFetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -332,7 +333,7 @@ function TemplatesView({ user, onSelect }: { user: any, onSelect: (text: string,
 
   const generateAndSaveTemplates = async (platId: string, pageNum: number) => {
     try {
-      const response = await fetch('/api/gemini/generate', {
+      const response = await apiFetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,3 +1,4 @@
+import { apiFetch } from "../firebase";
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, updateDoc, doc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, authorizedFetch } from '../firebase';
@@ -460,7 +461,7 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
     const originalPlatform = selectedEvent.data?.platform || selectedEvent.platform || 'youtube';
 
     try {
-      const response = await fetch('/api/gemini/generate', {
+      const response = await apiFetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

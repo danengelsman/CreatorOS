@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Play, Pause, SpeakerHigh, SpeakerSlash, FastForward, Rewind, CornersOut } from '@phosphor-icons/react';
+import { Play, Pause, SpeakerHigh, SpeakerSlash, FastForward, Rewind, CornersOut, CircleNotch } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
+import localforage from 'localforage';
 
 interface CustomVideoPlayerProps {
   videoUrl: string;
@@ -15,14 +16,56 @@ export default function CustomVideoPlayer({ videoUrl }: CustomVideoPlayerProps) 
   const [duration, setDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [hasError, setHasError] = useState(false);
+  const [resolvedUrl, setResolvedUrl] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    let objectUrl = '';
     setHasError(false);
-    if (videoRef.current) {
+    setIsLoading(true);
+
+    const loadVideo = async () => {
+      if (!videoUrl) {
+        setHasError(true);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (videoUrl.startsWith('local:')) {
+        try {
+          const blob = await localforage.getItem<Blob>(videoUrl);
+          if (blob && active) {
+            objectUrl = URL.createObjectURL(blob);
+            setResolvedUrl(objectUrl);
+          } else if (active) {
+            setHasError(true);
+          }
+        } catch (err) {
+          if (active) setHasError(true);
+        }
+      } else {
+        if (active) setResolvedUrl(videoUrl);
+      }
+      if (active) setIsLoading(false);
+    };
+
+    loadVideo();
+
+    return () => {
+      active = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [videoUrl]);
+
+  useEffect(() => {
+    if (resolvedUrl && videoRef.current && !hasError && !isLoading) {
       videoRef.current.play().catch(e => console.log('Auto-play blocked'));
       setIsPlaying(true);
     }
-  }, [videoUrl]);
+  }, [resolvedUrl, hasError, isLoading]);
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -108,7 +151,7 @@ export default function CustomVideoPlayer({ videoUrl }: CustomVideoPlayerProps) 
         <>
           <video
             ref={videoRef}
-            src={videoUrl}
+            src={resolvedUrl || undefined}
             loop
             playsInline
             onClick={togglePlay}
@@ -118,8 +161,14 @@ export default function CustomVideoPlayer({ videoUrl }: CustomVideoPlayerProps) 
             className="w-full h-full object-cover cursor-pointer"
           />
           
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm z-10">
+              <CircleNotch size={32} className="animate-spin text-white opacity-80" />
+            </div>
+          )}
+
           {/* Play/Pause Large Overlay Center (optional) */}
-          {!isPlaying && (
+          {!isPlaying && !isLoading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="bg-black/50 p-4 rounded-full backdrop-blur-sm">
                 <Play size={48} weight="fill" className="text-white opacity-80 pl-1" />
