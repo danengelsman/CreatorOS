@@ -9,24 +9,27 @@ interface ScenePlannerProps {
   initialTitle?: string;
   showToast: (msg: string) => void;
   onSendToVideoStudio?: (prompt: string) => void;
+  brand?: any;
 }
 
-export default function ScenePlanner({ initialScript = '', initialTitle = '', showToast, onSendToVideoStudio }: ScenePlannerProps) {
+export default function ScenePlanner({ initialScript = '', initialTitle = '', showToast, onSendToVideoStudio, brand }: ScenePlannerProps) {
   const [scriptText, setScriptText] = useState(initialScript);
   const [titleText, setTitleText] = useState(initialTitle);
   const [isGenerating, setIsGenerating] = useState(false);
   const [scenePlan, setScenePlan] = useState<any | null>(null);
   const [copiedBeatId, setCopiedBeatId] = useState<string | null>(null);
   const [copiedJson, setCopiedJson] = useState(false);
+  const [error, setError] = useState('');
 
   const handleGeneratePlan = async () => {
     if (!scriptText.trim()) {
       showToast('Please enter or paste a video script first.');
       return;
     }
+    setError('');
     setIsGenerating(true);
     try {
-      const plan = await generateScenePlan(scriptText, titleText);
+      const plan = await generateScenePlan(scriptText, titleText, brand);
       setScenePlan(plan?.video_plan || plan);
       showToast('Scene plan generated successfully!');
     } catch (err: any) {
