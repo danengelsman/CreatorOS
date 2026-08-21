@@ -9,23 +9,26 @@ interface RetentionHookLabProps {
   showToast: (msg: string) => void;
   onApplyHookToEditor?: (hookText: string) => void;
   onSendToScenePlanner?: (hookText: string) => void;
+  brand?: any;
 }
 
-export default function RetentionHookLab({ initialText = '', showToast, onApplyHookToEditor, onSendToScenePlanner }: RetentionHookLabProps) {
+export default function RetentionHookLab({ initialText = '', showToast, onApplyHookToEditor, onSendToScenePlanner, brand }: RetentionHookLabProps) {
   const [inputText, setInputText] = useState(initialText);
   const [platform, setPlatform] = useState<'youtube' | 'tiktok' | 'reels'>('youtube');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<any | null>(null);
+  const [error, setError] = useState('');
   const [copiedHookIndex, setCopiedHookIndex] = useState<number | null>(null);
 
   const handleAnalyze = async () => {
     if (!inputText.trim()) {
-      showToast('Please enter a hook, intro, or video script to analyze.');
+      setError('Please provide a hook or intro to analyze.');
       return;
     }
+    setError('');
     setIsAnalyzing(true);
     try {
-      const data = await analyzeAndOptimizeRetention(inputText, platform);
+      const data = await analyzeAndOptimizeRetention(inputText, platform, brand);
       setResult(data?.retention_analysis || data);
       showToast('Retention analysis complete!');
     } catch (err: any) {

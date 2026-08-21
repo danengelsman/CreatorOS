@@ -573,6 +573,7 @@ ${body}`
         <RetentionHookLab
           initialText={body}
           showToast={showToast}
+          brand={brand}
           onApplyHookToEditor={(newHook) => {
             setBody((prev) => (prev ? `${newHook}\n\n${prev}` : newHook));
             setStudioTab('editor');
@@ -580,7 +581,7 @@ ${body}`
           onSendToScenePlanner={() => setStudioTab('planner')}
         />
       ) : studioTab === 'planner' ? (
-        <ScenePlanner initialScript={body} initialTitle={title} showToast={showToast} />
+        <ScenePlanner initialScript={body} initialTitle={title} showToast={showToast} brand={brand} />
       ) : (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         <div className="lg:col-span-8 space-y-6">

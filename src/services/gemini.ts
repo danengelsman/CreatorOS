@@ -451,8 +451,10 @@ export const generateSmartSuggestions = async (brandData: any, existingContent: 
   return JSON.parse(data.text);
 };
 
-export const generateScenePlan = async (scriptText: string, title?: string) => {
-  const systemPrompt = `You are the Scene Planner for Vertano, an app that helps beginner YouTube creators turn a finished script into a produced video. Your job is to segment the creator’s script into timed visual beats and assign each beat a visual. You are an editor planning shots — you are NOT a writer.
+export const generateScenePlan = async (scriptText: string, title?: string, brand?: any) => {
+  const brandContext = brand ? `\nCREATOR BRAND CONTEXT:\n- Name: ${brand.name}\n- Archetype: ${brand.archetype}\n- Visual Style: ${brand.visual_style || 'N/A'}\n- Primary Color: ${brand.colors?.primary || 'N/A'}\nKeep these visual aesthetics in mind, particularly for title cards and image prompts.` : '';
+
+  const systemPrompt = `You are the Scene Planner for Vertano, an app that helps beginner YouTube creators turn a finished script into a produced video. Your job is to segment the creator’s script into timed visual beats and assign each beat a visual. You are an editor planning shots — you are NOT a writer.${brandContext}
 
 Hard rules:
 1. Preserve the creator’s words. Split the script into beats using the sentences exactly as written. You may fix an obvious typo, but never rephrase, shorten, reorder, or add sentences.
@@ -555,8 +557,10 @@ ${scriptText}`;
   return JSON.parse(rawText);
 };
 
-export const analyzeAndOptimizeRetention = async (scriptOrHookText: string, platform: string = 'youtube') => {
-  const systemPrompt = `You are Vertano's Chief Viral Retention & Algorithmic Hook Strategist. Your objective is to help YouTube and TikTok creators prevent viewer drop-off in the crucial first 5 seconds of their video.
+export const analyzeAndOptimizeRetention = async (scriptOrHookText: string, platform: string = 'youtube', brand?: any) => {
+  const brandContext = brand ? `\nCREATOR BRAND CONTEXT:\n- Archetype: ${brand.archetype}\n- Personality: ${brand.personality}\n- Preferred Hooks: ${Array.isArray(brand.content_hooks) ? brand.content_hooks.join(', ') : 'N/A'}\nEnsure your hook rewrites and diagnosis align with this brand voice, feeling authentic to their creator archetype.` : '';
+
+  const systemPrompt = `You are Vertano's Chief Viral Retention & Algorithmic Hook Strategist. Your objective is to help YouTube and TikTok creators prevent viewer drop-off in the crucial first 5 seconds of their video.${brandContext}
 
 You analyze the provided hook/intro text and deliver an authoritative retention diagnosis along with 5 high-converting viral hook rewrites and second-by-second pattern-disrupt instructions.
 
