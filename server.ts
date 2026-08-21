@@ -387,29 +387,7 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
     }
   });
 
-  app.post("/api/gemini/generate-video", async (req: any, res) => {
-    try {
-      const { prompt, aspectRatio, durationSeconds } = req.body;
-      
-      const interaction = await (await getAI()).interactions.create({
-        model: 'gemini-omni-flash-preview',
-        input: prompt,
-        background: true,
-        store: true,
-        stream: false,
-        response_format: {
-          type: 'video',
-          aspect_ratio: aspectRatio || '16:9',
-          duration: durationSeconds ? `${durationSeconds}s` : '5s',
-        }
-      });
-      
-      res.json({ operationName: interaction.id });
-    } catch (error: any) {
-      console.error('Video Generation Error:', error);
-      res.status(500).json({ error: formatGeminiError(error) });
-    }
-  });
+  
 
   app.post("/api/gemini/video-status", async (req: any, res) => {
     try {
@@ -548,76 +526,9 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
   });
 
   // TikTok OAuth
-  app.get("/api/auth/tiktok/url", authenticateUser, (req: any, res) => {
-    const csrfState = Math.random().toString(36).substring(7);
-    const scope = 'user.info.basic,video.list';
-    
-    // Construct TikTok auth URL
-    // Documentation: https://developers.tiktok.com/doc/login-kit-web
-    const url = `https://www.tiktok.com/v2/auth/authorize/?client_key=${TIKTOK_CLIENT_KEY}&scope=${scope}&response_type=code&redirect_uri=${encodeURIComponent(TIKTOK_REDIRECT_URI)}&state=${req.user.uid}`;
-    
-    res.json({ url });
-  });
+  
 
-  app.get("/api/auth/tiktok/callback", async (req, res) => {
-    const { code, state } = req.query;
-    const userId = state as string;
-
-    if (!userId) return res.status(400).send('Missing user state');
-
-    try {
-      // Exchange code for token
-      const response = await axios.post('https://open.tiktokapis.com/v2/oauth/token/', 
-        new URLSearchParams({
-          client_key: TIKTOK_CLIENT_KEY!,
-          client_secret: TIKTOK_CLIENT_SECRET!,
-          code: code as string,
-          grant_type: 'authorization_code',
-          redirect_uri: TIKTOK_REDIRECT_URI,
-        }).toString(),
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-      );
-
-      const { access_token, refresh_token, expires_in, open_id } = response.data;
-
-      // Save to DB
-      const existing = db.prepare('SELECT user_id FROM user_accounts WHERE user_id = ? AND platform = ?')
-        .get(userId, 'tiktok');
-
-      if (existing) {
-        db.prepare(`
-          UPDATE user_accounts SET 
-            access_token = ?, refresh_token = ?, expiry_date = ?, profile_data = ?
-          WHERE user_id = ? AND platform = ?
-        `).run(access_token, refresh_token, Date.now() + expires_in * 1000, JSON.stringify({ open_id }), userId, 'tiktok');
-      } else {
-        db.prepare(`
-          INSERT INTO user_accounts (user_id, platform, access_token, refresh_token, expiry_date, profile_data)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `).run(userId, 'tiktok', access_token, refresh_token, Date.now() + expires_in * 1000, JSON.stringify({ open_id }));
-      }
-
-      res.send(`
-        <html>
-          <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #F9F9F8;">
-            <div style="text-align: center; padding: 40px; background: white; border-radius: 24px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);">
-              <h1 style="color: #141414;">TikTok Connected</h1>
-              <p style="color: #666;">Success! You can close this window.</p>
-              <script>
-                if (window.opener) {
-                  window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', platform: 'tiktok' }, '*');
-                  window.close();
-                }
-              </script>
-            </div>
-          </body>
-        </html>
-      `);
-    } catch (error) {
-      console.error('TikTok OAuth Error:', error);
-      res.status(500).send('TikTok Authentication failed');
-    }
-  });
+  
 
   app.get("/api/accounts", authenticateUser, (req: any, res) => {
     const accounts = db.prepare('SELECT platform, profile_data FROM user_accounts WHERE user_id = ?').all(req.user.uid);
@@ -627,78 +538,7 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
     })));
   });
 
-  app.post("/api/publish", authenticateUser, async (req: any, res) => {
-    const { title, body, platforms } = req.body;
-    if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
-      return res.status(400).json({ error: "No target platforms specified" });
-    }
-
-    try {
-      const results: { [key: string]: { status: 'success' | 'error', message: string, url?: string } } = {};
-      
-      // Get all connected accounts for the user
-      const accounts = db.prepare('SELECT platform, access_token, profile_data FROM user_accounts WHERE user_id = ?')
-        .all(req.user.uid);
-
-      for (const platform of platforms) {
-        const lowerPlatform = platform.toLowerCase();
-        
-        // Check if the platform is connected via OAuth
-        const account = accounts.find(a => a.platform === lowerPlatform);
-        
-        if (!account) {
-          results[platform] = {
-            status: 'error',
-            message: `Platform ${platform} is not connected via OAuth. Please connect it in the Integrations tab first.`
-          };
-          continue;
-        }
-
-        const profile = JSON.parse(account.profile_data || '{}');
-
-        if (lowerPlatform === 'youtube') {
-          // Authentic YouTube community post / draft simulator using OAuth profile context
-          const channelId = profile.id || 'UC' + Math.random().toString(36).substring(2, 12).toUpperCase();
-          results[platform] = {
-            status: 'success',
-            message: `Successfully synchronized and pushed to channel "${profile.name || 'YouTube'}"!`,
-            url: `https://studio.youtube.com/channel/${channelId}/community`
-          };
-        } else if (lowerPlatform === 'tiktok') {
-          // Authentic TikTok API draft push simulator using OAuth profile context
-          const openId = profile.open_id || 'tiktok-creator';
-          results[platform] = {
-            status: 'success',
-            message: `Successfully pushed content draft container to TikTok! Ready for mobile review.`,
-            url: `https://www.tiktok.com/creator-academy`
-          };
-        } else if (lowerPlatform === 'instagram') {
-          results[platform] = {
-            status: 'success',
-            message: `Successfully synchronized post caption and media guidelines to Meta Creator Studio!`,
-            url: `https://business.facebook.com/creatorstudio`
-          };
-        } else if (lowerPlatform === 'twitter' || lowerPlatform === 'x') {
-          results[platform] = {
-            status: 'success',
-            message: `Successfully pushed content draft and scheduled post container to X!`,
-            url: `https://x.com/home`
-          };
-        } else {
-          results[platform] = {
-            status: 'success',
-            message: `Successfully synced content to ${platform}!`,
-            url: '#'
-          };
-        }
-      }
-
-      res.json({ success: true, results });
-    } catch (err: any) {
-      console.error('Publish API Error:', err);
-      res.status(500).json({ error: err.message || 'Failed to sync content' });
-    }
-  });
+  
 
   app.get("/api/analytics/youtube", authenticateUser, async (req: any, res) => {
     const account = db.prepare('SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?').get(req.user.uid, 'youtube');
@@ -733,18 +573,7 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
     }
   });
 
-  app.get("/api/analytics/tiktok", authenticateUser, async (req: any, res) => {
-    // Mocking TikTok analytics for now as their API access is heavily gated
-    // but demonstrating where the integration would live.
-    const account = db.prepare('SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?').get(req.user.uid, 'tiktok');
-    if (!account) return res.json({ followers: 0, views: 0, likes: 0 });
-    
-    res.json({
-      followers: 1240,
-      views: 45000,
-      likes: 8900
-    });
-  });
+  
 
   app.get("/api/analytics/summary", authenticateUser, async (req: any, res) => {
     try {
@@ -864,9 +693,9 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
       const isBrandKitComplete = !!brand;
 
       // 6. Aggregate figures
-      const totalFollowers = youtubeStats.subscribers + tiktokStats.followers;
-      const totalViews = youtubeStats.views + tiktokStats.views;
-      const totalLikes = tiktokStats.likes;
+      const totalFollowers = youtubeStats.subscribers;
+      const totalViews = youtubeStats.views;
+      const totalLikes = 0;
       const engagementRate = totalViews > 0 ? parseFloat(((totalLikes / totalViews) * 100).toFixed(2)) : 0;
 
       // Calculate milestone completions
