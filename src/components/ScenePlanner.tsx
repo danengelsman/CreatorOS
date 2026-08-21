@@ -52,6 +52,27 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
     showToast('Copied to clipboard');
   };
 
+  const copyToMarkdownTable = () => {
+    if (!scenePlan) return;
+    
+    let md = `| Section | Duration | Narration | Visual Type | Visual Detail |\n`;
+    md += `| :--- | :--- | :--- | :--- | :--- |\n`;
+    
+    scenePlan.sections?.forEach((section: any) => {
+      section.beats?.forEach((beat: any) => {
+        const visual = beat.visual;
+        const visualDetail = visual.type === 'stock_video' ? visual.stock_query : 
+                             visual.type === 'title_card' ? visual.title_card_text : 
+                             visual.ai_image_prompt;
+                             
+        md += `| ${section.section_label} | ${beat.est_seconds}s | ${beat.narration.replace(/\n/g, ' ')} | ${visual.type} | ${visualDetail} |\n`;
+      });
+    });
+    
+    navigator.clipboard.writeText(md);
+    showToast('Markdown table copied to clipboard!');
+  };
+
   const formatTotalTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -99,13 +120,22 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
             </div>
           </div>
           {scenePlan && (
-            <button
-              onClick={() => copyToClipboard(JSON.stringify({ video_plan: scenePlan }, null, 2))}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-secondary)] text-[12px] font-semibold text-[var(--label-secondary)] hover:text-[var(--label-primary)] transition-colors border border-[var(--separator)]"
-            >
-              {copiedJson ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-              <span>{copiedJson ? 'Copied JSON' : 'Export JSON'}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={copyToMarkdownTable}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-secondary)] text-[12px] font-semibold text-[var(--label-secondary)] hover:text-[var(--label-primary)] transition-colors border border-[var(--separator)]"
+              >
+                <Export size={14} />
+                <span>Export Markdown Table</span>
+              </button>
+              <button
+                onClick={() => copyToClipboard(JSON.stringify({ video_plan: scenePlan }, null, 2))}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-secondary)] text-[12px] font-semibold text-[var(--label-secondary)] hover:text-[var(--label-primary)] transition-colors border border-[var(--separator)]"
+              >
+                {copiedJson ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                <span>{copiedJson ? 'Copied JSON' : 'Export JSON'}</span>
+              </button>
+            </div>
           )}
         </div>
 
