@@ -78,7 +78,7 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.7-flash',
           contents,
           config: {
             // Note: If image generation model requires specific config, use them, otherwise this works with flash
