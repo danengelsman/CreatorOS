@@ -22,7 +22,7 @@ interface ContentItem {
   platforms?: string[];
 }
 
-export default function CreatorHub({ projects = [] }: { projects: any[] }) {
+export default function CreatorHub({ projects = [], setActiveTab }: { projects: any[], setActiveTab?: (tab: string) => void }) {
   const [view, setView] = useState<'grid' | 'calendar'>('grid');
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -102,7 +102,7 @@ export default function CreatorHub({ projects = [] }: { projects: any[] }) {
                   <div className="p-8 text-center text-[var(--label-secondary)]">No content found. Start a new project to see it here.</div>
                 )}
                 
-                <div role="button" className="w-full p-4 flex items-center gap-3 text-[var(--accent)] active:bg-[var(--separator)] transition-colors group cursor-pointer">
+                <div role="button" onClick={() => setActiveTab?.('create')} className="w-full p-4 flex items-center gap-3 text-[var(--accent)] active:bg-[var(--separator)] transition-colors group cursor-pointer">
                   <div className="w-8 h-8 rounded-full bg-[var(--accent)]/10 flex items-center justify-center">
                     <Plus size={18} strokeWidth={1.5} />
                   </div>

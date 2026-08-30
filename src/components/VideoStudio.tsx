@@ -134,11 +134,14 @@ export default function VideoStudio({ body, title, platform, brand, showToast, u
       
       let done = false;
       let finalOp = operation;
+      let status = operation;
       
       // Polling for video completion
       while (!done) {
-        await new Promise(r => setTimeout(r, 6000));
-        const status = await getOperationStatus(finalOp);
+        if (!status.done) {
+          await new Promise(r => setTimeout(r, 6000));
+          status = await getOperationStatus(finalOp);
+        }
         
         if (status.done) {
           done = true;

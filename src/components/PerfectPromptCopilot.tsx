@@ -177,7 +177,7 @@ function GeneratorView({ user, input, setInput }: { user: any, input: string, se
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gemini-2.5-flash",
+          model: "gemini-3.7-flash",
           contents: `Act as a World-Class Content Strategist and Viral Copywriter. 
           Take the following rough idea and output a highly detailed, markdown-formatted prompt that includes:
           - Target Audience
@@ -337,7 +337,7 @@ function TemplatesView({ user, onSelect }: { user: any, onSelect: (text: string,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gemini-2.5-flash",
+          model: "gemini-3.7-flash",
           contents: `Generate 5 unique, highly engaging content prompt templates for ${platId}. Page ${pageNum}.
           Output JSON strictly: { "templates": [{ "title": "...", "hook": "...", "description": "..." }] }`,
           config: {
