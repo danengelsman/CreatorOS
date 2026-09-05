@@ -7,11 +7,13 @@ import { cn } from '../lib/utils';
 import { db, serverTimestamp, handleFirestoreError, OperationType } from '../firebase';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import BrandIcon from './BrandIcon';
+import BrandArchetypeQuiz from './BrandArchetypeQuiz';
 
 export default function Brand({ brand, setBrand, user }: { brand: any, setBrand: any, user: any }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isQuizOpen, setIsQuizOpen] = useState(false);
 
 
   const [isGeneratingLogo, setIsGeneratingLogo] = useState(false);
@@ -387,6 +389,15 @@ export default function Brand({ brand, setBrand, user }: { brand: any, setBrand:
           className="w-full bg-[var(--bg-secondary)] text-[var(--label-primary)] rounded-[20px] p-6 text-[17px] leading-relaxed border border-[var(--separator)] focus:border-[var(--accent)] outline-none transition-colors h-48 resize-none placeholder:text-[var(--label-tertiary)]"
         />
         
+        <div className="flex justify-center -mt-4 mb-2">
+           <button 
+             onClick={() => setIsQuizOpen(true)}
+             className="text-[15px] font-medium text-[var(--label-secondary)] hover:text-[var(--accent)] transition-colors flex items-center gap-2 bg-[var(--bg-secondary)] px-4 py-2 rounded-full border border-[var(--separator)]"
+           >
+             <Lightbulb size={18} /> Don't know where to start? Take the Archetype Quiz
+           </button>
+        </div>
+        
         {errorMsg && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 p-4 rounded-[16px] text-[15px] font-medium flex items-start gap-3 mt-4">
             <WarningCircle size={20} weight="fill" className="shrink-0 mt-0.5 text-red-500" />
@@ -409,6 +420,18 @@ export default function Brand({ brand, setBrand, user }: { brand: any, setBrand:
           )}
         </button>
       </div>
+
+      <AnimatePresence>
+        {isQuizOpen && (
+          <BrandArchetypeQuiz 
+            onClose={() => setIsQuizOpen(false)}
+            onComplete={(promptSeed) => {
+              setInput(promptSeed);
+              setIsQuizOpen(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
