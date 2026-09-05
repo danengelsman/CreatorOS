@@ -105,7 +105,7 @@ export default function SupportHub({ user }: { user: any }) {
       ai: [
         { text: '🧠 [PLAYWRIGHT] Starting AI generative model regression checks...', delay: 350 },
         { text: '📡 [PLAYWRIGHT] Testing backend proxy endpoint: /api/gemini/generate...', delay: 500 },
-        { text: '🤖 [PLAYWRIGHT] Model defined: gemini-3.7-flash', delay: 300 },
+        { text: '🤖 [PLAYWRIGHT] Model defined: gemini-2.5-flash', delay: 300 },
         { text: '💬 [PLAYWRIGHT] Sending payload: { contents: "respond with healthy" }...', delay: 400 },
         { text: '⏳ [PLAYWRIGHT] Waiting for API gateway response...', delay: 550 },
         { text: '✅ [PLAYWRIGHT] Gemini API response parsed successfully. Received: "healthy"', delay: 350 },
@@ -177,7 +177,7 @@ export default function SupportHub({ user }: { user: any }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gemini-3.7-flash",
+          model: "gemini-2.5-flash",
           contents: prompt
         })
       });
@@ -538,7 +538,7 @@ export default function SupportHub({ user }: { user: any }) {
                   </div>
                   <div>
                     <h3 className="text-[14px] font-bold">Gemini Engine</h3>
-                    <p className="text-[11px] text-[var(--label-secondary)]">Model: gemini-3.7-flash</p>
+                    <p className="text-[11px] text-[var(--label-secondary)]">Model: gemini-2.5-flash</p>
                   </div>
                 </div>
                 <div className="mt-6 flex items-center justify-between">

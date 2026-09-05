@@ -465,7 +465,7 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-2.5-flash',
           contents: `You are an expert social media copywriter and content strategist.
 Your task is to reformat the following content block for multiple target platforms: ${selectedTargetPlatforms.join(', ')}.
 
