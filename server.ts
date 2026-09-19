@@ -387,6 +387,91 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
     }
   });
 
+  // --- Dynamic Niche Sparks for Hesitant Day-Zero Creators ---
+  app.get("/api/onboarding/niche-sparks", authenticateUser, async (req: any, res) => {
+    // Curated high-converting fallbacks in case of network latency or rate limit
+    const fallbackSparks = {
+      museMessage: "Take a breath—day zero is the hardest step because the canvas is blank. You don't have to guess: here are high-momentum niches thriving right now.",
+      sparks: [
+        {
+          type: "trending",
+          badge: "Trending Today",
+          title: "AI Workflows for Solo Creators",
+          pitch: "Creators are booming by breaking down simple prompts, free AI tools, and everyday productivity shortcuts.",
+          dreamViewer: "Freelancers, students & creators saving time",
+          vibe: "Clear, actionable, and exciting"
+        },
+        {
+          type: "underserved",
+          badge: "Underserved Goldmine",
+          title: "Micro-Budget Studio Gear Reviews",
+          pitch: "Massive search volume with low competition: testing budget $30 microphones and smartphone lighting setups.",
+          dreamViewer: "Beginner creators who want quality without spending thousands",
+          vibe: "Honest, resourceful, and grounded"
+        },
+        {
+          type: "trending",
+          badge: "High Growth",
+          title: "Cozy Tech & Mindful Productivity",
+          pitch: "Audiences fatigued by hustle culture are loving desk setups, calm focus sessions, and intentional tech.",
+          dreamViewer: "Remote workers and students craving peace",
+          vibe: "Calm, aesthetic, and supportive"
+        }
+      ]
+    };
+
+    try {
+      const prompt = `You are an empathetic creative muse and brand strategist for a new video creator who is frozen with blank-page paralysis on their very first question.
+Generate 3 magnetic, beginner-friendly niches:
+- 2 that are currently viral / trending with high audience appetite
+- 1 that is an underserved "goldmine" niche (high search demand, but low competition / low saturation)
+
+Keep the descriptions inspiring, simple, and jargon-free.
+Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.`;
+
+      const response = await (await getAI()).models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT" as any,
+            properties: {
+              museMessage: { type: "STRING" as any },
+              sparks: {
+                type: "ARRAY" as any,
+                items: {
+                  type: "OBJECT" as any,
+                  properties: {
+                    type: { type: "STRING" as any, description: "'trending' or 'underserved'" },
+                    badge: { type: "STRING" as any, description: "Short badge like 'Trending Today' or 'Hidden Gem'" },
+                    title: { type: "STRING" as any, description: "Concise niche title" },
+                    pitch: { type: "STRING" as any, description: "1 punchy sentence why it works" },
+                    dreamViewer: { type: "STRING" as any, description: "Who watches this" },
+                    vibe: { type: "STRING" as any, description: "Suggested mood" }
+                  },
+                  required: ["type", "badge", "title", "pitch", "dreamViewer", "vibe"]
+                }
+              }
+            },
+            required: ["museMessage", "sparks"]
+          }
+        }
+      });
+
+      if (response?.text) {
+        const parsed = JSON.parse(response.text);
+        if (parsed.sparks && Array.isArray(parsed.sparks) && parsed.sparks.length > 0) {
+          return res.json(parsed);
+        }
+      }
+      return res.json(fallbackSparks);
+    } catch (error: any) {
+      console.warn('Niche Sparks Gemini fallback activated:', error?.message || error);
+      return res.json(fallbackSparks);
+    }
+  });
+
   
 
   app.post("/api/gemini/generate-video", async (req: any, res) => {
