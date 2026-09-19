@@ -13,6 +13,7 @@ import {
 } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import { authorizedFetch } from '../firebase';
+import AINicheCoach from './AINicheCoach';
 
 const formatNumber = (num: number) => {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -20,7 +21,7 @@ const formatNumber = (num: number) => {
   return num.toLocaleString();
 };
 
-export default function FirstDollarDashboard({ user }: { user: any }) {
+export default function FirstDollarDashboard({ user, brand }: { user: any, brand: any }) {
   const [sharingMilestone, setSharingMilestone] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [summary, setSummary] = useState<any>(null);
@@ -122,6 +123,8 @@ export default function FirstDollarDashboard({ user }: { user: any }) {
           </div>
         ))}
       </div>
+
+      <AINicheCoach summary={summary} brand={brand} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-4">

@@ -16,6 +16,7 @@ import { cn } from '../lib/utils';
 import { db, serverTimestamp, handleFirestoreError, OperationType, authorizedFetch } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import Confetti from './Confetti';
+import MysticalNicheSparks, { NicheSpark, NicheSparksData } from './MysticalNicheSparks';
 
 interface OnboardingProps {
   onComplete: (targetTab?: string) => void;
@@ -44,13 +45,125 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
   const [inputValue, setInputValue] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
+
+  // In-Stream Conversational Muse state for blank-page paralysis
+  const [sparksData, setSparksData] = useState<NicheSparksData | null>(null);
+  const [isLoadingSparks, setIsLoadingSparks] = useState(false);
+  const [showSparks, setShowSparks] = useState(false);
+  const [hasTriggeredSparks, setHasTriggeredSparks] = useState(false);
+  const [selectedSparkTitle, setSelectedSparkTitle] = useState<string | null>(null);
+  const [idleSeconds, setIdleSeconds] = useState(0);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Automatically scroll to bottom of chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isAiTyping]);
+  }, [messages, isAiTyping, showSparks, sparksData]);
+
+  // Monitor idle hesitation on Question 1 (60 seconds)
+  useEffect(() => {
+    if (phase !== 'interview' || messages.length > 1 || hasTriggeredSparks) {
+      return;
+    }
+
+    // If user is actively typing, don't interrupt them
+    if (inputValue.trim().length > 0) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setIdleSeconds((prev) => {
+        const next = prev + 1;
+        if (next >= 60 && !hasTriggeredSparks) {
+          triggerSparks();
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [phase, messages.length, hasTriggeredSparks, inputValue]);
+
+  const triggerSparks = async () => {
+    setHasTriggeredSparks(true);
+    setShowSparks(true);
+    setIsLoadingSparks(true);
+    try {
+      const res = await authorizedFetch('/api/onboarding/niche-sparks');
+      if (res && res.sparks) {
+        setSparksData(res);
+      }
+    } catch (err) {
+      console.warn('Sparks fetch error:', err);
+      setSparksData({
+        museMessage: "Take a breath—day zero is the hardest step because the canvas is blank. You don't have to guess: here are high-momentum niches thriving right now.",
+        sparks: [
+          {
+            type: "trending",
+            badge: "Trending Today",
+            title: "AI Workflows for Solo Creators",
+            pitch: "Creators are booming by breaking down simple prompts, free AI tools, and everyday productivity shortcuts.",
+            dreamViewer: "Freelancers, students & creators saving time",
+            vibe: "Clear, actionable, and exciting"
+          },
+          {
+            type: "underserved",
+            badge: "Underserved Goldmine",
+            title: "Micro-Budget Studio Gear Reviews",
+            pitch: "Massive search volume with low competition: testing budget $30 microphones and smartphone lighting setups.",
+            dreamViewer: "Beginner creators who want quality without spending thousands",
+            vibe: "Honest, resourceful, and grounded"
+          },
+          {
+            type: "trending",
+            badge: "High Growth",
+            title: "Cozy Tech & Mindful Productivity",
+            pitch: "Audiences fatigued by hustle culture are loving desk setups, calm focus sessions, and intentional tech.",
+            dreamViewer: "Remote workers and students craving peace",
+            vibe: "Calm, aesthetic, and supportive"
+          }
+        ]
+      });
+    } finally {
+      setIsLoadingSparks(false);
+    }
+  };
+
+  const handleSelectSpark = async (spark: NicheSpark) => {
+    if (isAiTyping) return;
+    setSelectedSparkTitle(spark.title);
+    
+    // Send selected niche spark as user's response
+    const userText = `I'd love to make videos about: ${spark.title}`;
+    const updatedMessages: Message[] = [...messages, { role: 'user', content: userText }];
+    setMessages(updatedMessages);
+    setIsAiTyping(true);
+
+    try {
+      const data = await authorizedFetch('/api/onboarding/chat', {
+        method: 'POST',
+        body: JSON.stringify({ messages: updatedMessages })
+      });
+
+      setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+      
+      if (data.isComplete) {
+        setSummary(data.summary || {
+          niche: spark.title,
+          audience: spark.dreamViewer || "Content Creators",
+          vibe: spark.vibe || "Friendly & Encouraging"
+        });
+        setTimeout(() => {
+          setPhase('success');
+        }, 2200);
+      }
+    } catch (error) {
+      console.error('Error during onboarding chat after selecting spark:', error);
+    } finally {
+      setIsAiTyping(false);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isAiTyping) return;
@@ -264,6 +377,26 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                   </div>
                 </div>
 
+                {/* Mystical Floating Toast Banner */}
+                <AnimatePresence>
+                  {showSparks && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="mx-6 mt-3 px-4 py-2 rounded-2xl bg-gradient-to-r from-purple-900/60 via-indigo-900/40 to-black/60 border border-purple-500/30 text-purple-200 text-xs font-medium backdrop-blur-xl flex items-center justify-between shadow-lg shadow-purple-950/40 flex-shrink-0"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={14} weight="fill" className="text-amber-300 animate-pulse flex-shrink-0" />
+                        <span>The Creative Muse sensed your hesitation — live sparks revealed below</span>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-300/80 bg-white/10 px-2 py-0.5 rounded-full flex-shrink-0">
+                        Live Market Radar
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 {/* Chat Area */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                   {messages.map((msg, idx) => (
@@ -288,6 +421,21 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                     </motion.div>
                   ))}
 
+                  {/* In-Stream Conversational Muse Sparks (Option 3) */}
+                  <AnimatePresence>
+                    {(showSparks || isLoadingSparks) && (
+                      <MysticalNicheSparks
+                        data={sparksData}
+                        isLoading={isLoadingSparks}
+                        onSelectSpark={handleSelectSpark}
+                        onRefresh={triggerSparks}
+                        onDismiss={() => setShowSparks(false)}
+                        selectedSparkTitle={selectedSparkTitle}
+                        disabled={isAiTyping || messages.length > 1}
+                      />
+                    )}
+                  </AnimatePresence>
+
                   {isAiTyping && (
                     <motion.div
                       initial={{ opacity: 0, y: 8 }}
@@ -304,6 +452,25 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                   
                   <div ref={chatEndRef} />
                 </div>
+
+                {/* Hesitation Helper Pill above input */}
+                {messages.length === 1 && !showSparks && (
+                  <div className="px-6 py-2 border-t border-[var(--separator)]/50 bg-[var(--bg-tertiary)]/20 flex items-center justify-between text-xs">
+                    <button
+                      onClick={triggerSparks}
+                      className="group inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-400/20 text-[11px] font-medium transition-all active:scale-95"
+                    >
+                      <Sparkles size={12} weight="fill" className="text-amber-300 group-hover:rotate-12 transition-transform" />
+                      <span>Blank page? Tap for trending niche sparks</span>
+                      {idleSeconds > 0 && idleSeconds < 60 && (
+                        <span className="text-[10px] text-purple-300/60 font-mono">({60 - idleSeconds}s)</span>
+                      )}
+                    </button>
+                    <span className="text-[10px] text-[var(--label-secondary)]/60 hidden sm:inline">
+                      Auto-summons after 60s hesitation
+                    </span>
+                  </div>
+                )}
 
                 {/* Input Bar */}
                 <div className="p-4 border-t border-[var(--separator)] bg-[var(--bg-tertiary)]/30 backdrop-blur-md flex gap-2 items-center">
