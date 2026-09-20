@@ -186,8 +186,18 @@ export default function App() {
       const brandRef = doc(db, 'projects', `brand_${user.uid}`);
       const unsubscribeBrand = onSnapshot(brandRef, (snap) => {
         if (snap.exists()) {
-          setBrand(snap.data().data);
-          setShowOnboarding(false);
+          const projectData = snap.data();
+          // Only complete brand and dismiss onboarding if not a draft
+          if (projectData.status === 'draft') {
+            setBrand(null);
+            setShowOnboarding(true);
+          } else if (projectData.data) {
+            setBrand(projectData.data);
+            setShowOnboarding(false);
+          } else {
+            setBrand(null);
+            setShowOnboarding(true);
+          }
         } else {
           setBrand(null);
           setShowOnboarding(true);

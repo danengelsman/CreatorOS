@@ -14,7 +14,7 @@ import {
 import BrandIcon from './BrandIcon';
 import { cn } from '../lib/utils';
 import { db, serverTimestamp, handleFirestoreError, OperationType, authorizedFetch } from '../firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import Confetti from './Confetti';
 import MysticalNicheSparks, { NicheSpark, NicheSparksData } from './MysticalNicheSparks';
 
@@ -34,6 +34,37 @@ interface Summary {
   vibe: string;
 }
 
+/**
+ * Caches the user's chosen niche spark into their local branding project profile
+ * document (`projects/brand_${user.uid}`) in Firestore with `status: 'draft'`.
+ * This preserves the selection across reloads and tab navigations while preventing premature modal closure.
+ */
+export const cacheNicheToBrandProfile = async (user: any, spark: NicheSpark) => {
+  if (!user?.uid) return;
+  try {
+    const brandRef = doc(db, 'projects', `brand_${user.uid}`);
+    await setDoc(brandRef, {
+      userId: user.uid,
+      name: spark.title?.slice(0, 95) || 'Draft Brand Profile',
+      type: 'brand_kit',
+      status: 'draft',
+      draft: {
+        niche: spark.title,
+        pitch: spark.pitch || '',
+        dreamViewer: spark.dreamViewer || '',
+        vibe: spark.vibe || '',
+        badge: spark.badge || '',
+        type: spark.type || 'trending',
+        cachedAt: new Date().toISOString()
+      },
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`);
+  }
+};
+
 export default function Onboarding({ onComplete, user }: OnboardingProps) {
   const [phase, setPhase] = useState<'welcome' | 'interview' | 'success' | 'generating'>('welcome');
   const [messages, setMessages] = useState<Message[]>([
@@ -52,13 +83,75 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
   const [showSparks, setShowSparks] = useState(false);
   const [hasTriggeredSparks, setHasTriggeredSparks] = useState(false);
   const [selectedSparkTitle, setSelectedSparkTitle] = useState<string | null>(null);
+  const [restoredFromDraft, setRestoredFromDraft] = useState<string | null>(null);
   const [idleSeconds, setIdleSeconds] = useState(0);
   
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const sparksTopRef = useRef<HTMLDivElement>(null);
 
-  // Automatically scroll to bottom of chat
+  // Automatically restore previously cached niche from brand profile if user refreshed
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    let isMounted = true;
+    const restorePersistedNiche = async () => {
+      if (!user?.uid) return;
+      try {
+        const brandRef = doc(db, 'projects', `brand_${user.uid}`);
+        const snap = await getDoc(brandRef);
+        if (snap.exists() && isMounted) {
+          const projectData = snap.data();
+          if (projectData.status === 'draft' && projectData.draft?.niche) {
+            const draft = projectData.draft;
+            setSelectedSparkTitle(draft.niche);
+            setRestoredFromDraft(draft.niche);
+            setPhase('interview');
+            setMessages([
+              { 
+                role: 'assistant', 
+                content: "Welcome! Let's build your perfect Creator Profile together. To start, what topic or niche excites you the most for your channel?" 
+              },
+              { 
+                role: 'user', 
+                content: `I'd love to make videos about: ${draft.niche}` 
+              },
+              { 
+                role: 'assistant', 
+                content: `Welcome back! We've restored your chosen direction: "${draft.niche}". Next, who is your dream audience or target viewer?` 
+              }
+            ]);
+          }
+        }
+      } catch (error) {
+        console.warn('Could not restore cached branding project draft:', error);
+      }
+    };
+    restorePersistedNiche();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.uid]);
+
+  // Automatically scroll chat container intelligently
+  useEffect(() => {
+    if (showSparks && sparksTopRef.current && chatContainerRef.current) {
+      // Small timeout allows framer-motion entry animation to paint and stabilize height
+      const timer = setTimeout(() => {
+        const container = chatContainerRef.current;
+        const element = sparksTopRef.current;
+        if (container && element) {
+          const containerRect = container.getBoundingClientRect();
+          const elementRect = element.getBoundingClientRect();
+          const relativeTop = elementRect.top - containerRect.top + container.scrollTop;
+          container.scrollTo({
+            top: Math.max(0, relativeTop - 12),
+            behavior: 'smooth'
+          });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    } else if (!showSparks) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, isAiTyping, showSparks, sparksData]);
 
   // Monitor idle hesitation on Question 1 (60 seconds)
@@ -134,6 +227,14 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
     if (isAiTyping) return;
     setSelectedSparkTitle(spark.title);
     
+    // Automatically cache the selected niche into the user's branding project profile in Firestore
+    cacheNicheToBrandProfile(user, spark);
+
+    // Smoothly dismiss the sparks card after brief affirmation
+    setTimeout(() => {
+      setShowSparks(false);
+    }, 1000);
+    
     // Send selected niche spark as user's response
     const userText = `I'd love to make videos about: ${spark.title}`;
     const updatedMessages: Message[] = [...messages, { role: 'user', content: userText }];
@@ -146,9 +247,11 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
         body: JSON.stringify({ messages: updatedMessages })
       });
 
-      setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+      if (data?.message) {
+        setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+      }
       
-      if (data.isComplete) {
+      if (data?.isComplete) {
         setSummary(data.summary || {
           niche: spark.title,
           audience: spark.dreamViewer || "Content Creators",
@@ -159,7 +262,15 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
         }, 2200);
       }
     } catch (error) {
-      console.error('Error during onboarding chat after selecting spark:', error);
+      console.warn('Network issue during onboarding chat after selecting spark, using local fallback:', error);
+      // Fallback message to prevent conversational freezing
+      setMessages(prev => [
+        ...prev, 
+        { 
+          role: 'assistant', 
+          content: `Fantastic choice! Focusing on "${spark.title}" is a winning angle. Who is your dream viewer or target audience for these videos?` 
+        }
+      ]);
     } finally {
       setIsAiTyping(false);
     }
@@ -183,9 +294,11 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
       });
 
       // Add AI reply
-      setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+      if (data?.message) {
+        setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+      }
       
-      if (data.isComplete) {
+      if (data?.isComplete) {
         setSummary(data.summary || {
           niche: userText,
           audience: "Content Creators",
@@ -197,7 +310,33 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
         }, 2200);
       }
     } catch (error) {
-      console.error('Error during onboarding chat:', error);
+      console.warn('Network issue during onboarding chat, using local fallback:', error);
+      const userCount = updatedMessages.filter(m => m.role === 'user').length;
+      if (userCount === 2) {
+        setMessages(prev => [
+          ...prev, 
+          { 
+            role: 'assistant', 
+            content: "Got it! That gives us a really clear target. Lastly, what should the style and mood of your content feel like? (e.g., friendly and easy to follow, calm and aesthetic, or energetic and bold?)" 
+          }
+        ]);
+      } else {
+        setMessages(prev => [
+          ...prev, 
+          { 
+            role: 'assistant', 
+            content: "Fantastic! I have all the details needed to architect your custom Creator Profile. Click 'Build My Brand Kit' below!" 
+          }
+        ]);
+        setSummary({
+          niche: updatedMessages[1]?.content?.replace(/^I'd love to make videos about:\s*/i, '') || userText,
+          audience: updatedMessages[2]?.content || "Audience & Viewers",
+          vibe: userText || "Authentic & Engaging"
+        });
+        setTimeout(() => {
+          setPhase('success');
+        }, 2200);
+      }
     } finally {
       setIsAiTyping(false);
     }
@@ -222,10 +361,11 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
         userId: user.uid,
         name: kit.name || 'Untitled Brand',
         type: 'brand_kit',
+        status: 'completed',
         data: kit,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
-      }).catch(err => handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`));
+      }, { merge: true }).catch(err => handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`));
 
       // 3. Save onboardingAnswers to User document in Firestore
       const userRef = doc(db, 'users', user.uid);
@@ -265,33 +405,33 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 30 }}
         transition={{ type: "spring", damping: 26, stiffness: 190 }}
-        className="relative w-full max-w-4xl bg-[var(--bg-secondary)] rounded-[40px] shadow-2xl overflow-hidden flex flex-col md:flex-row h-full max-h-[680px] border border-white/10"
+        className="relative w-full max-w-4xl bg-[var(--bg-secondary)] rounded-[40px] shadow-2xl overflow-hidden flex flex-col md:flex-row h-full max-h-[92vh] md:max-h-[720px] lg:max-h-[760px] border border-white/10"
       >
         
         {/* Left Side: Visual Guide / Status Panel */}
-        <div className="hidden md:flex md:w-[35%] relative bg-black/40 flex-col justify-between p-10 border-r border-white/5 overflow-hidden">
+        <div className="hidden md:flex md:w-[280px] lg:w-[320px] shrink-0 relative bg-black/40 flex-col justify-between p-6 lg:p-8 border-r border-white/5 overflow-y-auto">
           {/* Subtle decorative glow */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-[var(--accent)] rounded-full filter blur-[100px] opacity-20 pointer-events-none" />
           
-          <div className="z-10 space-y-6">
-            <div className="p-3.5 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 w-fit">
-              <BrandIcon size={32} className="text-white animate-pulse" />
+          <div className="z-10 space-y-4 lg:space-y-6">
+            <div className="p-2.5 lg:p-3 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 w-fit">
+              <BrandIcon size={26} className="text-white animate-pulse" />
             </div>
             
             <div className="space-y-2">
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/40 block">
+              <span className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.2em] text-white/40 block">
                 Creator Profile
               </span>
-              <h3 className="text-xl font-serif font-semibold text-white tracking-tight">
+              <h3 className="text-lg lg:text-xl font-serif font-semibold text-white tracking-tight leading-snug">
                 Architect Your Identity
               </h3>
-              <p className="text-sm text-white/50 leading-relaxed font-medium">
+              <p className="text-xs lg:text-[13px] text-white/60 leading-relaxed font-normal">
                 We're tailoring a unique channel voice, customized color palette, templates, and script generators just for you.
               </p>
             </div>
           </div>
 
-          <div className="z-10 space-y-4">
+          <div className="z-10 space-y-3 lg:space-y-4 pt-4">
             <div className="flex justify-between items-end">
               <span className="text-xs font-semibold text-white/40">Profile Setup</span>
               <span className="text-xs font-bold text-white/80">{progressPercent}% Done</span>
@@ -367,38 +507,26 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                 className="flex-1 flex flex-col h-full overflow-hidden"
               >
                 {/* Header of Chat */}
-                <div className="px-6 py-4 border-b border-[var(--separator)] flex items-center gap-3 bg-[var(--bg-tertiary)]/50 backdrop-blur-md">
-                  <div className="w-10 h-10 bg-[var(--accent)]/10 rounded-xl flex items-center justify-center text-[var(--accent)]">
-                    <Robot size={22} weight="duotone" />
+                <div className="px-6 py-4 border-b border-[var(--separator)] flex items-center justify-between bg-[var(--bg-tertiary)]/50 backdrop-blur-md">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[var(--accent)]/10 rounded-xl flex items-center justify-center text-[var(--accent)]">
+                      <Robot size={22} weight="duotone" />
+                    </div>
+                    <div>
+                      <h4 className="text-[15px] font-semibold">AI Brand Architect</h4>
+                      <span className="text-[11px] font-medium text-[var(--label-secondary)] block">Online • Creator Interview</span>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-[15px] font-semibold">AI Brand Architect</h4>
-                    <span className="text-[11px] font-medium text-[var(--label-secondary)] block">Online • Creator Interview</span>
-                  </div>
+                  {restoredFromDraft && (
+                    <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-medium">
+                      <Sparkles size={13} weight="fill" className="text-amber-300 animate-pulse" />
+                      <span className="truncate max-w-[180px]">Restored: {restoredFromDraft}</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Mystical Floating Toast Banner */}
-                <AnimatePresence>
-                  {showSparks && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="mx-6 mt-3 px-4 py-2 rounded-2xl bg-gradient-to-r from-purple-900/60 via-indigo-900/40 to-black/60 border border-purple-500/30 text-purple-200 text-xs font-medium backdrop-blur-xl flex items-center justify-between shadow-lg shadow-purple-950/40 flex-shrink-0"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Sparkles size={14} weight="fill" className="text-amber-300 animate-pulse flex-shrink-0" />
-                        <span>The Creative Muse sensed your hesitation — live sparks revealed below</span>
-                      </div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-300/80 bg-white/10 px-2 py-0.5 rounded-full flex-shrink-0">
-                        Live Market Radar
-                      </span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
                 {/* Chat Area */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                   {messages.map((msg, idx) => (
                     <motion.div
                       key={idx}
@@ -420,6 +548,9 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                       </div>
                     </motion.div>
                   ))}
+
+                  {/* Scroll Anchor to ensure sparks are never decapitated */}
+                  <div ref={sparksTopRef} className="scroll-mt-4" />
 
                   {/* In-Stream Conversational Muse Sparks (Option 3) */}
                   <AnimatePresence>
