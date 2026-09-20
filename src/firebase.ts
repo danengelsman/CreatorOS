@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, User as FirebaseUser } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import {
   getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot,
   addDoc, updateDoc, deleteDoc, serverTimestamp, getDocFromServer
@@ -39,6 +39,9 @@ export const loginWithGoogle = async () => {
     throw error;
   }
 };
+/** Completes a pending full-page Google redirect after the app reloads. */
+export const completeGoogleRedirect = () => getRedirectResult(auth);
+
 export const loginWithEmail = (email: string, pass: string) => signInWithEmailAndPassword(auth, email, pass);
 export const registerWithEmail = (email: string, pass: string) => createUserWithEmailAndPassword(auth, email, pass);
 export const logout = () => signOut(auth);

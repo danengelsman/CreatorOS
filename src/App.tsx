@@ -29,7 +29,7 @@ import {
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
-import { auth, onAuthStateChanged, db, logout, FirebaseUser, handleFirestoreError, OperationType } from './firebase';
+import { auth, onAuthStateChanged, completeGoogleRedirect, db, logout, FirebaseUser, handleFirestoreError, OperationType } from './firebase';
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
 
 // Components
@@ -131,43 +131,63 @@ export default function App() {
   }, [activeTab]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (firebaseUser) {
-          // Sync user profile to Firestore
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          const userSnap = await getDoc(userRef);
-          
-          if (!userSnap.exists()) {
-            await setDoc(userRef, {
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName,
-              photoURL: firebaseUser.photoURL,
-              accountProvider: firebaseUser.providerData[0]?.providerId || 'google',
-              createdAt: serverTimestamp(),
-              lastLogin: serverTimestamp(),
-              subscriptionTier: 'free',
-              accountStatus: 'active'
-            });
-          } else {
-            await setDoc(userRef, {
-              lastLogin: serverTimestamp()
-            }, { merge: true });
-          }
-          setUser(firebaseUser);
-        } else {
-          setUser(null);
-        }
-      } catch (error) {
-        console.error("Error during auth state change:", error);
-        // Still set user so they can at least see the app, or handle error state
-        setUser(firebaseUser);
-      } finally {
-        setIsAuthLoading(false);
-      }
-    });
+    let isActive = true;
+    let unsubscribe = () => {};
 
-    return () => unsubscribe();
+    const initializeAuth = async () => {
+      try {
+        // Firebase only finalizes a full-page OAuth flow when the redirect
+        // result is consumed after the application reloads.
+        await completeGoogleRedirect();
+      } catch (error) {
+        console.error('Unable to complete Google redirect sign-in:', error);
+      }
+
+      if (!isActive) return;
+
+      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        try {
+          if (firebaseUser) {
+            // Sync user profile to Firestore
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            const userSnap = await getDoc(userRef);
+
+            if (!userSnap.exists()) {
+              await setDoc(userRef, {
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName,
+                photoURL: firebaseUser.photoURL,
+                accountProvider: firebaseUser.providerData[0]?.providerId || 'google',
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp(),
+                subscriptionTier: 'free',
+                accountStatus: 'active'
+              });
+            } else {
+              await setDoc(userRef, {
+                lastLogin: serverTimestamp()
+              }, { merge: true });
+            }
+            setUser(firebaseUser);
+          } else {
+            setUser(null);
+          }
+        } catch (error) {
+          console.error("Error during auth state change:", error);
+          // Still set user so they can at least see the app, or handle error state
+          setUser(firebaseUser);
+        } finally {
+          setIsAuthLoading(false);
+        }
+      });
+    };
+
+    void initializeAuth();
+
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
