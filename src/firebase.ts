@@ -26,6 +26,12 @@ export const loginWithGoogle = async () => {
       error?.code === 'auth/popup-blocked' ||
       error?.code === 'auth/cancelled-popup-request'
     ) {
+      // Vercel serves this SPA from `/`; returning directly to a client-side
+      // route such as `/login` would otherwise produce a platform 404.
+      if (window.location.pathname !== '/') {
+        window.history.replaceState(window.history.state, '', '/');
+      }
+
       await signInWithRedirect(auth, googleProvider);
       return null;
     }
