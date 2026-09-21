@@ -235,7 +235,7 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gemini-2.5-flash",
+          model: "gemini-3.8-flash",
           contents: `Rewrite the following content to be formatted specifically for ${label}. Adapt the tone, length, and style appropriately. Keep it high quality.\n\nContent:\n${body}`
         })
       });

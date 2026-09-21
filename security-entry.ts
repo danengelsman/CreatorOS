@@ -91,7 +91,8 @@ async function protectGeminiRoute(req: any, res: any, next: any) {
 
     if (route === '/api/gemini/generate') {
       const requestedModel = req.body?.model;
-      if (requestedModel && requestedModel !== 'gemini-2.5-flash') {
+      const allowedModels = new Set(['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash']);
+      if (requestedModel && !allowedModels.has(requestedModel)) {
         return res.status(400).json({ error: 'Unsupported Gemini model.' });
       }
     }
