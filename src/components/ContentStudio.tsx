@@ -23,9 +23,19 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
   const [studioTab, setStudioTab] = useState<'editor' | 'ideas' | 'templates' | 'retention' | 'planner' | 'calendar'>('editor');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-    const [videoHistory, setVideoHistory] = useState<any[]>([]);
+  const [videoHistory, setVideoHistory] = useState<any[]>([]);
   const [allProjects, setAllProjects] = useState<any[]>([]);
-        const [activePreviewVideo, setActivePreviewVideo] = useState<any>(null);
+  const [activePreviewVideo, setActivePreviewVideo] = useState<any>(null);
+  const [platform, setPlatform] = useState('youtube');
+  const [isScoring, setIsScoring] = useState(false);
+  const [scoreData, setScoreData] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPolishing, setIsPolishing] = useState(false);
+  const [isGeneratingSpeech, setIsGeneratingSpeech] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const audioChunks = useRef<Blob[]>([]);
 
   const loadVideoHistory = async () => {
     if (!user) return;
@@ -117,21 +127,6 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
       }
     }
   }, [selectedIdea, setSelectedIdea]);
-  const [platform, setPlatform] = useState('youtube');
-        
-          
-  const [isScoring, setIsScoring] = useState(false);
-  const [scoreData, setScoreData] = useState<any>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isPolishing, setIsPolishing] = useState(false);
-  const [isGeneratingSpeech, setIsGeneratingSpeech] = useState(false);
-      const [saveSuccess, setSaveSuccess] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
-
-    const audioChunks = useRef<Blob[]>([]);
-
-  const [toastMessage, setToastMessage] = useState('');
-
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3000);

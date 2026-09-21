@@ -33,8 +33,8 @@ import { auth, onAuthStateChanged, completeGoogleRedirect, db, logout, FirebaseU
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
 
 // Components
-const Dashboard = React.lazy(() => import('./components/Dashboard'));
-const ContentStudio = React.lazy(() => import('./components/ContentStudio'));
+import Dashboard from './components/Dashboard';
+import ContentStudio from './components/ContentStudio';
 const ContentRepurposer = React.lazy(() => import('./components/ContentRepurposer'));
 const BrandingEngine = React.lazy(() => import('./components/BrandingEngine'));
 const VideoIdeas = React.lazy(() => import('./components/VideoIdeas'));
@@ -260,11 +260,19 @@ export default function App() {
   }
 
   if (currentPath === '/privacy') {
-    return <PrivacyPolicy onBack={() => navigate('/')} />;
+    return (
+      <React.Suspense fallback={<LoadingScreen />}>
+        <PrivacyPolicy onBack={() => navigate('/')} />
+      </React.Suspense>
+    );
   }
 
   if (currentPath === '/terms') {
-    return <TermsOfService onBack={() => navigate('/')} />;
+    return (
+      <React.Suspense fallback={<LoadingScreen />}>
+        <TermsOfService onBack={() => navigate('/')} />
+      </React.Suspense>
+    );
   }
 
   if (currentPath === '/roadmap') {
@@ -333,10 +341,11 @@ export default function App() {
 
   if (!user) {
     document.body.classList.remove('is-app');
-    if (currentPath === '/login') {
-      return <Login navigate={navigate} />;
-    }
-    return <LandingPage navigate={navigate} />;
+    return (
+      <React.Suspense fallback={<LoadingScreen />}>
+        {currentPath === '/login' ? <Login navigate={navigate} /> : <LandingPage navigate={navigate} />}
+      </React.Suspense>
+    );
   }
 
   document.body.classList.add('is-app');
@@ -494,19 +503,26 @@ export default function App() {
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 >
-                  {(() => {
-                    const Component = ActiveComponent as any;
-                    
-                    if (currentPath.startsWith('/help/')) {
-                      const topicId = currentPath.replace('/help/', '');
-                      return <HelpArticle topic={topicId} onBack={() => {
-                        navigate('/'); // Reset path
-                        setActiveTab('help');
-                      }} />;
-                    }
-                    
-                    return <Component brand={brand} setBrand={setBrand} setActiveTab={setActiveTab} navigate={navigate} user={user} userData={userData} projects={projects} selectedIdea={selectedIdea} setSelectedIdea={setSelectedIdea} />;
-                  })()}
+                  <React.Suspense fallback={
+                    <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+                      <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
+                      <span className="text-sm font-medium text-[var(--label-secondary)]">Loading workspace...</span>
+                    </div>
+                  }>
+                    {(() => {
+                      const Component = ActiveComponent as any;
+                      
+                      if (currentPath.startsWith('/help/')) {
+                        const topicId = currentPath.replace('/help/', '');
+                        return <HelpArticle topic={topicId} onBack={() => {
+                          navigate('/'); // Reset path
+                          setActiveTab('help');
+                        }} />;
+                      }
+                      
+                      return <Component brand={brand} setBrand={setBrand} setActiveTab={setActiveTab} navigate={navigate} user={user} userData={userData} projects={projects} selectedIdea={selectedIdea} setSelectedIdea={setSelectedIdea} />;
+                    })()}
+                  </React.Suspense>
                 </motion.div>
               </AnimatePresence>
             </div>

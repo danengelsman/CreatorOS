@@ -11,6 +11,10 @@ export default defineConfig(({mode}) => {
       alias: {
         '@': path.resolve('./src'),
       },
+      dedupe: ['react', 'react-dom'],
+    },
+    optimizeDeps: {
+      include: ['react', 'react-dom'],
     },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
