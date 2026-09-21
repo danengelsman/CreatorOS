@@ -4,7 +4,7 @@ export const generateBrandKit = async (userInput: string) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `Generate a complete brand kit for a creator based on this description: ${userInput}.
       Select a specific creator archetype (e.g., 'The Educator', 'The Entertainer', 'The Analyst', 'The Storyteller', 'The Guide', 'The Visionary').
       Provide granular options for visual styles, cohesive color palettes (with hex codes), and specific Google Fonts for typography. Ensure these elements are cohesive and generate a distinct brand identity. Also include default settings for an AI Avatar including gender, clothing style, sound/voice description, and default background.`,
@@ -76,7 +76,7 @@ export const generateContentIdeas = async (brandData: any) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `Generate 5-10 content ideas for a creator based on this brand identity:
       Name: ${brandData.name}
       Tagline: ${brandData.tagline}
@@ -125,7 +125,7 @@ export const scoreContent = async (content: string, brandVoice: string) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `Score this content (0-100) based on hook strength, clarity, engagement potential, and storytelling. 
       Brand Voice: ${brandVoice}
       Content: ${content}`,
@@ -164,7 +164,7 @@ export const remixContent = async (content: string, instruction: string) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `Remix and refine the following content according to these instructions: "${instruction}".
       Maintain the original core message but adapt it as requested. Return only the revised content.
       
@@ -183,7 +183,7 @@ export const optimizeSearchTerms = async (content: string, tone: string, audienc
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `Generate optimized SEO keywords and hashtags for the following content.
       Tone: ${tone}
       Audience: ${audience}
@@ -206,7 +206,7 @@ export const quickPolish = async (content: string) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `Briefly polish this content for better flow and impact. Keep it concise.
       Content: ${content}`
     })
@@ -229,7 +229,7 @@ export const repurposeContent = async (content: string) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `Analyze this published content and automatically suggest multiple ways to repurpose it for other platforms (e.g., TikTok, Twitter, LinkedIn).
       Provide specific, actionable ideas for transforming the content.
       Include suggested edits, format changes, platform-specific optimizations, and a draft for each idea.
@@ -289,7 +289,7 @@ export const generateSpeech = async (text: string, voice: string = 'Kore') => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: [{ parts: [{ text: `Say naturally: ${text}` }] }],
       config: {
         responseModalities: ["AUDIO"],
@@ -320,7 +320,7 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string = "a
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: {
         parts: [
           {
@@ -393,7 +393,7 @@ export const generateSmartSuggestions = async (brandData: any, existingContent: 
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `You are an expert Content Strategy Consultant. Analyze the creator's niche based on their Brand Identity and their existing content history. Then suggest trending topics and new unique angles.
 
       CREATOR BRAND IDENTITY:
@@ -450,7 +450,15 @@ export const generateSmartSuggestions = async (brandData: any, existingContent: 
     })
   });
 
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to generate suggestions. Please try again.');
+  }
+
   const data = await response.json();
+  if (!data?.text) {
+    throw new Error('No suggestions generated by the model. Please retry.');
+  }
   return JSON.parse(data.text);
 };
 
@@ -484,7 +492,7 @@ ${scriptText}`;
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `${systemPrompt}\n\n${userContent}`,
       config: {
         responseMimeType: "application/json",
@@ -577,7 +585,7 @@ Draft Hook / Intro Script to Analyze:
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `${systemPrompt}\n\n${userContent}`,
       config: {
         responseMimeType: "application/json",
@@ -727,7 +735,7 @@ Keep it highly scannable, elegant, and ready to be used as a source of truth by 
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
     })
   });

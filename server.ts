@@ -251,12 +251,41 @@ async function startServer() {
 
   app.post("/api/gemini/generate", async (req: any, res) => {
     try {
-      const { model, contents, config } = req.body;
-      const response = await (await getAI()).models.generateContent({
-        model: model || "gemini-3.8-flash",
-        contents,
-        config
-      });
+      let { model, contents, config } = req.body;
+      
+      // Transparently rewrite deprecated models to modern standard
+      if (!model || model === "gemini-2.5-flash") {
+        model = "gemini-3.8-flash";
+      }
+
+      const ai = await getAI();
+      let response;
+      try {
+        response = await ai.models.generateContent({
+          model,
+          contents,
+          config
+        });
+      } catch (firstAttemptError: any) {
+        // If 503 high demand or 404 retired model, retry with fallback flash-lite pool
+        const isTransientOrRetired = 
+          firstAttemptError?.status === 503 || 
+          firstAttemptError?.status === 404 || 
+          firstAttemptError?.message?.includes('high demand') ||
+          firstAttemptError?.message?.includes('no longer available');
+
+        if (isTransientOrRetired && model !== "gemini-3.1-flash-lite") {
+          console.warn(`Model ${model} unavailable (${firstAttemptError.message}), cascading to gemini-3.1-flash-lite...`);
+          response = await ai.models.generateContent({
+            model: "gemini-3.1-flash-lite",
+            contents,
+            config
+          });
+        } else {
+          throw firstAttemptError;
+        }
+      }
+
       res.json({ text: response.text, candidates: response.candidates });
     } catch (error: any) {
       console.error('Gemini Generate Error:', error);

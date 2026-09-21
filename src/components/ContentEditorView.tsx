@@ -161,7 +161,7 @@ export default function ContentEditorView({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: "gemini-2.5-flash",
+            model: "gemini-3.8-flash",
             contents: {
               parts: [
                 {
@@ -197,7 +197,7 @@ export default function ContentEditorView({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gemini-2.5-flash",
+          model: "gemini-3.8-flash",
           contents: `Generate 5 relevant hashtags for the following content. Output ONLY the hashtags separated by spaces, nothing else.\n\nContent:\n${body}`
         })
       });
@@ -276,7 +276,7 @@ export default function ContentEditorView({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gemini-2.5-flash",
+          model: "gemini-3.8-flash",
           contents: `Rewrite the following content as a detailed video script. Include time markers (e.g., [0:00 - 0:05]), settings, and AI Avatar look/sound based on the brand: ${JSON.stringify(brand.avatar || brand.visual_style)}. Ensure it is highly engaging and formatted well.\n\nContent:\n${body}`
         })
       });

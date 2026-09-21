@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { FilmScript, Sparkle, Clock, Copy, Check, VideoCamera, Image as ImageIcon, TextAa, Warning, ArrowRight, ListChecks, Export } from '@phosphor-icons/react';
+import { FilmScript, Sparkle, Clock, Copy, Check, VideoCamera, Image as ImageIcon, TextAa, Warning, ArrowRight, ListChecks, Export, ArrowClockwise } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import { generateScenePlan } from '../services/gemini';
 
@@ -31,10 +31,13 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
     try {
       const plan = await generateScenePlan(scriptText, titleText, brand);
       setScenePlan(plan?.video_plan || plan);
+      setError('');
       showToast('Scene plan generated successfully!');
     } catch (err: any) {
       console.error('Failed to generate scene plan:', err);
-      showToast(err.message || 'Failed to generate scene plan. Please try again.');
+      const errMsg = err?.message || 'Failed to generate scene plan. The AI service may be under high demand.';
+      setError(errMsg);
+      showToast(errMsg);
     } finally {
       setIsGenerating(false);
     }
@@ -181,6 +184,26 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <Warning size={20} weight="fill" className="text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[13px] font-semibold text-[var(--label-primary)]">Shot Planning Stalled</p>
+                <p className="text-[12px] text-[var(--label-secondary)] leading-relaxed">{error}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleGeneratePlan}
+              disabled={isGenerating || !scriptText.trim()}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[var(--accent)] text-[#17100b] text-[12px] font-bold shadow-sm hover:opacity-95 transition-opacity shrink-0"
+            >
+              <ArrowClockwise size={14} weight="bold" />
+              <span>Retry Planning</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Generated Shot List */}
