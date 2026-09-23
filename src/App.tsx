@@ -132,60 +132,62 @@ export default function App() {
 
   useEffect(() => {
     let isActive = true;
-    let unsubscribe = () => {};
 
-    const initializeAuth = async () => {
-      try {
-        // Firebase only finalizes a full-page OAuth flow when the redirect
-        // result is consumed after the application reloads.
-        await completeGoogleRedirect();
-      } catch (error) {
-        console.error('Unable to complete Google redirect sign-in:', error);
+    // Safety fallback: Ensure the loading screen never hangs permanently
+    const safetyTimeout = setTimeout(() => {
+      if (isActive) {
+        setIsAuthLoading(false);
       }
+    }, 3500);
 
-      if (!isActive) return;
+    // Concurrently handle any pending Google redirect flow in background
+    void completeGoogleRedirect().catch(err => {
+      console.warn('Google redirect check completed:', err);
+    });
 
-      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        try {
-          if (firebaseUser) {
-            // Sync user profile to Firestore
-            const userRef = doc(db, 'users', firebaseUser.uid);
-            const userSnap = await getDoc(userRef);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (!isActive) return;
 
-            if (!userSnap.exists()) {
-              await setDoc(userRef, {
-                email: firebaseUser.email,
-                displayName: firebaseUser.displayName,
-                photoURL: firebaseUser.photoURL,
-                accountProvider: firebaseUser.providerData[0]?.providerId || 'google',
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp(),
-                subscriptionTier: 'free',
-                accountStatus: 'active'
-              });
-            } else {
-              await setDoc(userRef, {
-                lastLogin: serverTimestamp()
-              }, { merge: true });
-            }
-            setUser(firebaseUser);
+        if (firebaseUser) {
+          // Sync user profile to Firestore
+          const userRef = doc(db, 'users', firebaseUser.uid);
+          const userSnap = await getDoc(userRef);
+
+          if (!userSnap.exists()) {
+            await setDoc(userRef, {
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName,
+              photoURL: firebaseUser.photoURL,
+              accountProvider: firebaseUser.providerData[0]?.providerId || 'google',
+              createdAt: serverTimestamp(),
+              lastLogin: serverTimestamp(),
+              subscriptionTier: 'free',
+              accountStatus: 'active'
+            });
           } else {
-            setUser(null);
+            await setDoc(userRef, {
+              lastLogin: serverTimestamp()
+            }, { merge: true });
           }
-        } catch (error) {
-          console.error("Error during auth state change:", error);
-          // Still set user so they can at least see the app, or handle error state
-          setUser(firebaseUser);
-        } finally {
+          if (isActive) setUser(firebaseUser);
+        } else {
+          if (isActive) setUser(null);
+        }
+      } catch (error) {
+        console.error("Error during auth state change:", error);
+        if (isActive) setUser(firebaseUser);
+      } finally {
+        if (isActive) {
+          clearTimeout(safetyTimeout);
           setIsAuthLoading(false);
         }
-      });
-    };
-
-    void initializeAuth();
+      }
+    });
 
     return () => {
       isActive = false;
+      clearTimeout(safetyTimeout);
       unsubscribe();
     };
   }, []);
