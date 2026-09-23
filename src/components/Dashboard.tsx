@@ -16,6 +16,7 @@ import {
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { authorizedFetch } from '../firebase';
+import DailyGoalTracker from './DailyGoalTracker';
 
 const formatNumber = (num: number) => {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
@@ -317,6 +318,9 @@ export default function Dashboard({ brand, setActiveTab, user, projects = [] }: 
           </div>
         </section>
       </div>
+
+      {/* Daily Creator Goal Tracker */}
+      <DailyGoalTracker user={user} className="mt-5" />
 
       {/* Recent work */}
       <section className="mt-5 overflow-hidden rounded-[28px] border border-white/[0.09] bg-white/[0.035] shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur-xl">

@@ -7,7 +7,19 @@ import {
 // Storage not available
 import firebaseConfig from '../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
+// Ensure the authDomain matches the active runtime host:
+// In Vercel deployments, use the configured Vercel domain with its /__/auth rewrites.
+// In dev preview/localhost, use the official Firebase domain to prevent iframe cross-origin locks.
+const resolvedAuthDomain = (typeof window !== 'undefined' && (
+  window.location.hostname.includes('vercel.app') ||
+  window.location.hostname === firebaseConfig.authDomain
+)) ? (firebaseConfig.authDomain || `${firebaseConfig.projectId}.firebaseapp.com`)
+   : `${firebaseConfig.projectId}.firebaseapp.com`;
+
+const app = initializeApp({
+  ...firebaseConfig,
+  authDomain: resolvedAuthDomain
+});
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
@@ -39,8 +51,19 @@ export const loginWithGoogle = async () => {
     throw error;
   }
 };
-/** Completes a pending full-page Google redirect after the app reloads. */
-export const completeGoogleRedirect = () => getRedirectResult(auth);
+/** Completes a pending full-page Google redirect after the app reloads with timeout safety. */
+export const completeGoogleRedirect = async () => {
+  try {
+    const redirectPromise = getRedirectResult(auth);
+    const timeoutPromise = new Promise<null>((resolve) => 
+      setTimeout(() => resolve(null), 2500)
+    );
+    return await Promise.race([redirectPromise, timeoutPromise]);
+  } catch (error) {
+    console.warn('Redirect check finished or skipped:', error);
+    return null;
+  }
+};
 
 export const loginWithEmail = (email: string, pass: string) => signInWithEmailAndPassword(auth, email, pass);
 export const registerWithEmail = (email: string, pass: string) => createUserWithEmailAndPassword(auth, email, pass);
