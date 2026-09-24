@@ -34,6 +34,8 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedAvatars, setGeneratedAvatars] = useState<Avatar[]>([]);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing avatars on mount
@@ -54,6 +56,7 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
 
   const handleGenerate = async () => {
     if (!auth.currentUser) return;
+    setErrorMessage(null);
     setIsGenerating(true);
 
     try {
@@ -80,14 +83,22 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
         body: JSON.stringify({
           model: 'gemini-3.8-flash',
           contents,
-          config: {
-            // Note: If image generation model requires specific config, use them, otherwise this works with flash
-            // Assuming we just use standard generation for simplicity if model changed
-          }
+          config: {}
         })
       });
       
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) {
+        const errorText = await response.text();
+        try {
+          const errorJson = JSON.parse(errorText);
+          throw new Error(errorJson.error || 'Server error generating avatar');
+        } catch {
+          if (errorText.includes('PayloadTooLargeError') || response.status === 413) {
+            throw new Error('Image file is too large. Please select a smaller photo or lower resolution image.');
+          }
+          throw new Error(errorText || 'Failed to generate avatar');
+        }
+      }
       const data = await response.json();
 
       let imageUrl = '';
@@ -124,9 +135,12 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
           createdAt: { seconds: Date.now() / 1000 } 
         } as unknown as Avatar;
         setGeneratedAvatars([newAvatar, ...generatedAvatars]);
+      } else {
+        throw new Error('No avatar image was returned. Please try with different instructions or another photo.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating avatar:", error);
+      setErrorMessage(error?.message || 'Failed to generate avatar. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -171,15 +185,38 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setReferenceImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setErrorMessage(null);
+    setIsProcessingPhoto(true);
+
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const rawBase64 = reader.result as string;
+          // Pre-compress and constrain dimension to 1024px to ensure fast upload and small payload
+          const compressed = await compressBase64Image(rawBase64, 1024, 0.85);
+          setReferenceImage(compressed);
+        } catch (compErr) {
+          console.warn('Image pre-compression note:', compErr);
+          setReferenceImage(reader.result as string);
+        } finally {
+          setIsProcessingPhoto(false);
+        }
+      };
+      reader.onerror = () => {
+        setErrorMessage('Failed to read image file. Please try another image.');
+        setIsProcessingPhoto(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Photo upload error:', err);
+      setErrorMessage('Failed to process image. Please try again.');
+      setIsProcessingPhoto(false);
+    }
   };
 
   const downloadAvatar = (url: string) => {
@@ -257,10 +294,15 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
                 <div className="space-y-4">
                   <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-widest">Reference Photo</label>
                   <div 
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => !isProcessingPhoto && fileInputRef.current?.click()}
                     className="aspect-square rounded-3xl border-2 border-dashed border-[var(--separator)] bg-[var(--bg-secondary)] flex flex-col items-center justify-center cursor-pointer hover:border-[var(--accent)] transition-colors overflow-hidden relative group"
                   >
-                    {referenceImage ? (
+                    {isProcessingPhoto ? (
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" strokeWidth={1.5} />
+                        <p className="text-xs font-bold text-[var(--label-secondary)]">Optimizing photo...</p>
+                      </div>
+                    ) : referenceImage ? (
                       <>
                         <img loading="lazy" src={referenceImage || undefined} alt="Reference" className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -320,9 +362,18 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
                 />
               </div>
 
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center justify-between gap-2">
+                  <span className="flex-1">{errorMessage}</span>
+                  <button onClick={() => setErrorMessage(null)} className="hover:opacity-75">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
               <button 
                 onClick={handleGenerate}
-                disabled={isGenerating || (activeTab === 'photo' && !referenceImage)}
+                disabled={isGenerating || isProcessingPhoto || (activeTab === 'photo' && !referenceImage)}
                 className="ios-button ios-button-filled w-full"
               >
                 {isGenerating ? (

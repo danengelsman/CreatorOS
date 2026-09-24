@@ -151,21 +151,24 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log('Firestore connection established successfully.');
+    // Only perform diagnostic check if auth state confirms user is present
+    if (auth.currentUser) {
+      await getDocFromServer(doc(db, 'test', 'connection'));
+      console.log('Firestore connection established successfully.');
+    }
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('the client is offline') || error.message.includes('unavailable')) {
-        console.error('Firestore connection failed: The client is offline or the service is unavailable. Please check your Firebase configuration and internet connection.');
+        // Log info rather than error to avoid false positive error triggers when client is offline/reconnecting
+        console.info('Firestore operating in offline cache mode.');
       } else if (error.message.toLowerCase().includes('permission') || (error as any).code === 'permission-denied') {
         console.log('Firestore connection established (Permission Denied as expected).');
       } else {
-        console.error('Firestore connection error:', error.message);
+        console.warn('Firestore connection check notice:', error.message);
       }
     }
   }
 }
-testConnection();
 
 /** Helper for authenticated API calls. */
 export async function authorizedFetch(url: string, options: RequestInit = {}) {
