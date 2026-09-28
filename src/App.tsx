@@ -106,6 +106,8 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [brand, setBrand] = useState<any>(null);
   const [projects, setProjects] = useState<any[]>([]);
+  const [isProjectsLoading, setIsProjectsLoading] = useState(true);
+  const [projectsLoadError, setProjectsLoadError] = useState(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -195,6 +197,8 @@ export default function App() {
 
   useEffect(() => {
     if (user) {
+      setIsProjectsLoading(true);
+      setProjectsLoadError(false);
       // Real-time user data update
       const userRef = doc(db, 'users', user.uid);
       const unsubscribeUser = onSnapshot(userRef, (snap) => {
@@ -241,7 +245,11 @@ export default function App() {
           }))
           .sort((a: any, b: any) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
         setProjects(projectsData);
+        setProjectsLoadError(false);
+        setIsProjectsLoading(false);
       }, (error) => {
+        setProjectsLoadError(true);
+        setIsProjectsLoading(false);
         handleFirestoreError(error, OperationType.GET, 'projects');
       });
 
@@ -251,6 +259,9 @@ export default function App() {
         unsubscribeProjects();
       };
     }
+    setProjects([]);
+    setIsProjectsLoading(true);
+    setProjectsLoadError(false);
   }, [user]);
 
   const isDeveloper = user?.email && DEVELOPER_EMAILS.includes(user.email);
@@ -532,7 +543,7 @@ export default function App() {
                         }} />;
                       }
                       
-                      return <Component brand={brand} setBrand={setBrand} setActiveTab={switchTab} navigate={navigate} user={user} userData={userData} projects={projects} selectedIdea={selectedIdea} setSelectedIdea={setSelectedIdea} selectedProject={selectedProject} onOpenProject={openProject} />;
+                      return <Component brand={brand} setBrand={setBrand} setActiveTab={switchTab} navigate={navigate} user={user} userData={userData} projects={projects} isProjectsLoading={isProjectsLoading} projectsLoadError={projectsLoadError} selectedIdea={selectedIdea} setSelectedIdea={setSelectedIdea} selectedProject={selectedProject} onOpenProject={openProject} />;
                     })()}
                   </React.Suspense>
                 </motion.div>

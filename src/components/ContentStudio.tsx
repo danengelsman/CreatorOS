@@ -18,6 +18,7 @@ import ContentEditorView, { PLATFORMS } from './ContentEditorView';
 import AIToolPanel from './AIToolPanel';
 import ContentIdeaGenerator from './ContentIdeaGenerator';
 import ViralTemplatesLibrary from './ViralTemplatesLibrary';
+import { recordJourneyEvent } from '../services/creatorJourney';
 
 export default function Create({ brand, setActiveTab, user, selectedIdea, setSelectedIdea, selectedProject }: { brand: any, setActiveTab: (tab: string) => void, user: any, selectedIdea?: any, setSelectedIdea?: any, selectedProject?: any }) {
   const [studioTab, setStudioTab] = useState<'editor' | 'ideas' | 'templates' | 'retention' | 'planner' | 'calendar'>('editor');
@@ -173,6 +174,9 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
     if (!user || !body) return;
     setIsSaving(true);
     try {
+      const firstDraftRevision = activeProjectId === selectedProject?.id
+        && selectedProject?.journeyStep === 'first_content'
+        && body.trim() !== (selectedProject.starterBody || selectedProject.data?.body || '').trim();
       const changes = {
         name: title || 'Untitled Content',
         data: {
@@ -181,10 +185,18 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
           platform,
           score: scoreData?.score || 0
         },
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        ...(firstDraftRevision ? { journeyDraftSavedAt: serverTimestamp() } : {})
       };
       if (activeProjectId) {
         await updateDoc(doc(db, 'projects', activeProjectId), changes);
+        if (firstDraftRevision) {
+          try {
+            await recordJourneyEvent(user.uid, { type: 'save_draft', projectId: activeProjectId });
+          } catch (err) {
+            console.warn('Draft saved; mission history will recover from the project:', err);
+          }
+        }
       } else {
         const projectRef = await addDoc(collection(db, 'projects'), {
           ...changes,
