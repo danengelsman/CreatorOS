@@ -102,6 +102,7 @@ const DEVELOPER_EMAILS = ['danengelsman@gmail.com'];
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [selectedIdea, setSelectedIdea] = useState<any>(null);
+  const [selectedProject, setSelectedProject] = useState<any>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [brand, setBrand] = useState<any>(null);
   const [projects, setProjects] = useState<any[]>([]);
@@ -354,9 +355,18 @@ export default function App() {
 
   const handleOnboardingComplete = (targetTab?: string) => {
     setShowOnboarding(false);
-    if (targetTab) {
-      setActiveTab(targetTab);
-    }
+    setActiveTab(targetTab || 'home');
+  };
+
+  const openProject = (project: any) => {
+    setSelectedIdea(null);
+    setSelectedProject(project);
+    setActiveTab('create');
+  };
+
+  const switchTab = (tab: string) => {
+    setSelectedProject(null);
+    setActiveTab(tab);
   };
 
   const userPhoto = userData?.photoURL || user?.photoURL || '';
@@ -456,7 +466,7 @@ export default function App() {
                               key={item.id}
                               onClick={() => {
                                 if (item.locked && !isDeveloper && projects.length === 0) return;
-                                setActiveTab(item.id);
+                                switchTab(item.id);
                                 setIsMobileMenuOpen(false);
                               }}
                               className={cn(
@@ -522,7 +532,7 @@ export default function App() {
                         }} />;
                       }
                       
-                      return <Component brand={brand} setBrand={setBrand} setActiveTab={setActiveTab} navigate={navigate} user={user} userData={userData} projects={projects} selectedIdea={selectedIdea} setSelectedIdea={setSelectedIdea} />;
+                      return <Component brand={brand} setBrand={setBrand} setActiveTab={switchTab} navigate={navigate} user={user} userData={userData} projects={projects} selectedIdea={selectedIdea} setSelectedIdea={setSelectedIdea} selectedProject={selectedProject} onOpenProject={openProject} />;
                     })()}
                   </React.Suspense>
                 </motion.div>
@@ -536,7 +546,7 @@ export default function App() {
               {visibleNavItems.filter(item => ['home', 'create', 'repurpose', 'brand', 'profile'].includes(item.id)).map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => switchTab(item.id)}
                   className={cn(
                     "flex flex-col items-center justify-center flex-1 gap-1 py-1 transition-colors",
                     activeTab === item.id ? "text-[var(--accent)]" : "text-[var(--label-secondary)]"

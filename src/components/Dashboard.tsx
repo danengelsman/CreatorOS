@@ -17,6 +17,7 @@ import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { authorizedFetch } from '../firebase';
 import DailyGoalTracker from './DailyGoalTracker';
+import FirstCreationMission from './FirstCreationMission';
 
 const formatNumber = (num: number) => {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
@@ -26,7 +27,7 @@ const formatNumber = (num: number) => {
 
 const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#08080d]';
 
-export default function Dashboard({ brand, setActiveTab, user, projects = [] }: { brand: any, setActiveTab: (tab: string) => void, user: any, projects?: any[] }) {
+export default function Dashboard({ brand, setActiveTab, user, projects = [], onOpenProject }: { brand: any, setActiveTab: (tab: string) => void, user: any, projects?: any[], onOpenProject?: (project: any) => void }) {
   const firstName = user?.displayName?.split(' ')?.[0] || 'Creator';
   const [summary, setSummary] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,6 +88,31 @@ export default function Dashboard({ brand, setActiveTab, user, projects = [] }: 
       dayPart: hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening',
     };
   }, []);
+
+  const contentProjects = projects.filter(project => project.type === 'content');
+  const firstDraft = contentProjects.find(project => project.journeyStep === 'first_content' && (project.status || 'Draft').toLowerCase() === 'draft');
+  if (brand && (firstDraft || contentProjects.length === 0)) {
+    return (
+      <div className="mx-auto max-w-5xl pb-20 pt-8">
+        <p className="mb-2 text-sm text-[var(--label-secondary)]">Good {dayPart}, {firstName}.</p>
+        {firstDraft ? (
+          <section aria-label="Continue your first draft" className="rounded-[28px] border border-[var(--accent)]/30 bg-[var(--bg-secondary)] p-6 md:p-8">
+            <p className="text-xs font-bold uppercase tracking-widest text-[var(--accent)]">Your first mission</p>
+            <h1 className="mt-2 text-3xl font-bold">Continue your first draft</h1>
+            <p className="mt-3 text-lg font-semibold">{firstDraft.name}</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--label-secondary)]">
+              You have a starting point. Add your own examples and shape it for the audience you chose. Your changes will stay with this draft when you save.
+            </p>
+            <button type="button" onClick={() => onOpenProject?.(firstDraft)} className="ios-button ios-button-filled mt-6 px-5">
+              Continue in Studio
+            </button>
+          </section>
+        ) : (
+          <FirstCreationMission brand={brand} user={user} onOpenDraft={project => onOpenProject?.(project)} />
+        )}
+      </div>
+    );
+  }
 
   const nextMove = !milestoneBrandKit
     ? { title: 'Define your brand system', description: 'Lock in your positioning, visual language, and voice before you publish.', action: 'Open Brand Studio', tab: 'brand' }
