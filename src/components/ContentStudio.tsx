@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { scoreContent, quickPolish, remixContent, optimizeSearchTerms, generateSpeech, transcribeAudio, generateVideo, getOperationStatus, generateContentIdeas, generateSmartSuggestions } from '../services/gemini';
 import { cn } from '../lib/utils';
 import { db, serverTimestamp, handleFirestoreError, OperationType } from '../firebase';
-import { doc, setDoc, collection, addDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { doc, setDoc, collection, addDoc, getDocs, query, where, orderBy, updateDoc } from 'firebase/firestore';
 import VideoStudio from "./VideoStudio";
 import BrandIcon from './BrandIcon';
 import CalendarView from './CalendarView';
@@ -19,10 +19,11 @@ import AIToolPanel from './AIToolPanel';
 import ContentIdeaGenerator from './ContentIdeaGenerator';
 import ViralTemplatesLibrary from './ViralTemplatesLibrary';
 
-export default function Create({ brand, setActiveTab, user, selectedIdea, setSelectedIdea }: { brand: any, setActiveTab: (tab: string) => void, user: any, selectedIdea?: any, setSelectedIdea?: any }) {
+export default function Create({ brand, setActiveTab, user, selectedIdea, setSelectedIdea, selectedProject }: { brand: any, setActiveTab: (tab: string) => void, user: any, selectedIdea?: any, setSelectedIdea?: any, selectedProject?: any }) {
   const [studioTab, setStudioTab] = useState<'editor' | 'ideas' | 'templates' | 'retention' | 'planner' | 'calendar'>('editor');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(selectedProject?.id || null);
   const [videoHistory, setVideoHistory] = useState<any[]>([]);
   const [allProjects, setAllProjects] = useState<any[]>([]);
   const [activePreviewVideo, setActivePreviewVideo] = useState<any>(null);
@@ -119,7 +120,17 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
   };
 
   useEffect(() => {
+    if (!selectedProject?.id || selectedProject.userId !== user?.uid) return;
+    setActiveProjectId(selectedProject.id);
+    setTitle(selectedProject.data?.title || selectedProject.name || '');
+    setBody(selectedProject.data?.body || '');
+    setPlatform(selectedProject.data?.platform || 'youtube');
+    setStudioTab('editor');
+  }, [selectedProject?.id, user?.uid]);
+
+  useEffect(() => {
     if (selectedIdea) {
+      setActiveProjectId(null);
       setTitle(selectedIdea.hook || selectedIdea.title || '');
       setBody(selectedIdea.description || '');
       if (setSelectedIdea) {
@@ -162,20 +173,28 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
     if (!user || !body) return;
     setIsSaving(true);
     try {
-      const projectRef = collection(db, 'projects');
-      await addDoc(projectRef, {
-        userId: user.uid,
+      const changes = {
         name: title || 'Untitled Content',
-        type: 'content',
         data: {
           title,
           body,
           platform,
           score: scoreData?.score || 0
         },
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
-      }).catch(err => handleFirestoreError(err, OperationType.CREATE, 'projects'));
+      };
+      if (activeProjectId) {
+        await updateDoc(doc(db, 'projects', activeProjectId), changes);
+      } else {
+        const projectRef = await addDoc(collection(db, 'projects'), {
+          ...changes,
+          userId: user.uid,
+          type: 'content',
+          status: 'Draft',
+          createdAt: serverTimestamp()
+        });
+        setActiveProjectId(projectRef.id);
+      }
       
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);

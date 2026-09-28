@@ -380,7 +380,7 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
       }, { merge: true }).catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`));
 
       // 4. Complete Onboarding
-      onComplete('brand');
+      onComplete('home');
     } catch (error) {
       console.error("Error generating brand kit during onboarding:", error);
       setPhase('success');
