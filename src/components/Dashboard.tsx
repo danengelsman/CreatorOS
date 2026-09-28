@@ -15,9 +15,11 @@ import {
 } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
-import { authorizedFetch } from '../firebase';
+import { authorizedFetch, db } from '../firebase';
 import DailyGoalTracker from './DailyGoalTracker';
 import FirstCreationMission from './FirstCreationMission';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { CreatorJourney, recordJourneyEvent } from '../services/creatorJourney';
 
 const formatNumber = (num: number) => {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
@@ -27,12 +29,31 @@ const formatNumber = (num: number) => {
 
 const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#08080d]';
 
-export default function Dashboard({ brand, setActiveTab, user, projects = [], onOpenProject }: { brand: any, setActiveTab: (tab: string) => void, user: any, projects?: any[], onOpenProject?: (project: any) => void }) {
+export default function Dashboard({ brand, setActiveTab, user, projects = [], isProjectsLoading = false, projectsLoadError = false, onOpenProject }: { brand: any, setActiveTab: (tab: string) => void, user: any, projects?: any[], isProjectsLoading?: boolean, projectsLoadError?: boolean, onOpenProject?: (project: any) => void }) {
   const firstName = user?.displayName?.split(' ')?.[0] || 'Creator';
   const [summary, setSummary] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [analyticsUnavailable, setAnalyticsUnavailable] = useState(false);
   const [loadKey, setLoadKey] = useState(0);
+  const [journey, setJourney] = useState<CreatorJourney | null>(null);
+  const [isJourneyLoading, setIsJourneyLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setJourney(null);
+      setIsJourneyLoading(false);
+      return;
+    }
+    setJourney(null);
+    setIsJourneyLoading(true);
+    return onSnapshot(doc(db, 'preferences', user.uid), snapshot => {
+      setJourney((snapshot.data()?.creatorJourney as CreatorJourney) || null);
+      setIsJourneyLoading(false);
+    }, error => {
+      console.warn('Could not load creator mission:', error);
+      setIsJourneyLoading(false);
+    });
+  }, [user?.uid]);
 
   useEffect(() => {
     let isMounted = true;
@@ -90,25 +111,52 @@ export default function Dashboard({ brand, setActiveTab, user, projects = [], on
   }, []);
 
   const contentProjects = projects.filter(project => project.type === 'content');
-  const firstDraft = contentProjects.find(project => project.journeyStep === 'first_content' && (project.status || 'Draft').toLowerCase() === 'draft');
+  const firstDraft = contentProjects.find(project => project.id === journey?.activeProjectId && (project.status || 'Draft').toLowerCase() === 'draft')
+    || contentProjects.find(project => project.journeyStep === 'first_content' && (project.status || 'Draft').toLowerCase() === 'draft');
+  useEffect(() => {
+    if (!user?.uid || !firstDraft || isProjectsLoading || projectsLoadError || isJourneyLoading) return;
+    if (journey?.activeProjectId === firstDraft.id && (!firstDraft.journeyDraftSavedAt || journey.activeMission === 'review_first_draft')) return;
+    void (async () => {
+      try {
+        if (journey?.activeProjectId !== firstDraft.id) {
+          await recordJourneyEvent(user.uid, { type: 'start_draft', projectId: firstDraft.id });
+        }
+        if (firstDraft.journeyDraftSavedAt && journey?.activeMission !== 'review_first_draft') {
+          await recordJourneyEvent(user.uid, { type: 'save_draft', projectId: firstDraft.id });
+        }
+      } catch (error) {
+        console.warn('Could not reconcile mission with saved draft:', error);
+      }
+    })();
+  }, [user?.uid, firstDraft?.id, firstDraft?.journeyDraftSavedAt, isProjectsLoading, projectsLoadError, isJourneyLoading, journey?.activeProjectId, journey?.activeMission]);
+  if (isProjectsLoading || isJourneyLoading) {
+    return <p className="px-6 py-12 text-sm text-[var(--label-secondary)]" role="status">Finding where you left off...</p>;
+  }
+  if (projectsLoadError) {
+    return <p className="px-6 py-12 text-sm text-[var(--label-secondary)]" role="alert">We could not load your projects. Refresh the page to resume your work.</p>;
+  }
   if (brand && (firstDraft || contentProjects.length === 0)) {
     return (
       <div className="mx-auto max-w-5xl pb-20 pt-8">
         <p className="mb-2 text-sm text-[var(--label-secondary)]">Good {dayPart}, {firstName}.</p>
         {firstDraft ? (
           <section aria-label="Continue your first draft" className="rounded-[28px] border border-[var(--accent)]/30 bg-[var(--bg-secondary)] p-6 md:p-8">
-            <p className="text-xs font-bold uppercase tracking-widest text-[var(--accent)]">Your first mission</p>
-            <h1 className="mt-2 text-3xl font-bold">Continue your first draft</h1>
+            <p className="text-xs font-bold uppercase tracking-widest text-[var(--accent)]">
+              Your first mission · {firstDraft.journeyDraftSavedAt ? '2 of 2 starting steps complete' : 'Step 2 of 2'}
+            </p>
+            <h1 className="mt-2 text-3xl font-bold">{firstDraft.journeyDraftSavedAt ? 'Review your saved draft' : 'Continue your first draft'}</h1>
             <p className="mt-3 text-lg font-semibold">{firstDraft.name}</p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--label-secondary)]">
-              You have a starting point. Add your own examples and shape it for the audience you chose. Your changes will stay with this draft when you save.
+              {firstDraft.journeyDraftSavedAt
+                ? 'You made this draft your own and saved it. Read through it, refine what needs work, and decide when you are ready to share it.'
+                : 'You have a starting point. Add your own examples and shape it for the audience you chose. Save your changes to finish this writing mission.'}
             </p>
             <button type="button" onClick={() => onOpenProject?.(firstDraft)} className="ios-button ios-button-filled mt-6 px-5">
-              Continue in Studio
+              {firstDraft.journeyDraftSavedAt ? 'Review in Studio' : 'Continue in Studio'}
             </button>
           </section>
         ) : (
-          <FirstCreationMission brand={brand} user={user} onOpenDraft={project => onOpenProject?.(project)} />
+          <FirstCreationMission brand={brand} user={user} journey={journey} onOpenDraft={project => onOpenProject?.(project)} />
         )}
       </div>
     );

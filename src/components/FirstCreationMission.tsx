@@ -2,12 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
 import { db, serverTimestamp } from '../firebase';
 import { generateContentIdeas } from '../services/gemini';
+import { CreatorJourney, recordJourneyEvent } from '../services/creatorJourney';
 
 type Idea = { title: string; hook: string; description: string };
 
-export default function FirstCreationMission({ brand, user, onOpenDraft }: {
+export default function FirstCreationMission({ brand, user, journey, onOpenDraft }: {
   brand: any;
   user: any;
+  journey: CreatorJourney | null;
   onOpenDraft: (project: any) => void;
 }) {
   const [ideas, setIdeas] = useState<Idea[]>(() => brand?.content_ideas || []);
@@ -17,6 +19,15 @@ export default function FirstCreationMission({ brand, user, onOpenDraft }: {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
   const requestedFor = useRef<string | null>(null);
+  const [locallySkipped, setLocallySkipped] = useState<string[]>([]);
+  const excluded = new Set([...(journey?.skippedIdeas || []), ...locallySkipped]);
+  const availableIdeas = ideas.filter(idea => !excluded.has(idea.title));
+
+  useEffect(() => {
+    if (user?.uid && !journey) {
+      void recordJourneyEvent(user.uid, { type: 'initialize' }).catch(error => console.warn('Could not initialize mission:', error));
+    }
+  }, [user?.uid, journey]);
 
   useEffect(() => {
     if (brand?.content_ideas?.length) {
@@ -56,7 +67,7 @@ export default function FirstCreationMission({ brand, user, onOpenDraft }: {
     const ownTopic = customIdea.trim();
     const idea = ownTopic
       ? { title: ownTopic, hook: '', description: `What would help your audience understand ${ownTopic}?` }
-      : ideas[selected];
+      : availableIdeas[selected] || availableIdeas[0];
     if (!user?.uid || !idea || starting) return;
     setStarting(true);
     setError('');
@@ -68,11 +79,17 @@ export default function FirstCreationMission({ brand, user, onOpenDraft }: {
         type: 'content',
         status: 'Draft',
         journeyStep: 'first_content',
+        starterBody: body,
         data: { title: idea.title, body, platform: 'youtube', score: 0 },
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
       const ref = await addDoc(collection(db, 'projects'), project);
+      try {
+        await recordJourneyEvent(user.uid, { type: 'start_draft', projectId: ref.id });
+      } catch (err) {
+        console.warn('Draft saved; mission history will recover from the project:', err);
+      }
       onOpenDraft({ ...project, id: ref.id });
     } catch (err) {
       console.error('Could not create first draft:', err);
@@ -82,18 +99,31 @@ export default function FirstCreationMission({ brand, user, onOpenDraft }: {
     }
   };
 
+  const skipIdea = async () => {
+    const title = (availableIdeas[selected] || availableIdeas[0])?.title;
+    if (!user?.uid || !title) return;
+    try {
+      await recordJourneyEvent(user.uid, { type: 'skip_idea', title });
+      setLocallySkipped(previous => [...previous, title]);
+      setSelected(0);
+    } catch (err) {
+      console.error('Could not save skipped idea:', err);
+      setError('Could not save your preference. Please try again.');
+    }
+  };
+
   return (
     <section aria-label="Your first creator mission" className="mb-6 rounded-[28px] border border-[var(--accent)]/30 bg-[var(--bg-secondary)] p-6 md:p-8">
-      <p className="text-xs font-bold uppercase tracking-widest text-[var(--accent)]">Your first mission</p>
+      <p className="text-xs font-bold uppercase tracking-widest text-[var(--accent)]">Your first mission · Step 1 of 2</p>
       <h2 className="mt-2 text-2xl font-bold">Make one piece for your audience</h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--label-secondary)]">
         Your brand has a direction. Now let's turn it into a first draft you can shape in your own voice. Pick a starting idea; you can change every word in Studio.
       </p>
 
       {loading && <p className="mt-5 text-sm" role="status">Preparing ideas from your brand...</p>}
-      {!loading && ideas.length > 0 && (
+      {!loading && availableIdeas.length > 0 && (
         <div className="mt-5 grid gap-3 md:grid-cols-3" role="group" aria-label="Choose a starting idea">
-          {ideas.slice(0, 3).map((idea, index) => (
+          {availableIdeas.slice(0, 3).map((idea, index) => (
             <button key={`${idea.title}-${index}`} type="button" aria-pressed={!customIdea && selected === index}
               onClick={() => { setSelected(index); setCustomIdea(''); }}
               className={`rounded-2xl border p-4 text-left transition-colors ${!customIdea && selected === index ? 'border-[var(--accent)] bg-[var(--accent)]/10' : 'border-[var(--separator)] hover:border-[var(--accent)]/50'}`}>
@@ -111,13 +141,18 @@ export default function FirstCreationMission({ brand, user, onOpenDraft }: {
         className="mt-2 w-full max-w-lg rounded-xl border border-[var(--separator)] bg-[var(--bg-primary)] px-4 py-3 text-[var(--label-primary)]" />
       {error && <p className="mt-3 text-sm text-[var(--system-red)]" role="alert">{error}</p>}
       <div className="mt-5 flex flex-wrap items-center gap-4">
-        <button type="button" onClick={startDraft} disabled={starting || (!customIdea.trim() && !ideas.length)}
+        <button type="button" onClick={startDraft} disabled={starting || (!customIdea.trim() && !availableIdeas.length)}
           className="ios-button ios-button-filled px-5 disabled:opacity-50">
           {starting ? 'Saving your draft...' : 'Start this draft'}
         </button>
         <button type="button" onClick={() => void prepareIdeas()} disabled={loading} className="text-sm font-semibold text-[var(--accent)] disabled:opacity-50">
           Suggest different ideas
         </button>
+        {!customIdea.trim() && availableIdeas.length > 0 && (
+          <button type="button" onClick={() => void skipIdea()} className="text-sm text-[var(--label-secondary)] hover:text-[var(--label-primary)]">
+            Not for me
+          </button>
+        )}
       </div>
     </section>
   );
