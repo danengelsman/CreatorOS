@@ -7,6 +7,18 @@
     {
       "source": "/__/firebase/init.json",
       "destination": "https://gen-lang-client-0282443702.firebaseapp.com/__/firebase/init.json"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/index.html"
     }
   ]
 }
