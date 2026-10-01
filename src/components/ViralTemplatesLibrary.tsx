@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkle, Copy, ArrowRight, Video, TwitterLogo, InstagramLogo, YoutubeLogo, TiktokLogo, FileText, CheckCircle, MagicWand, X, Cards } from '@phosphor-icons/react';
 import { apiFetch } from '../firebase';
 import { cn } from '../lib/utils';
+import { getFriendlyError } from '../lib/friendlyError';
 
 const TEMPLATES = [
   {
@@ -144,7 +145,7 @@ export default function ViralTemplatesLibrary({ brand, onSelectTemplate }: { bra
         });
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error tailoring template.');
+      setErrorMsg(getFriendlyError(err));
     } finally {
       setIsTailoring(false);
     }

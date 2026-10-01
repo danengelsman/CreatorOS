@@ -18,6 +18,7 @@ import { cn } from '../lib/utils';
 import { generateSmartSuggestions, optimizeSearchTerms } from '../services/gemini';
 import BrandIcon from './BrandIcon';
 import { PLATFORMS } from './ContentEditorView';
+import { getFriendlyError } from '../lib/friendlyError';
 
 export interface AIToolPanelProps {
   brand: any;
@@ -75,7 +76,7 @@ export default function AIToolPanel({
       showToast('Smart suggestions generated!');
     } catch (error: any) {
       console.error('Failed to generate suggestions:', error);
-      showToast(error.message || 'Failed to analyze and suggest content.');
+      showToast(getFriendlyError(error));
     } finally {
       setIsAnalyzingSuggestions(false);
     }
@@ -94,7 +95,7 @@ export default function AIToolPanel({
       showToast("Search terms appended to content");
     } catch (error: any) {
       console.error('Optimization failed:', error);
-      showToast(error.message || 'Optimization failed');
+      showToast(getFriendlyError(error));
     } finally {
       setIsPolishing(false);
     }

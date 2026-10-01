@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { VideoCamera, Sparkle, Target, ListChecks, FileVideo, UploadSimple, PauseCircle, PlayCircle, WarningCircle, CheckCircle } from '@phosphor-icons/react';
 import { analyzeVideo } from '../services/gemini';
 import Markdown from 'react-markdown';
+import { getFriendlyError } from '../lib/friendlyError';
 
 export default function VideoAnalyzer() {
   const [file, setFile] = useState<File | null>(null);
@@ -60,7 +61,7 @@ export default function VideoAnalyzer() {
       setResult(analysis);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Failed to analyze video.');
+      setError(getFriendlyError(err));
     } finally {
       setIsAnalyzing(false);
     }

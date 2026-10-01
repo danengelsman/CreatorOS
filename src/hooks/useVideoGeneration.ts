@@ -3,6 +3,7 @@ import { generateVideo, getOperationStatus } from '../services/gemini';
 import { db, serverTimestamp, OperationType } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import localforage from 'localforage';
+import { getFriendlyError } from '../lib/friendlyError';
 
 export interface UseVideoGenerationProps {
   body: string;
@@ -145,7 +146,7 @@ export function useVideoGeneration({
         if (status.done) {
           done = true;
           if (status.error) {
-             throw new Error(status.error.message || 'Video generation failed');
+             throw new Error(getFriendlyError(status.error));
           }
           if (status.data) {
             setVideoGenerationProgress('Processing video...');
@@ -178,7 +179,7 @@ export function useVideoGeneration({
       }
     } catch (error: any) {
       console.error('Video generation error:', error);
-      showToast(error.message || 'Video generation failed. Please try again.');
+      showToast(getFriendlyError(error));
     } finally {
       setIsVideoGenerating(false);
       setVideoGenerationProgress('');

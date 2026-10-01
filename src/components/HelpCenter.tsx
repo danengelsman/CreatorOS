@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { db, serverTimestamp, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
+import { getFriendlyError } from '../lib/friendlyError';
 
 const APP_VERSION = '1.2.0';
 
@@ -59,7 +60,7 @@ export default function Support({ user, navigate }: { user: any, navigate?: (pat
         setShowSupportForm(false);
       }, 2000);
     } catch (error: any) {
-      setErrorMsg(error.message || 'Failed to submit ticket');
+      setErrorMsg(getFriendlyError(error));
       try {
         handleFirestoreError(error, OperationType.WRITE, 'support_tickets');
       } catch(e) {

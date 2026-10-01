@@ -25,6 +25,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, where } from 'firebase/firestore';
 import { cn } from '../lib/utils';
+import { getFriendlyError } from '../lib/friendlyError';
 
 export default function SupportHub({ user }: { user: any }) {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -61,7 +62,7 @@ export default function SupportHub({ user }: { user: any }) {
       setDiagnosticsData(data);
     } catch (err: any) {
       console.error('Diagnostics failed:', err);
-      setDiagnosticsError(err.message || 'Failed to communicate with diagnostic servers');
+      setDiagnosticsError(getFriendlyError(err));
     } finally {
       setIsCheckingDiagnostics(false);
     }

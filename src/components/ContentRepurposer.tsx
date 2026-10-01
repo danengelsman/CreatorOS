@@ -3,6 +3,7 @@ import { ArrowsClockwise, Copy, Check } from '@phosphor-icons/react';
 import { repurposeContent } from '../services/gemini';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { getFriendlyError } from '../lib/friendlyError';
 
 export default function ContentRepurposer() {
   const [inputContent, setInputContent] = useState('');
@@ -23,7 +24,7 @@ export default function ContentRepurposer() {
       setResults(repurposed);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || 'Failed to repurpose content');
+      setErrorMsg(getFriendlyError(err));
     } finally {
       setIsGenerating(false);
     }

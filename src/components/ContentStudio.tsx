@@ -19,6 +19,7 @@ import AIToolPanel from './AIToolPanel';
 import ContentIdeaGenerator from './ContentIdeaGenerator';
 import ViralTemplatesLibrary from './ViralTemplatesLibrary';
 import { recordJourneyEvent } from '../services/creatorJourney';
+import { getFriendlyError } from '../lib/friendlyError';
 
 export default function Create({ brand, setActiveTab, user, selectedIdea, setSelectedIdea, selectedProject }: { brand: any, setActiveTab: (tab: string) => void, user: any, selectedIdea?: any, setSelectedIdea?: any, selectedProject?: any }) {
   const [studioTab, setStudioTab] = useState<'editor' | 'ideas' | 'templates' | 'retention' | 'planner' | 'calendar'>('editor');
@@ -154,7 +155,7 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
       setScoreData(result);
     } catch (error) {
       console.error(error);
-      showToast(error.message || 'Scoring failed');
+      showToast(getFriendlyError(error));
     } finally {
       setIsScoring(false);
     }
