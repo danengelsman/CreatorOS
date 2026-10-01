@@ -1,5 +1,6 @@
 /**
  * Vercel serverless entry for /api/*.
+ * Delegates to the esbuild-bundled Express app (dist/server.js).
  */
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -8,19 +9,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let ready = null;
 
-function getApp() {
+function getAppPromise() {
   if (!ready) {
     ready = import(path.join(__dirname, '..', 'dist', 'server.js')).then(async (mod) => {
-      if (typeof mod.getApp === 'function') return mod.getApp();
-      return mod.default ?? mod.app;
+      const app = await mod.getApp();
+      if (typeof app !== 'function') {
+        throw new Error('getApp() returned ' + typeof app + ', expected express app');
+      }
+      return app;
     });
+    ready.catch(() => { ready = null; }); // allow retry on next request
   }
   return ready;
 }
 
 export default async function handler(req, res) {
   try {
-    const app = await getApp();
+    const app = await getAppPromise();
     return app(req, res);
   } catch (err) {
     console.error('BOOT ERROR:', err?.stack || err);
