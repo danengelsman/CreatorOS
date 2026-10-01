@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { loginWithGoogle, loginWithEmail, registerWithEmail } from '../firebase';
+import { getFriendlyError } from '../lib/friendlyError';
 import { ShieldCheck, Globe, Lightning as Zap, CircleNotch as Loader2, ArrowRight, Sparkle as Sparkles } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 import BrandIcon from './BrandIcon';
@@ -18,7 +19,7 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
       await loginWithGoogle();
     } catch (error: any) {
       console.error('Google Login failed:', error);
-      setError(error.message || 'Google Login failed');
+      setError(getFriendlyError(error));
     } finally {
       setIsLoading(false);
     }
@@ -41,7 +42,7 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
       }
     } catch (err: any) {
       console.error('Auth failed:', err);
-      setError(err.message || 'Authentication failed');
+      setError(getFriendlyError(err));
     } finally {
       setIsLoading(false);
     }
