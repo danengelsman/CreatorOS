@@ -1,5 +1,7 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
+// vite is imported lazily — only in local dev. A static import here would
+// pull rollup native binaries into the serverless bundle and crash on boot.
+let createViteServer: any = null;
 import multer from 'multer';
 import db from "./src/db.ts";
 import { v4 as uuidv4 } from 'uuid';
@@ -1323,6 +1325,9 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   // this function only handles /api/* routes.
   if (!process.env.VERCEL) {
     if (process.env.NODE_ENV !== "production") {
+      if (!createViteServer) {
+        ({ createServer: createViteServer } = await import('vite'));
+      }
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa",

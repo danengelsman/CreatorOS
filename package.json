@@ -8,6 +8,7 @@
     "dev": "tsx security-entry.ts",
     "start": "node dist/server.js",
     "build": "vite build && esbuild security-entry.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.js",
+    "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --external:vite --sourcemap --outfile=dist/server.js",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
@@ -65,5 +66,5 @@
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.13"
   },
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build && npm run build:server"
 }
