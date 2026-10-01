@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
       "source": "/__/auth/:path*",
       "destination": "https://gen-lang-client-0282443702.firebaseapp.com/__/auth/:path*"
     },
@@ -20,5 +24,11 @@
       "source": "/login",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/index.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  }
 }
