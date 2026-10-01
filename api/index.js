@@ -1,6 +1,5 @@
 /**
  * Vercel serverless entry for /api/*.
- * Delegates to the esbuild-bundled Express app (dist/server.js).
  */
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -24,7 +23,8 @@ export default async function handler(req, res) {
     const app = await getApp();
     return app(req, res);
   } catch (err) {
-    console.error('Serverless bootstrap error:', err?.stack || err);
-    res.status(500).json({ error: 'Server failed to start. Please try again.' });
+    console.error('BOOT ERROR:', err?.stack || err);
+    const detail = (req.query && req.query.debug) ? String(err?.stack || err).slice(0, 1200) : undefined;
+    res.status(500).json({ error: 'Server failed to start. Please try again.', detail });
   }
 }

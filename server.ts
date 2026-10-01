@@ -29,10 +29,20 @@ try {
   console.error('Error reading firebase-applet-config.json:', err);
 }
 
-// Initialize Firebase Admin
-admin.initializeApp({
-  projectId: projectId
-});
+// Initialize Firebase Admin.
+// On Vercel, service-account credentials may be provided via
+// FIREBASE_SERVICE_ACCOUNT_* env var (base64 JSON). Fall back to metadata-server
+// behavior locally. Token verification requires real credentials in production.
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    const svc = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString('utf8'));
+    admin.initializeApp({ credential: admin.credential.cert(svc), projectId });
+  } else {
+    admin.initializeApp({ projectId });
+  }
+} catch (e) {
+  console.error('admin init failed:', e);
+}
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
