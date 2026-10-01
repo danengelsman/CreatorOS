@@ -1333,15 +1333,26 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 }
 
 let _app: any = null;
+let _started = false;
 
-/** Get the fully-configured Express app (builds it once, never listens). */
-export async function getApp() {
-  if (!_app) {
-    process.env.VERCEL = '1';
+/** Shared boot: registers all routes, never listens on Vercel. */
+async function ensureApp() {
+  if (!_started) {
+    _started = true;
     await startServer();
     _app = (globalThis as any).__creatoros_app;
   }
   return _app;
 }
 
-startServer();
+/** Serverless entry: build the app without listening. */
+export async function getApp() {
+  if (!process.env.VERCEL) process.env.VERCEL = '1';
+  return ensureApp();
+}
+
+// Local/node deployment boot. On Vercel, api/index.js calls getApp() instead —
+// starting here would double-register middleware and try to bind a port.
+if (!process.env.VERCEL) {
+  startServer();
+}
