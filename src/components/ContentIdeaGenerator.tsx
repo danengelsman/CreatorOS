@@ -3,6 +3,7 @@ import { Lightbulb, Sparkle, Clock, TrendUp, ChartLineUp, ArrowRight, Play, Chec
 import { motion, AnimatePresence } from 'motion/react';
 import { authorizedFetch, apiFetch } from '../firebase';
 import { cn } from '../lib/utils';
+import { getFriendlyError } from '../lib/friendlyError';
 
 export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: any, onSelectIdea: (idea: any) => void }) {
   const [ideas, setIdeas] = useState<any[]>([]);
@@ -133,7 +134,7 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
         setIdeas(parsed.ideas || []);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error generating ideas.');
+      setErrorMsg(getFriendlyError(err));
     } finally {
       setIsLoading(false);
     }

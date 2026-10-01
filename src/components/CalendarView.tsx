@@ -5,13 +5,14 @@ import { db, handleFirestoreError, OperationType, authorizedFetch } from '../fir
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { 
-  Youtube, 
-  Instagram, 
-  Twitter, 
-  Flame, 
-  Plus, 
-  Trash2, 
+import { getFriendlyError } from '../lib/friendlyError';
+import {
+  Youtube,
+  Instagram,
+  Twitter,
+  Flame,
+  Plus,
+  Trash2,
   Clock, 
   Sparkles, 
   Check, 
@@ -239,7 +240,7 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
       }
     } catch (err: any) {
       console.error(err);
-      setSyncError(err.message || 'Failed to sync content to platforms. Please try again.');
+      setSyncError(getFriendlyError(err));
     } finally {
       setIsSyncing(false);
     }
@@ -530,7 +531,7 @@ Return your response strictly in the following JSON format:
       }
     } catch (err: any) {
       console.error(err);
-      setReformatError(err.message || 'Failed to reformat content. Please try again.');
+      setReformatError(getFriendlyError(err));
     } finally {
       setIsGeneratingReformat(false);
     }

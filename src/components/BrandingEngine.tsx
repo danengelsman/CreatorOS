@@ -8,6 +8,7 @@ import { db, serverTimestamp, handleFirestoreError, OperationType } from '../fir
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import BrandIcon from './BrandIcon';
 import BrandArchetypeQuiz from './BrandArchetypeQuiz';
+import { getFriendlyError } from '../lib/friendlyError';
 
 export default function Brand({ brand, setBrand, user }: { brand: any, setBrand: any, user: any }) {
   const [input, setInput] = useState('');
@@ -65,7 +66,7 @@ export default function Brand({ brand, setBrand, user }: { brand: any, setBrand:
       setBrand({ ...brand, logoUrl });
     } catch (error: any) {
       console.error(error);
-      setErrorMsg(error.message || 'Failed to generate logo.');
+      setErrorMsg(getFriendlyError(error));
     } finally {
       setIsGeneratingLogo(false);
     }
@@ -91,7 +92,7 @@ export default function Brand({ brand, setBrand, user }: { brand: any, setBrand:
       setBrand(kit);
     } catch (error: any) {
       console.error(error);
-      setErrorMsg(error.message || 'An error occurred while generating the brand kit.');
+      setErrorMsg(getFriendlyError(error));
     } finally {
       setIsLoading(false);
     }

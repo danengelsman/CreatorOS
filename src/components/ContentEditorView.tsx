@@ -18,6 +18,7 @@ import { cn } from '../lib/utils';
 import BrandIcon from './BrandIcon';
 import { apiFetch } from '../firebase';
 import { quickPolish, remixContent, generateContentIdeas } from '../services/gemini';
+import { getFriendlyError } from '../lib/friendlyError';
 
 // Extracted from ContentStudio.tsx
 export const PLATFORMS = [
@@ -121,7 +122,7 @@ export default function ContentEditorView({
       setBody(polished);
     } catch (error: any) {
       console.error('Polish failed:', error);
-      showToast(error.message || 'Polish failed');
+      showToast(getFriendlyError(error));
     } finally {
       setIsPolishing(false);
     }
@@ -136,7 +137,7 @@ export default function ContentEditorView({
       setRemixInstruction('');
     } catch (error: any) {
       console.error('Remix failed:', error);
-      showToast(error.message || 'Remix failed');
+      showToast(getFriendlyError(error));
     } finally {
       setIsPolishing(false);
     }

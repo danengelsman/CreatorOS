@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { FilmScript, Sparkle, Clock, Copy, Check, VideoCamera, Image as ImageIcon, TextAa, Warning, ArrowRight, ListChecks, Export, ArrowClockwise } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import { generateScenePlan } from '../services/gemini';
+import { getFriendlyError } from '../lib/friendlyError';
 
 interface ScenePlannerProps {
   initialScript?: string;
@@ -35,7 +36,7 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
       showToast('Scene plan generated successfully!');
     } catch (err: any) {
       console.error('Failed to generate scene plan:', err);
-      const errMsg = err?.message || 'Failed to generate scene plan. The AI service may be under high demand.';
+      const errMsg = getFriendlyError(err);
       setError(errMsg);
       showToast(errMsg);
     } finally {

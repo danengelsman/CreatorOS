@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkle, Lightning, Gauge, ArrowRight, Copy, Check, Eye, WarningCircle, TrendUp, Play, FilmScript, Target, Waves } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import { analyzeAndOptimizeRetention } from '../services/gemini';
+import { getFriendlyError } from '../lib/friendlyError';
 
 interface RetentionHookLabProps {
   initialText?: string;
@@ -33,7 +34,7 @@ export default function RetentionHookLab({ initialText = '', showToast, onApplyH
       showToast('Retention analysis complete!');
     } catch (err: any) {
       console.error('Retention Analysis failed:', err);
-      showToast(err.message || 'Failed to analyze retention. Please try again.');
+      showToast(getFriendlyError(err));
     } finally {
       setIsAnalyzing(false);
     }

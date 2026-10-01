@@ -6,6 +6,7 @@ import { db, serverTimestamp, handleFirestoreError, OperationType } from '../fir
 import { doc, updateDoc, collection, addDoc } from 'firebase/firestore';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { getFriendlyError } from '../lib/friendlyError';
 
 export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSelectedIdea }: { brand: any, setBrand: any, user: any, setActiveTab: any, setSelectedIdea?: any }) {
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
@@ -163,7 +164,7 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
       setBrand(updatedBrand);
     } catch (error: any) {
       console.error(error);
-      setErrorMsg(error.message || 'An error occurred while generating ideas.');
+      setErrorMsg(getFriendlyError(error));
     } finally {
       setIsGeneratingIdeas(false);
     }
