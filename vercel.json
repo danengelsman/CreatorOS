@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "/api/index.js"
     },
     {
       "source": "/__/auth/:path*",
@@ -26,9 +26,10 @@
     }
   ],
   "functions": {
-    "api/index.ts": {
+    "api/index.js": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "dist/**"
     }
   }
 }
