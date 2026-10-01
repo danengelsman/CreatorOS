@@ -45,6 +45,14 @@ const AUTH_ERRORS: Record<string, string> = {
     'This account is already linked to another user. Sign in with it first.',
   'auth/requires-recent-login':
     'For security, please sign out and sign back in, then try that again.',
+  'auth/invalid-api-key':
+    'Sign-in is temporarily unavailable due to a service configuration issue. We are on it — please try again soon.',
+  'auth/api-key-not-valid.-please-pass-a-valid-api-key.':
+    'Sign-in is temporarily unavailable due to a service configuration issue. We are on it — please try again soon.',
+  'auth/app-not-authorized':
+    'Sign-in is temporarily unavailable due to a service configuration issue. We are on it — please try again soon.',
+  'auth/project-not-found':
+    'Sign-in is temporarily unavailable due to a service configuration issue. We are on it — please try again soon.',
 };
 
 // ---------- Firestore / backend error map ----------
