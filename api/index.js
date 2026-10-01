@@ -1,24 +1,20 @@
 /**
  * Vercel serverless entry for /api/*.
- * Delegates to the esbuild-bundled Express app (dist/server.js).
+ * Delegates to the esbuild bundle co-located in api/_server.js
+ * (same directory = always included in the function trace).
  */
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 let ready = null;
 
 function getAppPromise() {
   if (!ready) {
-    ready = import(path.join(__dirname, '..', 'dist', 'server.js')).then(async (mod) => {
+    ready = import('./_server.js').then(async (mod) => {
       const app = await mod.getApp();
       if (typeof app !== 'function') {
         throw new Error('getApp() returned ' + typeof app + ', expected express app');
       }
       return app;
     });
-    ready.catch(() => { ready = null; }); // allow retry on next request
+    ready.catch(() => { ready = null; });
   }
   return ready;
 }

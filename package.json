@@ -8,7 +8,7 @@
     "dev": "tsx security-entry.ts",
     "start": "node dist/server.js",
     "build": "vite build && esbuild security-entry.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.js",
-    "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --external:vite --sourcemap --outfile=dist/server.js",
+    "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --external:vite --sourcemap --outfile=api/_server.js",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
