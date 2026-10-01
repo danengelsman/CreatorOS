@@ -68,6 +68,7 @@ function formatGeminiError(error) {
 
 async function startServer() {
   const app = express();
+  (globalThis as any).__creatoros_app = app;
   const PORT = 3000;
 
   app.use(express.json({ limit: '25mb' }));
@@ -135,7 +136,7 @@ async function startServer() {
   });
 
   app.get("/api/content", authenticateUser, (req: any, res) => {
-    const content = db.prepare('SELECT * FROM content WHERE user_id = ? ORDER BY created_at DESC').all(req.user.uid);
+    const content = db.prepare('SELECT * FROM content WHERE user_id = ? ORDER BY created_at DESC').all(req.user.uid) as any[];
     res.json(content);
   });
 
@@ -152,7 +153,7 @@ async function startServer() {
   });
 
   app.get("/api/analytics", authenticateUser, (req: any, res) => {
-    const analytics = db.prepare('SELECT * FROM analytics WHERE user_id = ? ORDER BY date ASC').all(req.user.uid);
+    const analytics = db.prepare('SELECT * FROM analytics WHERE user_id = ? ORDER BY date ASC').all(req.user.uid) as any[];
     res.json(analytics);
   });
 
@@ -772,7 +773,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
       // Save to DB
       const existing = db.prepare('SELECT user_id FROM user_accounts WHERE user_id = ? AND platform = ?')
-        .get(userId, 'youtube');
+        .get(userId, 'youtube') as any;
 
       if (existing) {
         db.prepare(`
@@ -858,7 +859,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
       // Save to DB
       const existing = db.prepare('SELECT user_id FROM user_accounts WHERE user_id = ? AND platform = ?')
-        .get(userId, 'tiktok');
+        .get(userId, 'tiktok') as any;
 
       if (existing) {
         db.prepare(`
@@ -896,7 +897,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   });
 
   app.get("/api/accounts", authenticateUser, (req: any, res) => {
-    const accounts = db.prepare('SELECT platform, profile_data FROM user_accounts WHERE user_id = ?').all(req.user.uid);
+    const accounts = db.prepare('SELECT platform, profile_data FROM user_accounts WHERE user_id = ?').all(req.user.uid) as any[];
     res.json(accounts.map(a => ({
       platform: a.platform,
       profile: JSON.parse(a.profile_data)
@@ -914,7 +915,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       
       // Get all connected accounts for the user
       const accounts = db.prepare('SELECT platform, access_token, profile_data FROM user_accounts WHERE user_id = ?')
-        .all(req.user.uid);
+        .all(req.user.uid) as any[];
 
       for (const platform of platforms) {
         const lowerPlatform = platform.toLowerCase();
@@ -977,7 +978,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   });
 
   app.get("/api/analytics/youtube", authenticateUser, async (req: any, res) => {
-    const account = db.prepare('SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?').get(req.user.uid, 'youtube');
+    const account = db.prepare('SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?').get(req.user.uid, 'youtube') as any;
     if (!account) return res.json({ views: 0, subscribers: 0, videos: 0 });
 
     try {
@@ -1012,7 +1013,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   app.get("/api/analytics/tiktok", authenticateUser, async (req: any, res) => {
     // Mocking TikTok analytics for now as their API access is heavily gated
     // but demonstrating where the integration would live.
-    const account = db.prepare('SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?').get(req.user.uid, 'tiktok');
+    const account = db.prepare('SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?').get(req.user.uid, 'tiktok') as any;
     if (!account) return res.json({ followers: 0, views: 0, likes: 0 });
     
     res.json({
@@ -1027,14 +1028,14 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const userId = req.user.uid;
 
       // 1. Fetch connected accounts
-      const accounts = db.prepare('SELECT platform, profile_data FROM user_accounts WHERE user_id = ?').all(userId);
+      const accounts = db.prepare('SELECT platform, profile_data FROM user_accounts WHERE user_id = ?').all(userId) as any[];
       const isYoutubeConnected = accounts.some(a => a.platform === 'youtube');
       const isTiktokConnected = accounts.some(a => a.platform === 'tiktok');
 
       // 2. Fetch YouTube Stats if connected
       let youtubeStats = { views: 0, subscribers: 0, videos: 0 };
       if (isYoutubeConnected) {
-        const ytAccount = db.prepare('SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?').get(userId, 'youtube');
+        const ytAccount = db.prepare('SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?').get(userId, 'youtube') as any;
         if (ytAccount) {
           try {
             const auth = new google.auth.OAuth2(
@@ -1307,24 +1308,40 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     `);
   });
 
-  // Vite middleware
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+  // Vite middleware / static serving (dev + node deployments only).
+  // On Vercel serverless, static files are served by Vercel's own CDN layer;
+  // this function only handles /api/* routes.
+  if (!process.env.VERCEL) {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*all', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   }
+}
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+let _app: any = null;
+
+/** Get the fully-configured Express app (builds it once, never listens). */
+export async function getApp() {
+  if (!_app) {
+    process.env.VERCEL = '1';
+    await startServer();
+    _app = (globalThis as any).__creatoros_app;
+  }
+  return _app;
 }
 
 startServer();

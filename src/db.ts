@@ -1,6 +1,8 @@
 import Database from 'better-sqlite3';
 
-const db = new Database('creator_os.db');
+// Vercel serverless has a read-only filesystem — only /tmp is writable.
+const dbPath = process.env.VERCEL ? '/tmp/creator_os.db' : 'creator_os.db';
+const db = new Database(dbPath);
 
 // Initialize tables
 db.exec(`
