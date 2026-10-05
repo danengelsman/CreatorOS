@@ -11,3 +11,7 @@ coverage/
 *.db-wal
 uploads/
 /tmp/
+
+# Agent/scratch working dirs
+.zwork/
+.hermes/

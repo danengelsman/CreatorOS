@@ -2,7 +2,7 @@
   "name": "creator-os",
   "description": "CreatorOS - The operating system for creators. Go from zero to your first dollar.",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0-beta",
   "type": "module",
   "scripts": {
     "dev": "tsx security-entry.ts",
@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "check:artifact": "node scripts/check-artifact-freshness.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -65,6 +66,5 @@
     "autoprefixer": "^10.4.21",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.13"
-  },
-  "buildCommand": "npm run build && npm run build:server"
+  }
 }

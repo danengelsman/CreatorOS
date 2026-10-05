@@ -109,6 +109,38 @@ try {
 } catch (err) {
   console.error("Error reading firebase-applet-config.json:", err);
 }
+if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+  const problems = [];
+  const warnings = [];
+  if (!process.env.GEMINI_API_KEY) problems.push("GEMINI_API_KEY is missing");
+  if (!process.env.APP_URL) problems.push("APP_URL is missing");
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    problems.push("FIREBASE_SERVICE_ACCOUNT is missing (base64 service-account JSON)");
+  } else {
+    try {
+      JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8"));
+    } catch {
+      problems.push("FIREBASE_SERVICE_ACCOUNT is not valid base64-encoded JSON");
+    }
+  }
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    warnings.push("GOOGLE_CLIENT_ID/SECRET missing \u2014 YouTube connect will fail");
+  }
+  if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET) {
+    warnings.push("TIKTOK_CLIENT_KEY/SECRET missing \u2014 TikTok connect will fail");
+  }
+  console.log("\u2500\u2500 CreatorOS boot: credential check \u2500\u2500");
+  console.log(`GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? "present" : "MISSING"}`);
+  console.log(`FIREBASE_SERVICE_ACCOUNT: ${process.env.FIREBASE_SERVICE_ACCOUNT ? "present" : "MISSING"}`);
+  console.log(`APP_URL: ${process.env.APP_URL || "MISSING"}`);
+  console.log(`projectId: ${projectId}`);
+  warnings.forEach((w) => console.warn(`warn: ${w}`));
+  if (problems.length > 0) {
+    console.error("FATAL: production credential check failed:");
+    problems.forEach((p) => console.error(`  - ${p}`));
+    process.exit(1);
+  }
+}
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const svc = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8"));
@@ -147,6 +179,26 @@ async function startServer() {
   const app = express();
   globalThis.__creatoros_app = app;
   const PORT = 3e3;
+  const ALLOWED_ORIGINS = [
+    process.env.APP_URL,
+    "https://creator-os-delta-lilac.vercel.app"
+  ].filter(Boolean);
+  const vercelPreviewOrigin = /^https:\/\/creator-os-[a-z0-9-]+\.vercel\.app$/;
+  app.use("/api", (req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      if (ALLOWED_ORIGINS.includes(origin) || vercelPreviewOrigin.test(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Vary", "Origin");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      } else {
+        return res.status(403).json({ error: "Origin not allowed" });
+      }
+    }
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+  });
   app.use(express.json({ limit: "25mb" }));
   app.use(express.urlencoded({ limit: "25mb", extended: true }));
   app.use(cookieParser());
@@ -167,6 +219,99 @@ async function startServer() {
     } catch (error) {
       console.error("Auth Error:", error);
       res.status(401).json({ error: "Invalid token" });
+    }
+  };
+  const AI_RATE_LIMITS = {
+    "/api/gemini/generate": 30,
+    "/api/gemini/analyze-video": 10,
+    "/api/gemini/generate-image": 10,
+    "/api/gemini/generate-video": 3,
+    "/api/gemini/video-status": 60,
+    "/api/gemini/video-download": 10,
+    "/api/onboarding/niche-sparks": 20
+  };
+  const AI_DEFAULT_LIMIT = 20;
+  const RATE_WINDOW_MS = 6e4;
+  const MAX_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024;
+  const ALLOWED_GEMINI_MODELS = /* @__PURE__ */ new Set([
+    "gemini-3.8-flash",
+    "gemini-3.6-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash"
+  ]);
+  const rateBuckets = /* @__PURE__ */ new Map();
+  const MAX_RATE_BUCKETS = 1e4;
+  function consumeRateLimit(userId, route) {
+    const now = Date.now();
+    const limit = AI_RATE_LIMITS[route] ?? AI_DEFAULT_LIMIT;
+    const key = `${route}:${userId}`;
+    const current = rateBuckets.get(key);
+    if (!current || current.resetAt <= now) {
+      if (!rateBuckets.has(key) && rateBuckets.size >= MAX_RATE_BUCKETS) {
+        const nowMs = now;
+        for (const [k, v] of rateBuckets) {
+          if (v.resetAt <= nowMs) rateBuckets.delete(k);
+        }
+        if (rateBuckets.size >= MAX_RATE_BUCKETS) {
+          return { allowed: true, retryAfter: 60 };
+        }
+      }
+      rateBuckets.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
+      return { allowed: true, retryAfter: 60 };
+    }
+    if (current.count >= limit) {
+      return { allowed: false, retryAfter: Math.max(1, Math.ceil((current.resetAt - now) / 1e3)) };
+    }
+    current.count += 1;
+    return { allowed: true, retryAfter: Math.max(1, Math.ceil((current.resetAt - now) / 1e3)) };
+  }
+  function isAllowedGeminiUri(value) {
+    if (typeof value !== "string" || value.length === 0 || value.length > 2048) return false;
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:") return false;
+      const hostname = url.hostname.toLowerCase();
+      return hostname === "generativelanguage.googleapis.com" || hostname.endsWith(".googleapis.com") || hostname.endsWith(".googleusercontent.com");
+    } catch {
+      return false;
+    }
+  }
+  const protectAIRoute = async (req, res, next) => {
+    const route = req.path;
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const token = authHeader.slice("Bearer ".length).trim();
+    if (!token) return res.status(401).json({ error: "Authentication required" });
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      req.user = decodedToken;
+      const rate = consumeRateLimit(decodedToken.uid, route);
+      res.setHeader("X-RateLimit-Limit", String(AI_RATE_LIMITS[route] ?? AI_DEFAULT_LIMIT));
+      if (!rate.allowed) {
+        res.setHeader("Retry-After", String(rate.retryAfter));
+        return res.status(429).json({
+          error: "Rate limit exceeded. Please wait before trying again.",
+          retryAfterSeconds: rate.retryAfter
+        });
+      }
+      if (route === "/api/gemini/generate" && req.body?.model && !ALLOWED_GEMINI_MODELS.has(req.body.model)) {
+        return res.status(400).json({ error: "Unsupported Gemini model." });
+      }
+      if (route === "/api/gemini/analyze-video") {
+        const contentLength = Number(req.headers["content-length"] || 0);
+        if (contentLength > MAX_VIDEO_UPLOAD_BYTES) {
+          return res.status(413).json({ error: "Video upload exceeds the 50 MB limit." });
+        }
+      }
+      if (route === "/api/gemini/video-download" && !isAllowedGeminiUri(req.body?.uri)) {
+        return res.status(400).json({ error: "Invalid video resource URI." });
+      }
+      next();
+    } catch (error) {
+      console.error("AI route auth error:", error);
+      return res.status(401).json({ error: "Invalid authentication token" });
     }
   };
   app.get("/api/user", authenticateUser, (req, res) => {
@@ -257,8 +402,11 @@ async function startServer() {
     }
     return null;
   }
-  const upload = multer({ dest: "/tmp/uploads/" });
-  app.post("/api/gemini/analyze-video", upload.single("video"), async (req, res) => {
+  const upload = multer({
+    dest: "/tmp/uploads/",
+    limits: { fileSize: MAX_VIDEO_UPLOAD_BYTES }
+  });
+  app.post("/api/gemini/analyze-video", protectAIRoute, upload.single("video"), async (req, res) => {
     try {
       const file = req.file;
       if (!file) {
@@ -287,7 +435,7 @@ async function startServer() {
       res.status(500).json({ error: formatGeminiError(error) });
     }
   });
-  app.post("/api/gemini/generate", async (req, res) => {
+  app.post("/api/gemini/generate", protectAIRoute, async (req, res) => {
     try {
       let { model, contents, config } = req.body;
       if (!model || model === "gemini-2.5-flash") {
@@ -320,7 +468,7 @@ async function startServer() {
       res.status(500).json({ error: formatGeminiError(error) });
     }
   });
-  app.post("/api/gemini/generate-image", async (req, res) => {
+  app.post("/api/gemini/generate-image", protectAIRoute, async (req, res) => {
     try {
       const { prompt, aspectRatio } = req.body;
       const response = await (await getAI()).models.generateContent({
@@ -558,7 +706,7 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
       return res.json(buildFallbackBrandKit());
     }
   });
-  app.get("/api/onboarding/niche-sparks", async (req, res) => {
+  app.get("/api/onboarding/niche-sparks", protectAIRoute, async (req, res) => {
     const fallbackSparks = {
       museMessage: "Take a breath\u2014day zero is the hardest step because the canvas is blank. You don't have to guess: here are high-momentum niches thriving right now.",
       sparks: [
@@ -647,7 +795,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       return res.json(fallbackSparks);
     }
   });
-  app.post("/api/gemini/generate-video", async (req, res) => {
+  app.post("/api/gemini/generate-video", protectAIRoute, async (req, res) => {
     try {
       const { prompt, aspectRatio, durationSeconds } = req.body;
       const interaction = await (await getAI()).interactions.create({
@@ -676,7 +824,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       res.status(500).json({ error: formatGeminiError(error) });
     }
   });
-  app.post("/api/gemini/video-status", async (req, res) => {
+  app.post("/api/gemini/video-status", protectAIRoute, async (req, res) => {
     try {
       const { operationName } = req.body;
       const interaction = await (await getAI()).interactions.get(operationName);
@@ -705,7 +853,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       res.status(500).json({ error: formatGeminiError(error) });
     }
   });
-  app.post("/api/gemini/video-download", async (req, res) => {
+  app.post("/api/gemini/video-download", protectAIRoute, async (req, res) => {
     try {
       const { uri } = req.body;
       if (!uri) return res.status(400).send("No URI");

@@ -31,6 +31,45 @@ try {
   console.error('Error reading firebase-applet-config.json:', err);
 }
 
+// F1.2 — Fail-fast credential boot. In production the server must never start
+// half-credentialed: Vercel surfaces boot failures as failed deploys, which is
+// exactly what we want instead of a running app that 401s every request.
+if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+  const problems: string[] = [];
+  const warnings: string[] = [];
+
+  if (!process.env.GEMINI_API_KEY) problems.push('GEMINI_API_KEY is missing');
+  if (!process.env.APP_URL) problems.push('APP_URL is missing');
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    problems.push('FIREBASE_SERVICE_ACCOUNT is missing (base64 service-account JSON)');
+  } else {
+    try {
+      JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString('utf8'));
+    } catch {
+      problems.push('FIREBASE_SERVICE_ACCOUNT is not valid base64-encoded JSON');
+    }
+  }
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    warnings.push('GOOGLE_CLIENT_ID/SECRET missing — YouTube connect will fail');
+  }
+  if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET) {
+    warnings.push('TIKTOK_CLIENT_KEY/SECRET missing — TikTok connect will fail');
+  }
+
+  console.log('── CreatorOS boot: credential check ──');
+  console.log(`GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'present' : 'MISSING'}`);
+  console.log(`FIREBASE_SERVICE_ACCOUNT: ${process.env.FIREBASE_SERVICE_ACCOUNT ? 'present' : 'MISSING'}`);
+  console.log(`APP_URL: ${process.env.APP_URL || 'MISSING'}`);
+  console.log(`projectId: ${projectId}`);
+  warnings.forEach((w) => console.warn(`warn: ${w}`));
+
+  if (problems.length > 0) {
+    console.error('FATAL: production credential check failed:');
+    problems.forEach((p) => console.error(`  - ${p}`));
+    process.exit(1);
+  }
+}
+
 // Initialize Firebase Admin.
 // On Vercel, service-account credentials may be provided via
 // FIREBASE_SERVICE_ACCOUNT_* env var (base64 JSON). Fall back to metadata-server
@@ -83,6 +122,33 @@ async function startServer() {
   (globalThis as any).__creatoros_app = app;
   const PORT = 3000;
 
+  // F1.6d — Restrictive CORS. The API is same-origin only (plus CreatorOS
+  // Vercel preview deployments). Requests without an Origin (curl, mobile)
+  // pass through — they still hit route-level auth below.
+  const ALLOWED_ORIGINS = [
+    process.env.APP_URL,
+    'https://creator-os-delta-lilac.vercel.app',
+  ].filter(Boolean) as string[];
+  const vercelPreviewOrigin = /^https:\/\/creator-os-[a-z0-9-]+\.vercel\.app$/;
+
+  // CORS applies to API surface only; page routes (OAuth callback HTML with
+  // inline scripts) are same-origin documents and don't need it.
+  app.use('/api', (req: any, res: any, next: any) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      if (ALLOWED_ORIGINS.includes(origin) || vercelPreviewOrigin.test(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      } else {
+        return res.status(403).json({ error: 'Origin not allowed' });
+      }
+    }
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
+
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ limit: '25mb', extended: true }));
   app.use(cookieParser());
@@ -109,6 +175,119 @@ async function startServer() {
     } catch (error) {
       console.error('Auth Error:', error);
       res.status(401).json({ error: 'Invalid token' });
+    }
+  };
+
+  // --- AI route security (F1.1, intrinsic — safe in every bundle/deploy path) ---
+  // Auth + per-user rate limits + payload guards live ON the AI routes so the
+  // serverless bundle cannot ship them "off" by wrapping the wrong entry file.
+  const AI_RATE_LIMITS: Record<string, number> = {
+    '/api/gemini/generate': 30,
+    '/api/gemini/analyze-video': 10,
+    '/api/gemini/generate-image': 10,
+    '/api/gemini/generate-video': 3,
+    '/api/gemini/video-status': 60,
+    '/api/gemini/video-download': 10,
+    '/api/onboarding/niche-sparks': 20,
+  };
+  const AI_DEFAULT_LIMIT = 20;
+  const RATE_WINDOW_MS = 60_000;
+  const MAX_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024;
+  const ALLOWED_GEMINI_MODELS = new Set([
+    'gemini-3.8-flash',
+    'gemini-3.6-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-2.5-flash',
+  ]);
+  const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+  const MAX_RATE_BUCKETS = 10_000;
+
+  function consumeRateLimit(userId: string, route: string) {
+    const now = Date.now();
+    const limit = AI_RATE_LIMITS[route] ?? AI_DEFAULT_LIMIT;
+    const key = `${route}:${userId}`;
+    const current = rateBuckets.get(key);
+
+    if (!current || current.resetAt <= now) {
+      // Bound memory: once the map is full, evict expired buckets; if none are
+      // expirable (pathological traffic), shed the newest write.
+      if (!rateBuckets.has(key) && rateBuckets.size >= MAX_RATE_BUCKETS) {
+        const nowMs = now;
+        for (const [k, v] of rateBuckets) {
+          if (v.resetAt <= nowMs) rateBuckets.delete(k);
+        }
+        if (rateBuckets.size >= MAX_RATE_BUCKETS) {
+          return { allowed: true, retryAfter: 60 };
+        }
+      }
+      rateBuckets.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
+      return { allowed: true, retryAfter: 60 };
+    }
+    if (current.count >= limit) {
+      return { allowed: false, retryAfter: Math.max(1, Math.ceil((current.resetAt - now) / 1000)) };
+    }
+    current.count += 1;
+    return { allowed: true, retryAfter: Math.max(1, Math.ceil((current.resetAt - now) / 1000)) };
+  }
+
+  // Never let callers turn /api/gemini/video-download into an arbitrary-URL
+  // fetcher that spends the Gemini API key. Only Google-hosted resource URIs.
+  function isAllowedGeminiUri(value: unknown) {
+    if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return false;
+    try {
+      const url = new URL(value);
+      if (url.protocol !== 'https:') return false;
+      const hostname = url.hostname.toLowerCase();
+      return hostname === 'generativelanguage.googleapis.com'
+        || hostname.endsWith('.googleapis.com')
+        || hostname.endsWith('.googleusercontent.com');
+    } catch {
+      return false;
+    }
+  }
+
+  const protectAIRoute = async (req: any, res: any, next: any) => {
+    const route = req.path;
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const token = authHeader.slice('Bearer '.length).trim();
+    if (!token) return res.status(401).json({ error: 'Authentication required' });
+
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      req.user = decodedToken;
+
+      const rate = consumeRateLimit(decodedToken.uid, route);
+      res.setHeader('X-RateLimit-Limit', String(AI_RATE_LIMITS[route] ?? AI_DEFAULT_LIMIT));
+      if (!rate.allowed) {
+        res.setHeader('Retry-After', String(rate.retryAfter));
+        return res.status(429).json({
+          error: 'Rate limit exceeded. Please wait before trying again.',
+          retryAfterSeconds: rate.retryAfter,
+        });
+      }
+
+      if (route === '/api/gemini/generate' && req.body?.model && !ALLOWED_GEMINI_MODELS.has(req.body.model)) {
+        return res.status(400).json({ error: 'Unsupported Gemini model.' });
+      }
+
+      if (route === '/api/gemini/analyze-video') {
+        const contentLength = Number(req.headers['content-length'] || 0);
+        if (contentLength > MAX_VIDEO_UPLOAD_BYTES) {
+          return res.status(413).json({ error: 'Video upload exceeds the 50 MB limit.' });
+        }
+      }
+
+      if (route === '/api/gemini/video-download' && !isAllowedGeminiUri(req.body?.uri)) {
+        return res.status(400).json({ error: 'Invalid video resource URI.' });
+      }
+
+      next();
+    } catch (error) {
+      console.error('AI route auth error:', error);
+      return res.status(401).json({ error: 'Invalid authentication token' });
     }
   };
 
@@ -230,9 +409,12 @@ async function startServer() {
     return null;
   }
 
-  const upload = multer({ dest: '/tmp/uploads/' });
+  const upload = multer({
+    dest: '/tmp/uploads/',
+    limits: { fileSize: MAX_VIDEO_UPLOAD_BYTES },
+  });
 
-  app.post("/api/gemini/analyze-video", upload.single('video'), async (req: any, res) => {
+  app.post("/api/gemini/analyze-video", protectAIRoute, upload.single('video'), async (req: any, res) => {
     try {
       const file = req.file;
       if (!file) {
@@ -263,7 +445,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/gemini/generate", async (req: any, res) => {
+  app.post("/api/gemini/generate", protectAIRoute, async (req: any, res) => {
     try {
       let { model, contents, config } = req.body;
       
@@ -307,7 +489,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/gemini/generate-image", async (req: any, res) => {
+  app.post("/api/gemini/generate-image", protectAIRoute, async (req: any, res) => {
     try {
       const { prompt, aspectRatio } = req.body;
       const response = await (await getAI()).models.generateContent({
@@ -571,7 +753,7 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
   });
 
   // --- Dynamic Niche Sparks for Hesitant Day-Zero Creators ---
-  app.get("/api/onboarding/niche-sparks", async (req: any, res) => {
+  app.get("/api/onboarding/niche-sparks", protectAIRoute, async (req: any, res) => {
     // Curated high-converting fallbacks in case of network latency or rate limit
     const fallbackSparks = {
       museMessage: "Take a breath—day zero is the hardest step because the canvas is blank. You don't have to guess: here are high-momentum niches thriving right now.",
@@ -668,7 +850,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
   
 
-  app.post("/api/gemini/generate-video", async (req: any, res) => {
+  app.post("/api/gemini/generate-video", protectAIRoute, async (req: any, res) => {
     try {
       const { prompt, aspectRatio, durationSeconds } = req.body;
       
@@ -700,7 +882,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
 
-  app.post("/api/gemini/video-status", async (req: any, res) => {
+  app.post("/api/gemini/video-status", protectAIRoute, async (req: any, res) => {
     try {
       const { operationName } = req.body;
       const interaction = await (await getAI()).interactions.get(operationName);
@@ -734,7 +916,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
 
-  app.post("/api/gemini/video-download", async (req: any, res) => {
+  app.post("/api/gemini/video-download", protectAIRoute, async (req: any, res) => {
     try {
       const { uri } = req.body;
       if (!uri) return res.status(400).send('No URI');

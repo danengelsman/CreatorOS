@@ -11,8 +11,10 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() &&
-        ("email" in request.auth.token && request.auth.token.email == "danengelsman@gmail.com");
+      // F1.6b — admin is a custom claim (admin: true), set via
+      // scripts/set-admin-claim.ts. A hardcoded email means mailbox
+      // compromise equals super-admin.
+      return isAuthenticated() && request.auth.token.admin == true;
     }
 
     function isValidEmail(email) {
@@ -70,10 +72,6 @@ service cloud.firestore {
 
     function isUnchangedOwner() {
       return request.resource.data.userId == resource.data.userId;
-    }
-
-    match /test/{docId} {
-      allow read: if isAuthenticated();
     }
 
     match /users/{userId} {

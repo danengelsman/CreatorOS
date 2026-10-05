@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     return app(req, res);
   } catch (err) {
     console.error('BOOT ERROR:', err?.stack || err);
-    const detail = (req.query && req.query.debug) ? String(err?.stack || err).slice(0, 1200) : undefined;
-    res.status(500).json({ error: 'Server failed to start. Please try again.', detail });
+    // No stack traces to clients (F1.6c) — details live in server logs only.
+    res.status(500).json({ error: 'Server failed to start. Please try again.' });
   }
 }
