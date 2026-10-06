@@ -51,13 +51,7 @@ export default function SupportHub({ user }: { user: any }) {
     setIsCheckingDiagnostics(true);
     setDiagnosticsError(null);
     try {
-      const idToken = await user.getIdToken();
-      const response = await fetch('/api/diagnostics/check', {
-        headers: {
-          'Authorization': `Bearer ${idToken}`
-        }
-      });
-      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+      const response = await apiFetch('/api/diagnostics/check');
       const data = await response.json();
       setDiagnosticsData(data);
     } catch (err: any) {
