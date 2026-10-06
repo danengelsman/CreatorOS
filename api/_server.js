@@ -90,182 +90,139 @@ import fs from "fs";
 import { google } from "googleapis";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
-import admin2 from "firebase-admin";
+import admin from "firebase-admin";
 import axios from "axios";
 
-// src/server/oauth-state.ts
-import crypto from "crypto";
-import admin from "firebase-admin";
-var STATE_TTL_MS = 10 * 60 * 1e3;
-var AUD = "oauth";
-function b64url(buf) {
-  return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+// src/server/quotaLedger.ts
+var DAILY_BUDGET_DEFAULT = 25e4;
+var ROUTE_COST_ESTIMATES = {
+  "/api/gemini/generate": 4e3,
+  // typical chat/script generation
+  "/api/gemini/analyze-video": 3e4,
+  // video upload = expensive
+  "/api/gemini/generate-image": 5e3,
+  "/api/gemini/generate-video": 6e4,
+  // most expensive per call
+  "/api/gemini/video-status": 50,
+  // status poll, cheap
+  "/api/gemini/video-download": 50,
+  // download, no generation
+  "/api/onboarding/niche-sparks": 1500
+};
+var DAY_MS = 24 * 60 * 60 * 1e3;
+function dayKeyFor(now = /* @__PURE__ */ new Date()) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
-function fromB64url(s) {
-  return Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+function msUntilLocalMidnight(now = /* @__PURE__ */ new Date()) {
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  return Math.max(1, tomorrow.getTime() - now.getTime());
 }
-function secret() {
-  const s = process.env.OAUTH_STATE_SECRET;
-  if (!s) throw new Error("OAUTH_STATE_SECRET is not set");
-  return s;
-}
-function createOAuthState(uid, platform) {
-  const now = Date.now();
-  const payload = {
-    uid,
-    platform,
-    iat: now,
-    exp: now + STATE_TTL_MS,
-    jti: crypto.randomUUID(),
-    aud: AUD
-  };
-  const body = b64url(Buffer.from(JSON.stringify(payload), "utf8"));
-  const sig = b64url(crypto.createHmac("sha256", secret()).update(body).digest());
-  return `${body}.${sig}`;
-}
-async function verifyAndConsumeOAuthState(state) {
-  const fail = (msg) => {
-    const err = new Error(msg);
-    err.oauthStateReason = msg;
-    throw err;
-  };
-  if (typeof state !== "string" || state.length === 0 || state.length > 4096) {
-    return fail("invalid state");
+var QuotaLedger = class {
+  constructor(deps) {
+    this.db = deps.db;
+    this.getDailyBudget = deps.getDailyBudget ?? (() => {
+      const raw = Number(process.env.DAILY_AI_BUDGET_TOKENS);
+      return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DAILY_BUDGET_DEFAULT;
+    });
+    this.nowFn = deps.now ?? (() => /* @__PURE__ */ new Date());
+    this.ensureSchema();
   }
-  const dot = state.indexOf(".");
-  if (dot <= 0 || dot === state.length - 1) return fail("invalid state");
-  const body = state.slice(0, dot);
-  const givenSig = state.slice(dot + 1);
-  const expected = b64url(crypto.createHmac("sha256", secret()).update(body).digest());
-  const a = Buffer.from(givenSig);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return fail("invalid state signature");
+  ensureSchema() {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_usage_ledger (
+        user_id TEXT NOT NULL,
+        day TEXT NOT NULL,
+        route TEXT NOT NULL,
+        calls INTEGER NOT NULL DEFAULT 0,
+        tokens INTEGER NOT NULL DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, day, route)
+      );
+      CREATE INDEX IF NOT EXISTS idx_ai_usage_ledger_user_day
+        ON ai_usage_ledger (user_id, day);
+    `);
   }
-  let payload;
-  try {
-    payload = JSON.parse(fromB64url(body).toString("utf8"));
-  } catch {
-    return fail("invalid state payload");
+  usedToday(userId) {
+    try {
+      const day = dayKeyFor(this.nowFn());
+      const row = this.db.prepare("SELECT COALESCE(SUM(tokens), 0) AS total FROM ai_usage_ledger WHERE user_id = ? AND day = ?").get(userId, day);
+      return Number(row?.total || 0);
+    } catch {
+      return 0;
+    }
   }
-  if (!payload || typeof payload.uid !== "string" || typeof payload.platform !== "string") {
-    return fail("invalid state payload");
+  check(userId) {
+    const dailyBudget = this.getDailyBudget();
+    let usedToday = 0;
+    try {
+      usedToday = this.usedToday(userId);
+    } catch {
+      usedToday = 0;
+    }
+    const allowed = usedToday < dailyBudget;
+    return {
+      allowed,
+      usedToday,
+      dailyBudget,
+      retryAfterSeconds: Math.ceil(msUntilLocalMidnight(this.nowFn()) / 1e3)
+    };
   }
-  if (payload.aud !== AUD) return fail("invalid state audience");
-  if (typeof payload.exp !== "number" || payload.exp < Date.now()) {
-    return fail("state expired");
+  /**
+   * Debit the ledger. `tokens` may come from real Gemini usageMetadata or the
+   * per-route estimate. Best-effort: swallows its own errors (fail-open).
+   */
+  record(userId, route, tokens) {
+    try {
+      const safeTokens = Math.max(0, Math.min(Math.floor(Number(tokens) || 0), 5e6));
+      const day = dayKeyFor(this.nowFn());
+      this.db.prepare(`
+          INSERT INTO ai_usage_ledger (user_id, day, route, calls, tokens, updated_at)
+          VALUES (?, ?, ?, 1, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(user_id, day, route) DO UPDATE SET
+            calls = calls + 1,
+            tokens = tokens + excluded.tokens,
+            updated_at = CURRENT_TIMESTAMP
+        `).run(userId, day, route, safeTokens);
+    } catch (err) {
+      console.error("quota ledger record failed (fail-open):", err);
+    }
   }
-  const consumed = await getStore().consume(payload.jti);
-  if (!consumed) return fail("state already used");
-  return payload;
-}
-var _store = null;
-function getStore() {
-  if (_store) return _store;
-  if (admin.apps.length === 0) {
-    throw new Error("Firebase admin not initialized \u2014 cannot enforce OAuth state single-use");
+  /** Admin/diagnostics snapshot for one user. */
+  snapshot(userId) {
+    try {
+      const day = dayKeyFor(this.nowFn());
+      return this.db.prepare("SELECT route, calls, tokens FROM ai_usage_ledger WHERE user_id = ? AND day = ? ORDER BY tokens DESC").all(userId, day);
+    } catch {
+      return [];
+    }
   }
-  const firestore = admin.firestore();
-  const states = firestore.collection("oauth_states");
-  _store = {
-    async consume(jti) {
-      return firestore.runTransaction(async (tx) => {
-        const ref = states.doc(jti);
-        const doc = await tx.get(ref);
-        if (!doc.exists || doc.data()?.consumed === true) return false;
-        tx.set(ref, {
-          uid: doc.data()?.uid ?? null,
-          createdAt: doc.data()?.createdAt ?? Date.now(),
-          consumed: true
-        });
-        return true;
+};
+function quotaGuardMiddleware(ledger) {
+  return function quotaGuard(req, res, next) {
+    const uid = req.user?.uid;
+    if (!uid) return next();
+    const check = ledger.check(uid);
+    res.setHeader("X-Quota-Limit", String(check.dailyBudget));
+    res.setHeader("X-Quota-Used", String(check.usedToday));
+    if (!check.allowed) {
+      res.setHeader("Retry-After", String(check.retryAfterSeconds));
+      return res.status(429).json({
+        error: "Daily AI quota exhausted. Your allowance resets at midnight.",
+        retryAfterSeconds: check.retryAfterSeconds,
+        usedToday: check.usedToday,
+        dailyBudget: check.dailyBudget
       });
     }
+    next();
   };
-  return _store;
 }
-
-// src/server/crypto.ts
-import crypto2 from "crypto";
-var CURRENT_KEY_VERSION = "v1";
-var ENVELOPE_MARKER = '"v":1';
-function loadKey() {
-  const raw = process.env.TOKEN_ENCRYPTION_KEY;
-  if (!raw) {
-    throw new Error("TOKEN_ENCRYPTION_KEY is not set \u2014 cannot encrypt/decrypt tokens");
-  }
-  const buffer = decodeKey(raw);
-  if (buffer.length !== 32) {
-    throw new Error(
-      `TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes (got ${buffer.length})`
-    );
-  }
-  return buffer;
-}
-function decodeKey(raw) {
-  const trimmed = raw.trim();
-  if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
-    return Buffer.from(trimmed, "hex");
-  }
-  const b64 = trimmed.includes("-") || trimmed.includes("_") ? trimmed.replace(/-/g, "+").replace(/_/g, "/") : trimmed;
-  return Buffer.from(b64, "base64");
-}
-function looksEncrypted(value) {
-  return typeof value === "string" && value.startsWith("{") && value.includes(ENVELOPE_MARKER) && value.includes('"ciphertext"');
-}
-function b64u(buf) {
-  return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-function fromB64u(s) {
-  return Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
-}
-function encryptToken(plaintext) {
-  if (plaintext === null || plaintext === void 0 || plaintext === "") return plaintext;
-  const key = loadKey();
-  const iv = crypto2.randomBytes(12);
-  const cipher = crypto2.createCipheriv("aes-256-gcm", key, iv);
-  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-  return JSON.stringify({
-    v: 1,
-    ciphertext: b64u(ciphertext),
-    iv: b64u(iv),
-    tag: b64u(cipher.getAuthTag()),
-    keyVersion: CURRENT_KEY_VERSION
-  });
-}
-function decryptToken(serialized, legacy) {
-  if (serialized === null || serialized === void 0 || serialized === "") {
-    return serialized ?? null;
-  }
-  if (typeof serialized !== "string") return null;
-  if (!looksEncrypted(serialized)) {
-    if (legacy && !process.env.VERCEL) {
-      try {
-        legacy.update(encryptToken(serialized));
-      } catch (err) {
-        console.error("token re-encryption failed:", err);
-      }
-    }
-    return serialized;
-  }
-  try {
-    const envelope = JSON.parse(serialized);
-    const key = loadKey();
-    const decipher = crypto2.createDecipheriv(
-      "aes-256-gcm",
-      key,
-      fromB64u(envelope.iv)
-    );
-    decipher.setAuthTag(fromB64u(envelope.tag));
-    const plaintext = Buffer.concat([
-      decipher.update(fromB64u(envelope.ciphertext)),
-      decipher.final()
-    ]);
-    return plaintext.toString("utf8");
-  } catch (err) {
-    console.error("token decryption failed:", err);
-    return null;
-  }
+function extractTokensUsed(response) {
+  const usage = response?.usageMetadata ?? response?.usage_metadata ?? null;
+  const total = usage?.totalTokenCount ?? usage?.total_token_count ?? null;
+  return typeof total === "number" && Number.isFinite(total) && total > 0 ? Math.floor(total) : null;
 }
 
 // server.ts
@@ -300,23 +257,6 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
       problems.push("FIREBASE_SERVICE_ACCOUNT is not valid base64-encoded JSON");
     }
   }
-  if (!process.env.TOKEN_ENCRYPTION_KEY) {
-    problems.push("TOKEN_ENCRYPTION_KEY is missing (32-byte hex or base64)");
-  } else {
-    let keyBuf = null;
-    try {
-      const k = process.env.TOKEN_ENCRYPTION_KEY.trim();
-      keyBuf = /^[0-9a-fA-F]{64}$/.test(k) ? Buffer.from(k, "hex") : Buffer.from(k.replace(/-/g, "+").replace(/_/g, "/"), "base64");
-    } catch {
-      keyBuf = null;
-    }
-    if (!keyBuf || keyBuf.length !== 32) {
-      problems.push("TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes");
-    }
-  }
-  if (!process.env.OAUTH_STATE_SECRET) {
-    problems.push("OAUTH_STATE_SECRET is missing (HMAC secret for OAuth state)");
-  }
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     warnings.push("GOOGLE_CLIENT_ID/SECRET missing \u2014 YouTube connect will fail");
   }
@@ -327,8 +267,6 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
   console.log(`GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? "present" : "MISSING"}`);
   console.log(`FIREBASE_SERVICE_ACCOUNT: ${process.env.FIREBASE_SERVICE_ACCOUNT ? "present" : "MISSING"}`);
   console.log(`APP_URL: ${process.env.APP_URL || "MISSING"}`);
-  console.log(`TOKEN_ENCRYPTION_KEY: ${process.env.TOKEN_ENCRYPTION_KEY ? "present" : "MISSING"}`);
-  console.log(`OAUTH_STATE_SECRET: ${process.env.OAUTH_STATE_SECRET ? "present" : "MISSING"}`);
   console.log(`projectId: ${projectId}`);
   warnings.forEach((w) => console.warn(`warn: ${w}`));
   if (problems.length > 0) {
@@ -340,9 +278,9 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const svc = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8"));
-    admin2.initializeApp({ credential: admin2.credential.cert(svc), projectId });
+    admin.initializeApp({ credential: admin.credential.cert(svc), projectId });
   } else {
-    admin2.initializeApp({ projectId });
+    admin.initializeApp({ projectId });
   }
 } catch (e) {
   console.error("admin init failed:", e);
@@ -405,7 +343,7 @@ async function startServer() {
     }
     const token = authHeader.split("Bearer ")[1];
     try {
-      const decodedToken = await admin2.auth().verifyIdToken(token);
+      const decodedToken = await admin.auth().verifyIdToken(token);
       req.user = decodedToken;
       const userExists = db_default.prepare("SELECT id FROM users WHERE id = ?").get(decodedToken.uid);
       if (!userExists) {
@@ -472,6 +410,8 @@ async function startServer() {
       return false;
     }
   }
+  const quotaLedger = new QuotaLedger({ db: db_default });
+  const quotaGuard = quotaGuardMiddleware(quotaLedger);
   const protectAIRoute = async (req, res, next) => {
     const route = req.path;
     const authHeader = req.headers.authorization;
@@ -481,7 +421,7 @@ async function startServer() {
     const token = authHeader.slice("Bearer ".length).trim();
     if (!token) return res.status(401).json({ error: "Authentication required" });
     try {
-      const decodedToken = await admin2.auth().verifyIdToken(token);
+      const decodedToken = await admin.auth().verifyIdToken(token);
       req.user = decodedToken;
       const rate = consumeRateLimit(decodedToken.uid, route);
       res.setHeader("X-RateLimit-Limit", String(AI_RATE_LIMITS[route] ?? AI_DEFAULT_LIMIT));
@@ -504,10 +444,18 @@ async function startServer() {
       if (route === "/api/gemini/video-download" && !isAllowedGeminiUri(req.body?.uri)) {
         return res.status(400).json({ error: "Invalid video resource URI." });
       }
-      next();
+      quotaGuard(req, res, next);
     } catch (error) {
       console.error("AI route auth error:", error);
       return res.status(401).json({ error: "Invalid authentication token" });
+    }
+  };
+  const recordQuota = (req, route, response) => {
+    try {
+      if (!req.user?.uid) return;
+      const tokens = extractTokensUsed(response) ?? ROUTE_COST_ESTIMATES[route] ?? 1e3;
+      quotaLedger.record(req.user.uid, route, tokens);
+    } catch {
     }
   };
   app.get("/api/user", authenticateUser, (req, res) => {
@@ -621,6 +569,7 @@ async function startServer() {
           { text: prompt || "Analyze this video." }
         ]
       });
+      recordQuota(req, "/api/gemini/analyze-video", response);
       try {
         fs.unlinkSync(file.path);
       } catch (e) {
@@ -645,6 +594,7 @@ async function startServer() {
           contents,
           config
         });
+        recordQuota(req, "/api/gemini/generate", response);
       } catch (firstAttemptError) {
         const isTransientOrRetired = firstAttemptError?.status === 503 || firstAttemptError?.status === 404 || firstAttemptError?.message?.includes("high demand") || firstAttemptError?.message?.includes("no longer available");
         if (isTransientOrRetired && model !== "gemini-3.1-flash-lite") {
@@ -654,6 +604,7 @@ async function startServer() {
             contents,
             config
           });
+          recordQuota(req, "/api/gemini/generate", response);
         } else {
           throw firstAttemptError;
         }
@@ -678,6 +629,7 @@ async function startServer() {
           }
         }
       });
+      recordQuota(req, "/api/gemini/generate-image", response);
       let base64EncodeString = "";
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
@@ -976,6 +928,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           "gemini-flash-latest"
         ]
       );
+      recordQuota(req, "/api/onboarding/niche-sparks", responseText ? { usageMetadata: null } : null);
       if (responseText) {
         try {
           const parsed = JSON.parse(responseText);
@@ -1006,6 +959,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           duration: durationSeconds ? `${durationSeconds}s` : "5s"
         }
       }, { timeout: 3e5 });
+      recordQuota(req, "/api/gemini/generate-video", interaction);
       const videoPart = interaction.output_video;
       if (videoPart && (videoPart.data || videoPart.uri)) {
         res.json({
@@ -1024,6 +978,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     try {
       const { operationName } = req.body;
       const interaction = await (await getAI()).interactions.get(operationName);
+      recordQuota(req, "/api/gemini/video-status", interaction);
       let done = false;
       let data = null;
       let progressPercentage = 50;
@@ -1056,6 +1011,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const videoRes = await fetch(uri, {
         headers: { "x-goog-api-key": process.env.GEMINI_API_KEY }
       });
+      recordQuota(req, "/api/gemini/video-download", null);
       res.setHeader("Content-Type", "video/mp4");
       videoRes.body.pipeTo(
         new WritableStream({
@@ -1080,33 +1036,21 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         "https://www.googleapis.com/auth/yt-analytics.readonly",
         "https://www.googleapis.com/auth/userinfo.profile"
       ],
-      state: createOAuthState(req.user.uid, "youtube"),
-      // F1.3 signed, single-use state
+      state: req.user.uid,
+      // Pass UID through state
       prompt: "consent"
     });
     res.json({ url });
   });
   app.get("/api/auth/google/callback", async (req, res) => {
     const { code, state } = req.query;
-    let userId;
-    let statePlatform;
-    try {
-      const verified = await verifyAndConsumeOAuthState(state);
-      userId = verified.uid;
-      statePlatform = verified.platform;
-    } catch (err) {
-      console.error("OAuth state rejected:", err?.oauthStateReason || err?.message || err);
-      return res.status(400).send("Invalid or expired state");
-    }
-    if (statePlatform !== "youtube") return res.status(400).send("Platform mismatch");
-    if (!code) return res.status(400).send("Missing code");
+    const userId = state;
+    if (!userId) return res.status(400).send("Missing user state");
     try {
       const { tokens } = await oauth2Client.getToken(code);
       oauth2Client.setCredentials(tokens);
       const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
       const userInfo = await oauth2.userinfo.get();
-      const encAccessToken = tokens.access_token ? encryptToken(tokens.access_token) : null;
-      const encRefreshToken = tokens.refresh_token ? encryptToken(tokens.refresh_token) : null;
       const existing = db_default.prepare("SELECT user_id FROM user_accounts WHERE user_id = ? AND platform = ?").get(userId, "youtube");
       if (existing) {
         db_default.prepare(`
@@ -1114,8 +1058,8 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
             access_token = ?, refresh_token = ?, expiry_date = ?, profile_data = ?
           WHERE user_id = ? AND platform = ?
         `).run(
-          encAccessToken,
-          encRefreshToken,
+          tokens.access_token,
+          tokens.refresh_token || null,
           tokens.expiry_date,
           JSON.stringify(userInfo.data),
           userId,
@@ -1128,8 +1072,8 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         `).run(
           userId,
           "youtube",
-          encAccessToken,
-          encRefreshToken,
+          tokens.access_token,
+          tokens.refresh_token,
           tokens.expiry_date,
           JSON.stringify(userInfo.data)
         );
@@ -1156,25 +1100,15 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
   app.get("/api/auth/tiktok/url", authenticateUser, (req, res) => {
+    const csrfState = Math.random().toString(36).substring(7);
     const scope = "user.info.basic,video.list";
-    const csrfState = createOAuthState(req.user.uid, "tiktok");
-    const url = `https://www.tiktok.com/v2/auth/authorize/?client_key=${TIKTOK_CLIENT_KEY}&scope=${scope}&response_type=code&redirect_uri=${encodeURIComponent(TIKTOK_REDIRECT_URI)}&state=${encodeURIComponent(csrfState)}`;
+    const url = `https://www.tiktok.com/v2/auth/authorize/?client_key=${TIKTOK_CLIENT_KEY}&scope=${scope}&response_type=code&redirect_uri=${encodeURIComponent(TIKTOK_REDIRECT_URI)}&state=${req.user.uid}`;
     res.json({ url });
   });
   app.get("/api/auth/tiktok/callback", async (req, res) => {
     const { code, state } = req.query;
-    let userId;
-    let statePlatform;
-    try {
-      const verified = await verifyAndConsumeOAuthState(state);
-      userId = verified.uid;
-      statePlatform = verified.platform;
-    } catch (err) {
-      console.error("OAuth state rejected:", err?.oauthStateReason || err?.message || err);
-      return res.status(400).send("Invalid or expired state");
-    }
-    if (statePlatform !== "tiktok") return res.status(400).send("Platform mismatch");
-    if (!code) return res.status(400).send("Missing code");
+    const userId = state;
+    if (!userId) return res.status(400).send("Missing user state");
     try {
       const response = await axios.post(
         "https://open.tiktokapis.com/v2/oauth/token/",
@@ -1188,20 +1122,18 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
       );
       const { access_token, refresh_token, expires_in, open_id } = response.data;
-      const encAccessToken = access_token ? encryptToken(access_token) : null;
-      const encRefreshToken = refresh_token ? encryptToken(refresh_token) : null;
       const existing = db_default.prepare("SELECT user_id FROM user_accounts WHERE user_id = ? AND platform = ?").get(userId, "tiktok");
       if (existing) {
         db_default.prepare(`
           UPDATE user_accounts SET 
             access_token = ?, refresh_token = ?, expiry_date = ?, profile_data = ?
           WHERE user_id = ? AND platform = ?
-        `).run(encAccessToken, encRefreshToken, Date.now() + expires_in * 1e3, JSON.stringify({ open_id }), userId, "tiktok");
+        `).run(access_token, refresh_token, Date.now() + expires_in * 1e3, JSON.stringify({ open_id }), userId, "tiktok");
       } else {
         db_default.prepare(`
           INSERT INTO user_accounts (user_id, platform, access_token, refresh_token, expiry_date, profile_data)
           VALUES (?, ?, ?, ?, ?, ?)
-        `).run(userId, "tiktok", encAccessToken, encRefreshToken, Date.now() + expires_in * 1e3, JSON.stringify({ open_id }));
+        `).run(userId, "tiktok", access_token, refresh_token, Date.now() + expires_in * 1e3, JSON.stringify({ open_id }));
       }
       res.send(`
         <html>
@@ -1238,13 +1170,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
     try {
       const results = {};
-      const accounts = db_default.prepare("SELECT platform, access_token, profile_data FROM user_accounts WHERE user_id = ?").all(req.user.uid).map((a) => ({
-        ...a,
-        // F1.4 — decrypt at rest tokens (legacy plaintext passes through + upgrades)
-        access_token: decryptToken(a.access_token, {
-          update: (enc) => db_default.prepare("UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?").run(enc, req.user.uid, a.platform)
-        })
-      }));
+      const accounts = db_default.prepare("SELECT platform, access_token, profile_data FROM user_accounts WHERE user_id = ?").all(req.user.uid);
       for (const platform of platforms) {
         const lowerPlatform = platform.toLowerCase();
         const account = accounts.find((a) => a.platform === lowerPlatform);
@@ -1305,12 +1231,8 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         process.env.GOOGLE_CLIENT_SECRET
       );
       auth.setCredentials({
-        access_token: decryptToken(account.access_token, {
-          update: (enc) => db_default.prepare("UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?").run(enc, req.user.uid, "youtube")
-        }),
-        refresh_token: decryptToken(account.refresh_token, {
-          update: (enc) => db_default.prepare("UPDATE user_accounts SET refresh_token = ? WHERE user_id = ? AND platform = ?").run(enc, req.user.uid, "youtube")
-        }),
+        access_token: account.access_token,
+        refresh_token: account.refresh_token,
         expiry_date: account.expiry_date
       });
       const youtube = google.youtube({ version: "v3", auth });
@@ -1354,12 +1276,8 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
               process.env.GOOGLE_CLIENT_SECRET
             );
             auth.setCredentials({
-              access_token: decryptToken(ytAccount.access_token, {
-                update: (enc) => db_default.prepare("UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?").run(enc, userId, "youtube")
-              }),
-              refresh_token: decryptToken(ytAccount.refresh_token, {
-                update: (enc) => db_default.prepare("UPDATE user_accounts SET refresh_token = ? WHERE user_id = ? AND platform = ?").run(enc, userId, "youtube")
-              }),
+              access_token: ytAccount.access_token,
+              refresh_token: ytAccount.refresh_token,
               expiry_date: ytAccount.expiry_date
             });
             const youtube = google.youtube({ version: "v3", auth });
@@ -1526,7 +1444,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       checks.database.error = err.message;
     }
     try {
-      if (admin2.apps.length > 0) {
+      if (admin.apps.length > 0) {
         checks.firebase.status = "healthy";
       } else {
         checks.firebase.status = "unhealthy";

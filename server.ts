@@ -14,6 +14,7 @@ import admin from 'firebase-admin';
 import axios from 'axios';
 import { createOAuthState, verifyAndConsumeOAuthState } from "./src/server/oauth-state.ts";
 import { encryptToken, decryptToken } from "./src/server/crypto.ts";
+import { QuotaLedger, quotaGuardMiddleware, extractTokensUsed, ROUTE_COST_ESTIMATES } from './src/server/quotaLedger';
 
 dotenv.config();
 
@@ -269,6 +270,12 @@ async function startServer() {
     }
   }
 
+  // F1.5 — per-user daily AI quota ledger (cost control, layered on top of the
+  // per-minute rate limit above). Fail-open internals; the 429 check itself is
+  // fail-closed only on the "over budget" path.
+  const quotaLedger = new QuotaLedger({ db });
+  const quotaGuard = quotaGuardMiddleware(quotaLedger);
+
   const protectAIRoute = async (req: any, res: any, next: any) => {
     const route = req.path;
     const authHeader = req.headers.authorization;
@@ -307,10 +314,22 @@ async function startServer() {
         return res.status(400).json({ error: 'Invalid video resource URI.' });
       }
 
-      next();
+      // Daily spend cap (F1.5) — after payload guards, before route handlers.
+      quotaGuard(req, res, next);
     } catch (error) {
       console.error('AI route auth error:', error);
       return res.status(401).json({ error: 'Invalid authentication token' });
+    }
+  };
+
+  /** Debit the ledger after a successful AI response. Best-effort by design. */
+  const recordQuota = (req: any, route: string, response: any) => {
+    try {
+      if (!req.user?.uid) return;
+      const tokens = extractTokensUsed(response) ?? ROUTE_COST_ESTIMATES[route] ?? 1_000;
+      quotaLedger.record(req.user.uid, route, tokens);
+    } catch {
+      /* fail-open */
     }
   };
 
@@ -458,6 +477,7 @@ async function startServer() {
           { text: prompt || "Analyze this video." }
         ]
       });
+      recordQuota(req, '/api/gemini/analyze-video', response);
       
       try { fs.unlinkSync(file.path); } catch (e) {}
       
@@ -485,6 +505,7 @@ async function startServer() {
           contents,
           config
         });
+        recordQuota(req, '/api/gemini/generate', response);
       } catch (firstAttemptError: any) {
         // If 503 high demand or 404 retired model, retry with fallback flash-lite pool
         const isTransientOrRetired = 
@@ -500,6 +521,7 @@ async function startServer() {
             contents,
             config
           });
+          recordQuota(req, '/api/gemini/generate', response);
         } else {
           throw firstAttemptError;
         }
@@ -526,6 +548,7 @@ async function startServer() {
           }
         }
       });
+      recordQuota(req, '/api/gemini/generate-image', response);
       let base64EncodeString = '';
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
@@ -854,6 +877,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           "gemini-flash-latest"
         ]
       );
+      recordQuota(req, '/api/onboarding/niche-sparks', responseText ? { usageMetadata: null } : null);
 
       if (responseText) {
         try {
@@ -889,6 +913,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           duration: durationSeconds ? `${durationSeconds}s` : '5s',
         }
       }, { timeout: 300000 });
+      recordQuota(req, '/api/gemini/generate-video', interaction);
       
       const videoPart = interaction.output_video;
       if (videoPart && (videoPart.data || videoPart.uri)) {
@@ -909,6 +934,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     try {
       const { operationName } = req.body;
       const interaction = await (await getAI()).interactions.get(operationName);
+      recordQuota(req, '/api/gemini/video-status', interaction);
       
       let done = false;
       let data = null;
@@ -946,6 +972,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const videoRes = await fetch(uri, {
         headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY! },
       });
+      recordQuota(req, '/api/gemini/video-download', null);
       res.setHeader('Content-Type', 'video/mp4');
       videoRes.body!.pipeTo(
         new WritableStream({
