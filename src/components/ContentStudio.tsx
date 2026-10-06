@@ -103,7 +103,9 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
         if (!localBlob) throw new Error('Local video not found');
         blob = localBlob;
       } else {
-        const response = await fetch(url);
+        // /api/video-download URLs are same-origin API routes — use the unified
+        // authenticated client (F1.7); local blobs were handled above.
+        const response = await apiFetch(url);
         if (!response.ok) throw new Error('Video not found');
         blob = await response.blob();
       }

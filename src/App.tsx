@@ -195,6 +195,24 @@ export default function App() {
     };
   }, []);
 
+  // F1.7: an unrecoverable 401 from the unified API client (refresh failed too)
+  // signs the user out and lands them back on the login view.
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      console.warn('Session expired — signing out.');
+      logout()
+        .catch((err) => console.error('Forced sign-out failed:', err))
+        .finally(() => {
+          setUser(null);
+          if (window.location.pathname !== '/login') {
+            navigate('/login');
+          }
+        });
+    };
+    window.addEventListener('creatoros:auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('creatoros:auth-expired', handleAuthExpired);
+  }, []);
+
   useEffect(() => {
     if (user) {
       setIsProjectsLoading(true);
