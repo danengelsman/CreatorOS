@@ -92,6 +92,140 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
 import axios from "axios";
+
+// src/server/quotaLedger.ts
+var DAILY_BUDGET_DEFAULT = 25e4;
+var ROUTE_COST_ESTIMATES = {
+  "/api/gemini/generate": 4e3,
+  // typical chat/script generation
+  "/api/gemini/analyze-video": 3e4,
+  // video upload = expensive
+  "/api/gemini/generate-image": 5e3,
+  "/api/gemini/generate-video": 6e4,
+  // most expensive per call
+  "/api/gemini/video-status": 50,
+  // status poll, cheap
+  "/api/gemini/video-download": 50,
+  // download, no generation
+  "/api/onboarding/niche-sparks": 1500
+};
+var DAY_MS = 24 * 60 * 60 * 1e3;
+function dayKeyFor(now = /* @__PURE__ */ new Date()) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+function msUntilLocalMidnight(now = /* @__PURE__ */ new Date()) {
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  return Math.max(1, tomorrow.getTime() - now.getTime());
+}
+var QuotaLedger = class {
+  constructor(deps) {
+    this.db = deps.db;
+    this.getDailyBudget = deps.getDailyBudget ?? (() => {
+      const raw = Number(process.env.DAILY_AI_BUDGET_TOKENS);
+      return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DAILY_BUDGET_DEFAULT;
+    });
+    this.nowFn = deps.now ?? (() => /* @__PURE__ */ new Date());
+    this.ensureSchema();
+  }
+  ensureSchema() {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_usage_ledger (
+        user_id TEXT NOT NULL,
+        day TEXT NOT NULL,
+        route TEXT NOT NULL,
+        calls INTEGER NOT NULL DEFAULT 0,
+        tokens INTEGER NOT NULL DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, day, route)
+      );
+      CREATE INDEX IF NOT EXISTS idx_ai_usage_ledger_user_day
+        ON ai_usage_ledger (user_id, day);
+    `);
+  }
+  usedToday(userId) {
+    try {
+      const day = dayKeyFor(this.nowFn());
+      const row = this.db.prepare("SELECT COALESCE(SUM(tokens), 0) AS total FROM ai_usage_ledger WHERE user_id = ? AND day = ?").get(userId, day);
+      return Number(row?.total || 0);
+    } catch {
+      return 0;
+    }
+  }
+  check(userId) {
+    const dailyBudget = this.getDailyBudget();
+    let usedToday = 0;
+    try {
+      usedToday = this.usedToday(userId);
+    } catch {
+      usedToday = 0;
+    }
+    const allowed = usedToday < dailyBudget;
+    return {
+      allowed,
+      usedToday,
+      dailyBudget,
+      retryAfterSeconds: Math.ceil(msUntilLocalMidnight(this.nowFn()) / 1e3)
+    };
+  }
+  /**
+   * Debit the ledger. `tokens` may come from real Gemini usageMetadata or the
+   * per-route estimate. Best-effort: swallows its own errors (fail-open).
+   */
+  record(userId, route, tokens) {
+    try {
+      const safeTokens = Math.max(0, Math.min(Math.floor(Number(tokens) || 0), 5e6));
+      const day = dayKeyFor(this.nowFn());
+      this.db.prepare(`
+          INSERT INTO ai_usage_ledger (user_id, day, route, calls, tokens, updated_at)
+          VALUES (?, ?, ?, 1, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(user_id, day, route) DO UPDATE SET
+            calls = calls + 1,
+            tokens = tokens + excluded.tokens,
+            updated_at = CURRENT_TIMESTAMP
+        `).run(userId, day, route, safeTokens);
+    } catch (err) {
+      console.error("quota ledger record failed (fail-open):", err);
+    }
+  }
+  /** Admin/diagnostics snapshot for one user. */
+  snapshot(userId) {
+    try {
+      const day = dayKeyFor(this.nowFn());
+      return this.db.prepare("SELECT route, calls, tokens FROM ai_usage_ledger WHERE user_id = ? AND day = ? ORDER BY tokens DESC").all(userId, day);
+    } catch {
+      return [];
+    }
+  }
+};
+function quotaGuardMiddleware(ledger) {
+  return function quotaGuard(req, res, next) {
+    const uid = req.user?.uid;
+    if (!uid) return next();
+    const check = ledger.check(uid);
+    res.setHeader("X-Quota-Limit", String(check.dailyBudget));
+    res.setHeader("X-Quota-Used", String(check.usedToday));
+    if (!check.allowed) {
+      res.setHeader("Retry-After", String(check.retryAfterSeconds));
+      return res.status(429).json({
+        error: "Daily AI quota exhausted. Your allowance resets at midnight.",
+        retryAfterSeconds: check.retryAfterSeconds,
+        usedToday: check.usedToday,
+        dailyBudget: check.dailyBudget
+      });
+    }
+    next();
+  };
+}
+function extractTokensUsed(response) {
+  const usage = response?.usageMetadata ?? response?.usage_metadata ?? null;
+  const total = usage?.totalTokenCount ?? usage?.total_token_count ?? null;
+  return typeof total === "number" && Number.isFinite(total) && total > 0 ? Math.floor(total) : null;
+}
+
+// server.ts
 import { fileURLToPath } from "url";
 var createViteServer = null;
 dotenv.config();
@@ -276,6 +410,8 @@ async function startServer() {
       return false;
     }
   }
+  const quotaLedger = new QuotaLedger({ db: db_default });
+  const quotaGuard = quotaGuardMiddleware(quotaLedger);
   const protectAIRoute = async (req, res, next) => {
     const route = req.path;
     const authHeader = req.headers.authorization;
@@ -308,10 +444,18 @@ async function startServer() {
       if (route === "/api/gemini/video-download" && !isAllowedGeminiUri(req.body?.uri)) {
         return res.status(400).json({ error: "Invalid video resource URI." });
       }
-      next();
+      quotaGuard(req, res, next);
     } catch (error) {
       console.error("AI route auth error:", error);
       return res.status(401).json({ error: "Invalid authentication token" });
+    }
+  };
+  const recordQuota = (req, route, response) => {
+    try {
+      if (!req.user?.uid) return;
+      const tokens = extractTokensUsed(response) ?? ROUTE_COST_ESTIMATES[route] ?? 1e3;
+      quotaLedger.record(req.user.uid, route, tokens);
+    } catch {
     }
   };
   app.get("/api/user", authenticateUser, (req, res) => {
@@ -425,6 +569,7 @@ async function startServer() {
           { text: prompt || "Analyze this video." }
         ]
       });
+      recordQuota(req, "/api/gemini/analyze-video", response);
       try {
         fs.unlinkSync(file.path);
       } catch (e) {
@@ -449,6 +594,7 @@ async function startServer() {
           contents,
           config
         });
+        recordQuota(req, "/api/gemini/generate", response);
       } catch (firstAttemptError) {
         const isTransientOrRetired = firstAttemptError?.status === 503 || firstAttemptError?.status === 404 || firstAttemptError?.message?.includes("high demand") || firstAttemptError?.message?.includes("no longer available");
         if (isTransientOrRetired && model !== "gemini-3.1-flash-lite") {
@@ -458,6 +604,7 @@ async function startServer() {
             contents,
             config
           });
+          recordQuota(req, "/api/gemini/generate", response);
         } else {
           throw firstAttemptError;
         }
@@ -482,6 +629,7 @@ async function startServer() {
           }
         }
       });
+      recordQuota(req, "/api/gemini/generate-image", response);
       let base64EncodeString = "";
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
@@ -780,6 +928,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           "gemini-flash-latest"
         ]
       );
+      recordQuota(req, "/api/onboarding/niche-sparks", responseText ? { usageMetadata: null } : null);
       if (responseText) {
         try {
           const parsed = JSON.parse(responseText);
@@ -810,6 +959,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           duration: durationSeconds ? `${durationSeconds}s` : "5s"
         }
       }, { timeout: 3e5 });
+      recordQuota(req, "/api/gemini/generate-video", interaction);
       const videoPart = interaction.output_video;
       if (videoPart && (videoPart.data || videoPart.uri)) {
         res.json({
@@ -828,6 +978,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     try {
       const { operationName } = req.body;
       const interaction = await (await getAI()).interactions.get(operationName);
+      recordQuota(req, "/api/gemini/video-status", interaction);
       let done = false;
       let data = null;
       let progressPercentage = 50;
@@ -860,6 +1011,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const videoRes = await fetch(uri, {
         headers: { "x-goog-api-key": process.env.GEMINI_API_KEY }
       });
+      recordQuota(req, "/api/gemini/video-download", null);
       res.setHeader("Content-Type", "video/mp4");
       videoRes.body.pipeTo(
         new WritableStream({
