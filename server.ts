@@ -12,6 +12,8 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import axios from 'axios';
+import { createOAuthState, verifyAndConsumeOAuthState } from "./src/server/oauth-state.ts";
+import { encryptToken, decryptToken } from "./src/server/crypto.ts";
 
 dotenv.config();
 
@@ -49,6 +51,25 @@ if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
       problems.push('FIREBASE_SERVICE_ACCOUNT is not valid base64-encoded JSON');
     }
   }
+  if (!process.env.TOKEN_ENCRYPTION_KEY) {
+    problems.push('TOKEN_ENCRYPTION_KEY is missing (32-byte hex or base64)');
+  } else {
+    let keyBuf: Buffer | null = null;
+    try {
+      const k = process.env.TOKEN_ENCRYPTION_KEY.trim();
+      keyBuf = /^[0-9a-fA-F]{64}$/.test(k)
+        ? Buffer.from(k, 'hex')
+        : Buffer.from(k.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+    } catch {
+      keyBuf = null;
+    }
+    if (!keyBuf || keyBuf.length !== 32) {
+      problems.push('TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes');
+    }
+  }
+  if (!process.env.OAUTH_STATE_SECRET) {
+    problems.push('OAUTH_STATE_SECRET is missing (HMAC secret for OAuth state)');
+  }
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     warnings.push('GOOGLE_CLIENT_ID/SECRET missing — YouTube connect will fail');
   }
@@ -60,6 +81,8 @@ if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
   console.log(`GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'present' : 'MISSING'}`);
   console.log(`FIREBASE_SERVICE_ACCOUNT: ${process.env.FIREBASE_SERVICE_ACCOUNT ? 'present' : 'MISSING'}`);
   console.log(`APP_URL: ${process.env.APP_URL || 'MISSING'}`);
+  console.log(`TOKEN_ENCRYPTION_KEY: ${process.env.TOKEN_ENCRYPTION_KEY ? 'present' : 'MISSING'}`);
+  console.log(`OAUTH_STATE_SECRET: ${process.env.OAUTH_STATE_SECRET ? 'present' : 'MISSING'}`);
   console.log(`projectId: ${projectId}`);
   warnings.forEach((w) => console.warn(`warn: ${w}`));
 
@@ -946,7 +969,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         'https://www.googleapis.com/auth/yt-analytics.readonly',
         'https://www.googleapis.com/auth/userinfo.profile'
       ],
-      state: req.user.uid, // Pass UID through state
+      state: createOAuthState(req.user.uid, 'youtube'), // F1.3 signed, single-use state
       prompt: 'consent'
     });
     res.json({ url });
@@ -954,9 +977,21 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
   app.get("/api/auth/google/callback", async (req, res) => {
     const { code, state } = req.query;
-    const userId = state as string;
 
-    if (!userId) return res.status(400).send('Missing user state');
+    // F1.3 — verify signature, TTL and single-use jti before trusting state.
+    let userId: string;
+    let statePlatform: string;
+    try {
+      const verified = await verifyAndConsumeOAuthState(state);
+      userId = verified.uid;
+      statePlatform = verified.platform;
+    } catch (err: any) {
+      console.error('OAuth state rejected:', err?.oauthStateReason || err?.message || err);
+      return res.status(400).send('Invalid or expired state');
+    }
+    if (statePlatform !== 'youtube') return res.status(400).send('Platform mismatch');
+
+    if (!code) return res.status(400).send('Missing code');
 
     try {
       const { tokens } = await oauth2Client.getToken(code as string);
@@ -964,6 +999,10 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
       const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
       const userInfo = await oauth2.userinfo.get();
+
+      // F1.4 — encrypt tokens before they touch the database
+      const encAccessToken = tokens.access_token ? encryptToken(tokens.access_token) : null;
+      const encRefreshToken = tokens.refresh_token ? encryptToken(tokens.refresh_token) : null;
 
       // Save to DB
       const existing = db.prepare('SELECT user_id FROM user_accounts WHERE user_id = ? AND platform = ?')
@@ -975,8 +1014,8 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
             access_token = ?, refresh_token = ?, expiry_date = ?, profile_data = ?
           WHERE user_id = ? AND platform = ?
         `).run(
-          tokens.access_token, 
-          tokens.refresh_token || null, 
+          encAccessToken,
+          encRefreshToken, 
           tokens.expiry_date, 
           JSON.stringify(userInfo.data), 
           userId, 
@@ -989,8 +1028,8 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         `).run(
           userId, 
           'youtube', 
-          tokens.access_token, 
-          tokens.refresh_token, 
+          encAccessToken, 
+          encRefreshToken, 
           tokens.expiry_date, 
           JSON.stringify(userInfo.data)
         );
@@ -1020,25 +1059,39 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
   // TikTok OAuth
   app.get("/api/auth/tiktok/url", authenticateUser, (req: any, res) => {
-    const csrfState = Math.random().toString(36).substring(7);
     const scope = 'user.info.basic,video.list';
-    
+
+    // F1.3 signed, single-use state (replaces raw uid / random csrfState)
+    const csrfState = createOAuthState(req.user.uid, 'tiktok');
+
     // Construct TikTok auth URL
     // Documentation: https://developers.tiktok.com/doc/login-kit-web
-    const url = `https://www.tiktok.com/v2/auth/authorize/?client_key=${TIKTOK_CLIENT_KEY}&scope=${scope}&response_type=code&redirect_uri=${encodeURIComponent(TIKTOK_REDIRECT_URI)}&state=${req.user.uid}`;
+    const url = `https://www.tiktok.com/v2/auth/authorize/?client_key=${TIKTOK_CLIENT_KEY}&scope=${scope}&response_type=code&redirect_uri=${encodeURIComponent(TIKTOK_REDIRECT_URI)}&state=${encodeURIComponent(csrfState)}`;
     
     res.json({ url });
   });
 
   app.get("/api/auth/tiktok/callback", async (req, res) => {
     const { code, state } = req.query;
-    const userId = state as string;
 
-    if (!userId) return res.status(400).send('Missing user state');
+    // F1.3 — verify signature, TTL and single-use jti before trusting state.
+    let userId: string;
+    let statePlatform: string;
+    try {
+      const verified = await verifyAndConsumeOAuthState(state);
+      userId = verified.uid;
+      statePlatform = verified.platform;
+    } catch (err: any) {
+      console.error('OAuth state rejected:', err?.oauthStateReason || err?.message || err);
+      return res.status(400).send('Invalid or expired state');
+    }
+    if (statePlatform !== 'tiktok') return res.status(400).send('Platform mismatch');
+
+    if (!code) return res.status(400).send('Missing code');
 
     try {
       // Exchange code for token
-      const response = await axios.post('https://open.tiktokapis.com/v2/oauth/token/', 
+      const response = await axios.post('https://open.tiktokapis.com/v2/oauth/token/',
         new URLSearchParams({
           client_key: TIKTOK_CLIENT_KEY!,
           client_secret: TIKTOK_CLIENT_SECRET!,
@@ -1051,6 +1104,10 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
       const { access_token, refresh_token, expires_in, open_id } = response.data;
 
+      // F1.4 — encrypt tokens before they touch the database
+      const encAccessToken = access_token ? encryptToken(access_token) : null;
+      const encRefreshToken = refresh_token ? encryptToken(refresh_token) : null;
+
       // Save to DB
       const existing = db.prepare('SELECT user_id FROM user_accounts WHERE user_id = ? AND platform = ?')
         .get(userId, 'tiktok') as any;
@@ -1060,12 +1117,12 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           UPDATE user_accounts SET 
             access_token = ?, refresh_token = ?, expiry_date = ?, profile_data = ?
           WHERE user_id = ? AND platform = ?
-        `).run(access_token, refresh_token, Date.now() + expires_in * 1000, JSON.stringify({ open_id }), userId, 'tiktok');
+        `).run(encAccessToken, encRefreshToken, Date.now() + expires_in * 1000, JSON.stringify({ open_id }), userId, 'tiktok');
       } else {
         db.prepare(`
           INSERT INTO user_accounts (user_id, platform, access_token, refresh_token, expiry_date, profile_data)
           VALUES (?, ?, ?, ?, ?, ?)
-        `).run(userId, 'tiktok', access_token, refresh_token, Date.now() + expires_in * 1000, JSON.stringify({ open_id }));
+        `).run(userId, 'tiktok', encAccessToken, encRefreshToken, Date.now() + expires_in * 1000, JSON.stringify({ open_id }));
       }
 
       res.send(`
@@ -1108,8 +1165,15 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const results: { [key: string]: { status: 'success' | 'error', message: string, url?: string } } = {};
       
       // Get all connected accounts for the user
-      const accounts = db.prepare('SELECT platform, access_token, profile_data FROM user_accounts WHERE user_id = ?')
-        .all(req.user.uid) as any[];
+      const accounts = (db.prepare('SELECT platform, access_token, profile_data FROM user_accounts WHERE user_id = ?')
+        .all(req.user.uid) as any[]).map((a) => ({
+          ...a,
+          // F1.4 — decrypt at rest tokens (legacy plaintext passes through + upgrades)
+          access_token: decryptToken(a.access_token, {
+            update: (enc) => db.prepare('UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?')
+              .run(enc, req.user.uid, a.platform),
+          }),
+        }));
 
       for (const platform of platforms) {
         const lowerPlatform = platform.toLowerCase();
@@ -1181,8 +1245,14 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         process.env.GOOGLE_CLIENT_SECRET
       );
       auth.setCredentials({
-        access_token: account.access_token,
-        refresh_token: account.refresh_token,
+        access_token: decryptToken(account.access_token, {
+          update: (enc) => db.prepare('UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?')
+            .run(enc, req.user.uid, 'youtube'),
+        }),
+        refresh_token: decryptToken(account.refresh_token, {
+          update: (enc) => db.prepare('UPDATE user_accounts SET refresh_token = ? WHERE user_id = ? AND platform = ?')
+            .run(enc, req.user.uid, 'youtube'),
+        }),
         expiry_date: account.expiry_date
       });
 
@@ -1237,8 +1307,14 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
               process.env.GOOGLE_CLIENT_SECRET
             );
             auth.setCredentials({
-              access_token: ytAccount.access_token,
-              refresh_token: ytAccount.refresh_token,
+              access_token: decryptToken(ytAccount.access_token, {
+                update: (enc) => db.prepare('UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?')
+                  .run(enc, userId, 'youtube'),
+              }),
+              refresh_token: decryptToken(ytAccount.refresh_token, {
+                update: (enc) => db.prepare('UPDATE user_accounts SET refresh_token = ? WHERE user_id = ? AND platform = ?')
+                  .run(enc, userId, 'youtube'),
+              }),
               expiry_date: ytAccount.expiry_date
             });
             const youtube = google.youtube({ version: 'v3', auth });
