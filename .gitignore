@@ -15,3 +15,5 @@ uploads/
 # Agent/scratch working dirs
 .zwork/
 .hermes/
+
+.vercel
