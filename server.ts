@@ -908,7 +908,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         model: 'gemini-omni-flash-preview',
         input: prompt,
         background: true,
-        store: false,
+        store: true, // required by the API for background interactions
         stream: false,
         response_format: {
           type: 'video',
