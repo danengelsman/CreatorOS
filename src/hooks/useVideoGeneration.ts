@@ -160,6 +160,12 @@ export function useVideoGeneration({
 
     const promptStr = editedPrompt || getAutoPrompt();
 
+    // Google's video model (gemini-omni-flash) has ZERO free-tier allowance —
+    // requests only work on a billed project. Detect that wall and say so
+    // immediately instead of retrying for 8 minutes.
+    const TIER_LIMIT_RE = /rate limit.*free tier|credits are depleted|billing settings|quota exceeded/i;
+    const TIER_LIMIT_MSG = "Video generation requires a paid Gemini API tier. Add billing to your API key's project at aistudio.google.com to unlock it — text features still work on the free tier.";
+
     const finalize = async (blob: Blob) => {
       setVideoGenerationProgress('Downloading finished video...');
       setVideoProgressPercent(97);
@@ -169,7 +175,15 @@ export function useVideoGeneration({
     };
     
     try {
-      const operation = await generateVideo(promptStr, videoAspect, videoLength);
+      let operation;
+      try {
+        operation = await generateVideo(promptStr, videoAspect, videoLength);
+      } catch (createErr: any) {
+        if (TIER_LIMIT_RE.test(String(createErr?.message || createErr))) {
+          throw new Error(TIER_LIMIT_MSG);
+        }
+        throw createErr;
+      }
       
       let done = false;
       let finalOp = operation;
@@ -190,6 +204,8 @@ export function useVideoGeneration({
             pollFailures = 0;
           } catch (pollErr) {
             pollFailures++;
+            const msg = String((pollErr as any)?.message || pollErr);
+            if (TIER_LIMIT_RE.test(msg)) throw new Error(TIER_LIMIT_MSG);
             if (Date.now() - startedAt > MAX_TOTAL_WAIT_MS) throw new Error(TIMEOUT_MSG);
             if (pollFailures >= MAX_POLL_FAILURES) {
               throw new Error('Lost contact with the render job after several retries. It may still finish and appear in your video history.');
