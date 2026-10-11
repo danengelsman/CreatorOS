@@ -347,11 +347,7 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string = "a
   return data.text;
 };
 
-export const generateVideo = async (prompt: string, aspectRatio: '16:9' | '9:16' = '16:9', videoLength: string = 'Short (5s)') => {
-  let durationSeconds = 5;
-  if (videoLength.includes('10s')) durationSeconds = 10;
-  if (videoLength.includes('5s')) durationSeconds = 5;
-
+export const generateVideo = async (prompt: string, aspectRatio: '16:9' | '9:16' = '16:9', durationSeconds: number = 5) => {
   const response = await apiFetch('/api/gemini/generate-video', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

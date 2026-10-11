@@ -1146,19 +1146,25 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const { prompt, aspectRatio, durationSeconds } = req.body;
       const repToken = getReplicateToken();
       if (repToken) {
-        const seconds = Number(durationSeconds) || 5;
-        const numFrames = seconds >= 7 ? 113 : 81;
-        const r = await fetch(`${REPLICATE_API}/models/wan-video/wan-2.2-t2v-fast/predictions`, {
+        const VIDEO_MODEL = process.env.REPLICATE_VIDEO_MODEL || "prunaai/p-video";
+        const seconds = Math.min(20, Math.max(1, Number(durationSeconds) || 5));
+        const input = VIDEO_MODEL.startsWith("prunaai/p-video") ? {
+          prompt,
+          aspect_ratio: aspectRatio === "9:16" ? "9:16" : "16:9",
+          resolution: "720p",
+          duration: seconds,
+          fps: 24
+        } : {
+          // wan-video/wan-2.2-t2v-fast: 81..121 frames @ 16fps -> 5s..7.5s
+          prompt,
+          aspect_ratio: aspectRatio === "9:16" ? "9:16" : "16:9",
+          num_frames: seconds >= 7 ? 113 : 81,
+          resolution: "480p"
+        };
+        const r = await fetch(`${REPLICATE_API}/models/${VIDEO_MODEL}/predictions`, {
           method: "POST",
           headers: replicateHeaders(),
-          body: JSON.stringify({
-            input: {
-              prompt,
-              aspect_ratio: aspectRatio === "9:16" ? "9:16" : "16:9",
-              num_frames: numFrames,
-              resolution: "480p"
-            }
-          })
+          body: JSON.stringify({ input })
         });
         const text = await r.text();
         if (!r.ok) throw new Error(`Render provider error (${r.status}): ${text.slice(0, 300)}`);

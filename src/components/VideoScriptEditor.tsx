@@ -72,7 +72,8 @@ export default function VideoScriptEditor({
                     <div className="flex gap-2">
                       <select value={videoLength} onChange={e => setVideoLength(e.target.value)} className="flex-1 bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none">
                         <option>Short (5s)</option>
-                        <option>Extended (7s)</option>
+                        <option>Long (10s)</option>
+                        <option>Extended (20s)</option>
                       </select>
                       <select value={videoAspect} onChange={e => setVideoAspect(e.target.value as any)} className="w-24 bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none">
                         <option value="9:16">9:16</option>

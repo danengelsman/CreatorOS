@@ -34,6 +34,7 @@ export function useVideoGeneration({
 
   // Customization Settings
   const [videoLength, setVideoLength] = useState('Short (5s)');
+  const parseVideoSeconds = (s: string) => (s.includes('20') ? 20 : s.includes('10') ? 10 : 5);
   const [avatarGender, setAvatarGender] = useState(brand?.avatar?.gender || 'Female');
   const [avatarClothing, setAvatarClothing] = useState(brand?.avatar?.clothing || 'Professional business attire');
   const [backgroundStyle, setBackgroundStyle] = useState(brand?.avatar?.background || 'Modern office with soft lighting');
@@ -178,7 +179,7 @@ export function useVideoGeneration({
     try {
       let operation;
       try {
-        operation = await generateVideo(promptStr, videoAspect, videoLength);
+        operation = await generateVideo(promptStr, videoAspect, parseVideoSeconds(videoLength));
       } catch (createErr: any) {
         if (TIER_LIMIT_RE.test(String(createErr?.message || createErr))) {
           throw new Error(TIER_LIMIT_MSG);
