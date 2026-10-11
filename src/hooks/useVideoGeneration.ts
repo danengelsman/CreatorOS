@@ -149,12 +149,13 @@ export function useVideoGeneration({
       return Math.min(95, 2 + Math.round(frac * 93));
     };
 
-    const updateProgress = () => {
-      const pct = curvePct();
+    const updateProgress = (realPct?: number | null) => {
+      const pct = typeof realPct === 'number' ? realPct : curvePct();
       setVideoProgressPercent(pct);
-      if (pct < 10) setVideoGenerationProgress('Gemini is composing scenes...');
-      else if (pct < 35) setVideoGenerationProgress('Gemini is rendering frames...');
-      else if (pct < 65) setVideoGenerationProgress('Refining motion and audio...');
+      if (pct < 10) setVideoGenerationProgress('Submitting render job...');
+      else if (pct < 35) setVideoGenerationProgress('Composing scenes...');
+      else if (pct < 65) setVideoGenerationProgress('Rendering frames...');
+      else if (pct < 85) setVideoGenerationProgress('Refining motion and audio...');
       else setVideoGenerationProgress('Finalizing render (almost there)...');
     };
 
@@ -202,6 +203,9 @@ export function useVideoGeneration({
           try {
             status = await getOperationStatus(finalOp);
             pollFailures = 0;
+            if (typeof (status as any)?.progressPercentage === 'number') {
+              updateProgress((status as any).progressPercentage);
+            }
           } catch (pollErr) {
             pollFailures++;
             const msg = String((pollErr as any)?.message || pollErr);

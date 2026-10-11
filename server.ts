@@ -897,10 +897,47 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
   
 
+  // --- Replicate (video provider with free credits; gemini-omni needs paid tier) ---
+  const REPLICATE_API = 'https://api.replicate.com/v1';
+  const getReplicateToken = () => process.env.REPLICATE_API_TOKEN || '';
+  const replicateHeaders = () => ({ 'Authorization': `Bearer ${getReplicateToken()}`, 'Content-Type': 'application/json' });
+
   app.post("/api/gemini/generate-video", protectAIRoute, async (req: any, res) => {
     try {
       const { prompt, aspectRatio, durationSeconds } = req.body;
-      
+
+      // Preferred engine: Replicate wan-2.2-t2v-fast (works on free credits).
+      const repToken = getReplicateToken();
+      if (repToken) {
+        const seconds = Number(durationSeconds) || 5;
+        // wan-2.2 fast: 81..121 frames @ 16fps -> 5s..7.5s
+        const numFrames = seconds >= 7 ? 113 : 81;
+        const r = await fetch(`${REPLICATE_API}/models/wan-video/wan-2.2-t2v-fast/predictions`, {
+          method: 'POST',
+          headers: replicateHeaders(),
+          body: JSON.stringify({
+            input: {
+              prompt,
+              aspect_ratio: aspectRatio === '9:16' ? '9:16' : '16:9',
+              num_frames: numFrames,
+              resolution: '480p',
+            },
+          }),
+        });
+        const text = await r.text();
+        if (!r.ok) throw new Error(`Render provider error (${r.status}): ${text.slice(0, 300)}`);
+        const pred = JSON.parse(text);
+        recordQuota(req, '/api/gemini/generate-video', null);
+        return res.json({
+          done: false,
+          provider: 'replicate',
+          operationName: `replicate:${pred.id}`,
+          renderStatus: pred.status,
+          startedAt: new Date().toISOString(),
+        });
+      }
+
+      // Fallback engine: Gemini omni (requires paid tier; background job).
       // background:true makes create() return as soon as the render job is
       // registered instead of blocking for the whole multi-minute render.
       // The client polls /api/gemini/video-status with the returned id.
@@ -941,6 +978,45 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   app.post("/api/gemini/video-status", protectAIRoute, async (req: any, res) => {
     try {
       const { operationName } = req.body;
+
+      // Replicate predictions: poll by id, parse real % from render logs.
+      if (typeof operationName === 'string' && operationName.startsWith('replicate:')) {
+        const predId = operationName.slice('replicate:'.length);
+        const r = await fetch(`${REPLICATE_API}/predictions/${predId}`, { headers: replicateHeaders() });
+        const text = await r.text();
+        if (!r.ok) throw new Error(`Render provider error (${r.status}): ${text.slice(0, 300)}`);
+        const pred = JSON.parse(text);
+        let done = false;
+        let data: string | null = null;
+        let progressPercentage: number | null = null;
+
+        if (pred.status === 'succeeded') {
+          done = true;
+          progressPercentage = 100;
+          const out = pred.output;
+          const url = Array.isArray(out) ? out[out.length - 1] : out;
+          data = typeof url === 'string' ? url : null;
+        } else if (pred.status === 'processing') {
+          // Replicate exposes no numeric progress field, but its logs contain
+          // tqdm-style "42%" updates from the render loop.
+          const matches = [...String(pred.logs || '').matchAll(/(\d{1,3})%/g)];
+          if (matches.length) progressPercentage = Math.min(99, parseInt(matches[matches.length - 1][1], 10));
+        } else if (pred.status === 'starting') {
+          progressPercentage = 1;
+        } else if (['failed', 'canceled'].includes(pred.status)) {
+          throw new Error(String(pred.error || `Render ${pred.status}`));
+        }
+        return res.json({
+          done,
+          progressPercentage,
+          renderStatus: pred.status,
+          provider: 'replicate',
+          startedAt: pred.created_at || null,
+          updatedAt: new Date().toISOString(),
+          data,
+        });
+      }
+
       const interaction = await (await getAI()).interactions.get(operationName);
       recordQuota(req, '/api/gemini/video-status', interaction);
       
@@ -986,8 +1062,11 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     try {
       const { uri } = req.body;
       if (!uri) return res.status(400).send('No URI');
+      // Only send the Google API key to Google hosts — never to third-party
+      // CDNs (e.g. Replicate's delivery hosts).
+      const googleHost = /^https:\/\/([a-z0-9-]+\.)*(googleapis|google)\.com\//i.test(uri);
       const videoRes = await fetch(uri, {
-        headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY! },
+        headers: googleHost ? { 'x-goog-api-key': process.env.GEMINI_API_KEY! } : {},
       });
       recordQuota(req, '/api/gemini/video-download', null);
       res.setHeader('Content-Type', 'video/mp4');

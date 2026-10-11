@@ -1138,9 +1138,40 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       return res.json(fallbackSparks);
     }
   });
+  const REPLICATE_API = "https://api.replicate.com/v1";
+  const getReplicateToken = () => process.env.REPLICATE_API_TOKEN || "";
+  const replicateHeaders = () => ({ "Authorization": `Bearer ${getReplicateToken()}`, "Content-Type": "application/json" });
   app.post("/api/gemini/generate-video", protectAIRoute, async (req, res) => {
     try {
       const { prompt, aspectRatio, durationSeconds } = req.body;
+      const repToken = getReplicateToken();
+      if (repToken) {
+        const seconds = Number(durationSeconds) || 5;
+        const numFrames = seconds >= 7 ? 113 : 81;
+        const r = await fetch(`${REPLICATE_API}/models/wan-video/wan-2.2-t2v-fast/predictions`, {
+          method: "POST",
+          headers: replicateHeaders(),
+          body: JSON.stringify({
+            input: {
+              prompt,
+              aspect_ratio: aspectRatio === "9:16" ? "9:16" : "16:9",
+              num_frames: numFrames,
+              resolution: "480p"
+            }
+          })
+        });
+        const text = await r.text();
+        if (!r.ok) throw new Error(`Render provider error (${r.status}): ${text.slice(0, 300)}`);
+        const pred = JSON.parse(text);
+        recordQuota(req, "/api/gemini/generate-video", null);
+        return res.json({
+          done: false,
+          provider: "replicate",
+          operationName: `replicate:${pred.id}`,
+          renderStatus: pred.status,
+          startedAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+      }
       const interaction = await (await getAI()).interactions.create({
         model: "gemini-omni-flash-preview",
         input: prompt,
@@ -1176,6 +1207,39 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   app.post("/api/gemini/video-status", protectAIRoute, async (req, res) => {
     try {
       const { operationName } = req.body;
+      if (typeof operationName === "string" && operationName.startsWith("replicate:")) {
+        const predId = operationName.slice("replicate:".length);
+        const r = await fetch(`${REPLICATE_API}/predictions/${predId}`, { headers: replicateHeaders() });
+        const text = await r.text();
+        if (!r.ok) throw new Error(`Render provider error (${r.status}): ${text.slice(0, 300)}`);
+        const pred = JSON.parse(text);
+        let done2 = false;
+        let data2 = null;
+        let progressPercentage2 = null;
+        if (pred.status === "succeeded") {
+          done2 = true;
+          progressPercentage2 = 100;
+          const out = pred.output;
+          const url = Array.isArray(out) ? out[out.length - 1] : out;
+          data2 = typeof url === "string" ? url : null;
+        } else if (pred.status === "processing") {
+          const matches = [...String(pred.logs || "").matchAll(/(\d{1,3})%/g)];
+          if (matches.length) progressPercentage2 = Math.min(99, parseInt(matches[matches.length - 1][1], 10));
+        } else if (pred.status === "starting") {
+          progressPercentage2 = 1;
+        } else if (["failed", "canceled"].includes(pred.status)) {
+          throw new Error(String(pred.error || `Render ${pred.status}`));
+        }
+        return res.json({
+          done: done2,
+          progressPercentage: progressPercentage2,
+          renderStatus: pred.status,
+          provider: "replicate",
+          startedAt: pred.created_at || null,
+          updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          data: data2
+        });
+      }
       const interaction = await (await getAI()).interactions.get(operationName);
       recordQuota(req, "/api/gemini/video-status", interaction);
       let done = false;
@@ -1213,8 +1277,9 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     try {
       const { uri } = req.body;
       if (!uri) return res.status(400).send("No URI");
+      const googleHost = /^https:\/\/([a-z0-9-]+\.)*(googleapis|google)\.com\//i.test(uri);
       const videoRes = await fetch(uri, {
-        headers: { "x-goog-api-key": process.env.GEMINI_API_KEY }
+        headers: googleHost ? { "x-goog-api-key": process.env.GEMINI_API_KEY } : {}
       });
       recordQuota(req, "/api/gemini/video-download", null);
       res.setHeader("Content-Type", "video/mp4");
