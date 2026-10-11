@@ -75,6 +75,8 @@ export default function VideoStudio({ body, title, platform, brand, showToast, u
         isVideoGenerating={videoGen.isVideoGenerating}
         videoAspect={videoGen.videoAspect}
         videoGenerationProgress={videoGen.videoGenerationProgress}
+        videoProgressPercent={videoGen.videoProgressPercent}
+        videoElapsedSeconds={videoGen.videoElapsedSeconds}
       />
     </div>
   );

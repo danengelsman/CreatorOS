@@ -901,10 +901,13 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     try {
       const { prompt, aspectRatio, durationSeconds } = req.body;
       
+      // background:true makes create() return as soon as the render job is
+      // registered instead of blocking for the whole multi-minute render.
+      // The client polls /api/gemini/video-status with the returned id.
       const interaction = await (await getAI()).interactions.create({
         model: 'gemini-omni-flash-preview',
         input: prompt,
-        background: false,
+        background: true,
         store: false,
         stream: false,
         response_format: {
@@ -912,18 +915,23 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           aspect_ratio: aspectRatio || '16:9',
           duration: durationSeconds ? `${durationSeconds}s` : '5s',
         }
-      }, { timeout: 300000 });
+      }, { timeout: 60000 });
       recordQuota(req, '/api/gemini/generate-video', interaction);
       
+      // Some backends may still complete synchronously — support both shapes.
       const videoPart = interaction.output_video;
-      if (videoPart && (videoPart.data || videoPart.uri)) {
-        res.json({ 
+      if (interaction.status === "completed" && videoPart && (videoPart.data || videoPart.uri)) {
+        return res.json({ 
           done: true, 
           data: videoPart.data ? `data:${videoPart.mime_type || 'video/mp4'};base64,${videoPart.data}` : videoPart.uri 
         });
-      } else {
-        throw new Error("No video output generated.");
       }
+      res.json({
+        done: false,
+        operationName: interaction.id,
+        renderStatus: interaction.status,
+        startedAt: interaction.created || new Date().toISOString(),
+      });
     } catch (error: any) {
       console.error('Video Generation Error:', error);
       res.status(500).json({ error: formatGeminiError(error) });
@@ -938,9 +946,15 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       
       let done = false;
       let data = null;
-      let progressPercentage = 50; // Interactions don't have explicit progress%
+      // Honest signals for the client's progress model. progressPercentage is
+      // null because the Interactions API exposes no percent — the client
+      // derives progress from renderStatus + elapsed time instead.
+      const renderStatus = interaction.status;
+      const startedAt = interaction.created || null;
+      const updatedAt = interaction.updated || null;
+      let progressPercentage: number | null = null;
       
-      if (interaction.status === "completed") {
+      if (renderStatus === "completed") {
         done = true;
         progressPercentage = 100;
         const videoPart = interaction.output_video;
@@ -950,13 +964,16 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
            // fallback just in case it returns URI
            data = videoPart.uri;
         }
-      } else if (["failed", "cancelled"].includes(interaction.status)) {
-        throw new Error(`Video generation ${interaction.status}`);
+      } else if (["failed", "cancelled"].includes(renderStatus)) {
+        throw new Error(`Video generation ${renderStatus}`);
       }
       
       res.json({ 
         done, 
         progressPercentage,
+        renderStatus,
+        startedAt,
+        updatedAt,
         data
       });
     } catch (error: any) {

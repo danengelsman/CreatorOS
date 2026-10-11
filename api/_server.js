@@ -1144,7 +1144,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const interaction = await (await getAI()).interactions.create({
         model: "gemini-omni-flash-preview",
         input: prompt,
-        background: false,
+        background: true,
         store: false,
         stream: false,
         response_format: {
@@ -1152,17 +1152,21 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           aspect_ratio: aspectRatio || "16:9",
           duration: durationSeconds ? `${durationSeconds}s` : "5s"
         }
-      }, { timeout: 3e5 });
+      }, { timeout: 6e4 });
       recordQuota(req, "/api/gemini/generate-video", interaction);
       const videoPart = interaction.output_video;
-      if (videoPart && (videoPart.data || videoPart.uri)) {
-        res.json({
+      if (interaction.status === "completed" && videoPart && (videoPart.data || videoPart.uri)) {
+        return res.json({
           done: true,
           data: videoPart.data ? `data:${videoPart.mime_type || "video/mp4"};base64,${videoPart.data}` : videoPart.uri
         });
-      } else {
-        throw new Error("No video output generated.");
       }
+      res.json({
+        done: false,
+        operationName: interaction.id,
+        renderStatus: interaction.status,
+        startedAt: interaction.created || (/* @__PURE__ */ new Date()).toISOString()
+      });
     } catch (error) {
       console.error("Video Generation Error:", error);
       res.status(500).json({ error: formatGeminiError(error) });
@@ -1175,8 +1179,11 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       recordQuota(req, "/api/gemini/video-status", interaction);
       let done = false;
       let data = null;
-      let progressPercentage = 50;
-      if (interaction.status === "completed") {
+      const renderStatus = interaction.status;
+      const startedAt = interaction.created || null;
+      const updatedAt = interaction.updated || null;
+      let progressPercentage = null;
+      if (renderStatus === "completed") {
         done = true;
         progressPercentage = 100;
         const videoPart = interaction.output_video;
@@ -1185,12 +1192,15 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         } else if (videoPart && videoPart.uri) {
           data = videoPart.uri;
         }
-      } else if (["failed", "cancelled"].includes(interaction.status)) {
-        throw new Error(`Video generation ${interaction.status}`);
+      } else if (["failed", "cancelled"].includes(renderStatus)) {
+        throw new Error(`Video generation ${renderStatus}`);
       }
       res.json({
         done,
         progressPercentage,
+        renderStatus,
+        startedAt,
+        updatedAt,
         data
       });
     } catch (error) {

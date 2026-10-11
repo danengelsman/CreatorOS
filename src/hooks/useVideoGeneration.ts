@@ -28,6 +28,8 @@ export function useVideoGeneration({
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
   const [videoAspect, setVideoAspect] = useState<'9:16' | '16:9'>('9:16');
   const [videoGenerationProgress, setVideoGenerationProgress] = useState('');
+  const [videoProgressPercent, setVideoProgressPercent] = useState(0);
+  const [videoElapsedSeconds, setVideoElapsedSeconds] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   // Customization Settings
@@ -125,22 +127,77 @@ export function useVideoGeneration({
       return;
     }
     setIsVideoGenerating(true);
-    setVideoGenerationProgress('Initializing Gemini Engine...');
+    setVideoGenerationProgress('Submitting render job to Gemini...');
+    setVideoProgressPercent(2);
+    setVideoElapsedSeconds(0);
     setVideoUrl(null);
     
+    const startedAt = Date.now();
+    // Live elapsed counter for the UI.
+    const elapsedTimer = setInterval(() => {
+      setVideoElapsedSeconds(Math.round((Date.now() - startedAt) / 1000));
+    }, 1000);
+
+    // Time-based progress curve. Google exposes no percent for video renders,
+    // so we map elapsed time onto a realistic render budget and never claim
+    // 100 until the video actually exists.
+    const renderBudgetMs = (videoLength.includes('10s') ? 10 : 5) * 60_000;
+    const curvePct = () => {
+      const elapsed = Date.now() - startedAt;
+      // ease-out: quick early movement, slowing as it approaches the cap
+      const frac = 1 - Math.exp(-elapsed / (renderBudgetMs * 0.45));
+      return Math.min(95, 2 + Math.round(frac * 93));
+    };
+
+    const updateProgress = () => {
+      const pct = curvePct();
+      setVideoProgressPercent(pct);
+      if (pct < 10) setVideoGenerationProgress('Gemini is composing scenes...');
+      else if (pct < 35) setVideoGenerationProgress('Gemini is rendering frames...');
+      else if (pct < 65) setVideoGenerationProgress('Refining motion and audio...');
+      else setVideoGenerationProgress('Finalizing render (almost there)...');
+    };
+
+    const promptStr = editedPrompt || getAutoPrompt();
+
+    const finalize = async (blob: Blob) => {
+      setVideoGenerationProgress('Downloading finished video...');
+      setVideoProgressPercent(97);
+      const localUrl = URL.createObjectURL(blob);
+      setVideoUrl(localUrl);
+      await saveVideoToHistory(localUrl, promptStr, blob);
+    };
+    
     try {
-      const promptStr = editedPrompt || getAutoPrompt();
       const operation = await generateVideo(promptStr, videoAspect, videoLength);
-      setVideoGenerationProgress('Synthesizing Gemini visuals...');
       
       let done = false;
       let finalOp = operation;
       let status = operation;
+      let pollFailures = 0;
+      /** Max consecutive failed status polls before declaring stuck. */
+      const MAX_POLL_FAILURES = 3;
+      /** Hard ceiling — beyond this a render is effectively lost. */
+      const MAX_TOTAL_WAIT_MS = 8 * 60_000;
+      const TIMEOUT_MSG = 'Video render timed out after 8 minutes. Try a shorter video or try again in a bit.';
       
       while (!done) {
         if (!status.done) {
-          await new Promise(r => setTimeout(r, 6000));
-          status = await getOperationStatus(finalOp);
+          updateProgress();
+          await new Promise(r => setTimeout(r, 5000));
+          try {
+            status = await getOperationStatus(finalOp);
+            pollFailures = 0;
+          } catch (pollErr) {
+            pollFailures++;
+            if (Date.now() - startedAt > MAX_TOTAL_WAIT_MS) throw new Error(TIMEOUT_MSG);
+            if (pollFailures >= MAX_POLL_FAILURES) {
+              throw new Error('Lost contact with the render job after several retries. It may still finish and appear in your video history.');
+            }
+            setVideoGenerationProgress(`Connection hiccup — retrying (${pollFailures}/${MAX_POLL_FAILURES})...`);
+            continue;
+          }
+          if (Date.now() - startedAt > MAX_TOTAL_WAIT_MS) throw new Error(TIMEOUT_MSG);
         }
         
         if (status.done) {
@@ -149,40 +206,35 @@ export function useVideoGeneration({
              throw new Error(getFriendlyError(status.error));
           }
           if (status.data) {
-            setVideoGenerationProgress('Processing video...');
-            let localUrl = status.data;
             let videoBlob: Blob | undefined;
-            
+
             if (status.data.startsWith('data:')) {
                const res = await fetch(status.data);
                videoBlob = await res.blob();
-               localUrl = URL.createObjectURL(videoBlob);
             } else if (status.data.startsWith('gs://') || status.data.startsWith('http')) {
                const { fetchVideoDownloadResponse } = await import('../services/gemini');
                videoBlob = await fetchVideoDownloadResponse(status.data);
-               localUrl = URL.createObjectURL(videoBlob);
             }
-            setVideoUrl(localUrl);
-            await saveVideoToHistory(localUrl, promptStr, videoBlob);
+            if (videoBlob) await finalize(videoBlob);
           } else if (status.uri) {
-            setVideoGenerationProgress('Downloading video...');
             const { fetchVideoDownloadResponse } = await import('../services/gemini');
             const blob = await fetchVideoDownloadResponse(status.uri);
-            const localUrl = URL.createObjectURL(blob);
-            setVideoUrl(localUrl);
-            await saveVideoToHistory(localUrl, promptStr, blob);
+            await finalize(blob);
+          } else {
+            throw new Error('Render finished but no video data was returned.');
           }
           break;
-        } else {
-          setVideoGenerationProgress(status.progressPercentage ? `Generating video... ${Math.round(status.progressPercentage)}%` : 'Generating video... this may take a minute');
         }
       }
     } catch (error: any) {
       console.error('Video generation error:', error);
       showToast(getFriendlyError(error));
     } finally {
+      clearInterval(elapsedTimer);
       setIsVideoGenerating(false);
       setVideoGenerationProgress('');
+      setVideoProgressPercent(0);
+      setVideoElapsedSeconds(0);
     }
   };
 
@@ -191,6 +243,8 @@ export function useVideoGeneration({
     isVideoGenerating,
     videoAspect, setVideoAspect,
     videoGenerationProgress,
+    videoProgressPercent,
+    videoElapsedSeconds,
     videoUrl, setVideoUrl,
     videoLength, setVideoLength,
     avatarGender, setAvatarGender,
