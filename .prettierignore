@@ -1,0 +1,7 @@
+api/_server.js
+api/_server.js.map
+dist/
+node_modules/
+package-lock.json
+coverage/
+playwright-report/

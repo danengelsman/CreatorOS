@@ -13,7 +13,16 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit && eslint .",
     "check:artifact": "node scripts/check-artifact-freshness.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,css,md}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "eslint --fix"
+    ]
   },
   "dependencies": {
     "@eslint/js": "^9.19.0",
@@ -64,6 +73,9 @@
     "@vercel/node": "^17.0.0",
     "autoprefixer": "^10.4.21",
     "drizzle-kit": "^0.31.10",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.10",
     "tsx": "^4.23.13"
   }
 }
