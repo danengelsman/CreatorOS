@@ -3,8 +3,6 @@ import express from "express";
 // pull rollup native binaries into the serverless bundle and crash on boot.
 let createViteServer: any = null;
 import multer from 'multer';
-import db from "./src/db.ts";
-import { v4 as uuidv4 } from 'uuid';
 import path from "path";
 import fs from "fs";
 import { google } from 'googleapis';
@@ -14,6 +12,15 @@ import admin from 'firebase-admin';
 import axios from 'axios';
 import { createOAuthState, verifyAndConsumeOAuthState } from "./src/server/oauth-state.ts";
 import { encryptToken, decryptToken } from "./src/server/crypto.ts";
+import {
+  serverFirestore,
+  projectsFirestore,
+  upsertIntegration,
+  updateIntegrationFields,
+  getIntegration,
+  listIntegrations,
+  firestorePing,
+} from "./src/server/firestore.ts";
 import { QuotaLedger, quotaGuardMiddleware, extractTokensUsed, ROUTE_COST_ESTIMATES } from './src/server/quotaLedger';
 
 dotenv.config();
@@ -188,13 +195,9 @@ async function startServer() {
     try {
       const decodedToken = await admin.auth().verifyIdToken(token);
       req.user = decodedToken;
-      
-      // Ensure user exists in our local DB
-      const userExists = db.prepare('SELECT id FROM users WHERE id = ?').get(decodedToken.uid);
-      if (!userExists) {
-        db.prepare('INSERT INTO users (id, email) VALUES (?, ?)').run(decodedToken.uid, decodedToken.email);
-      }
-      
+      // F2: the users table is gone — the client maintains users/{uid} in
+      // Firestore directly; no server-side user row is needed.
+
       next();
     } catch (error) {
       console.error('Auth Error:', error);
@@ -270,10 +273,10 @@ async function startServer() {
     }
   }
 
-  // F1.5 — per-user daily AI quota ledger (cost control, layered on top of the
-  // per-minute rate limit above). Fail-open internals; the 429 check itself is
-  // fail-closed only on the "over budget" path.
-  const quotaLedger = new QuotaLedger({ db });
+  // F1.5/F2 — per-user daily AI quota ledger (cost control, layered on top of
+  // the per-minute rate limit above), now backed by the Firestore `ai_quota`
+  // collection. Fail-open record; fail-closed 429 check (see quotaLedger.ts).
+  const quotaLedger = new QuotaLedger({ firestore: serverFirestore() });
   const quotaGuard = quotaGuardMiddleware(quotaLedger);
 
   const protectAIRoute = async (req: any, res: any, next: any) => {
@@ -334,67 +337,12 @@ async function startServer() {
   };
 
   // API Routes
-  
-  app.get("/api/user", authenticateUser, (req: any, res) => {
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.uid);
-    res.json(user);
-  });
-
-  app.get("/api/brand", authenticateUser, (req: any, res) => {
-    const brand = db.prepare('SELECT * FROM brands WHERE user_id = ?').get(req.user.uid);
-    res.json(brand || null);
-  });
-
-  app.post("/api/brand", authenticateUser, (req: any, res) => {
-    const { name, tagline, archetype, personality, colors, typography, visual_style, thumbnail_style, content_hooks, catchphrases } = req.body;
-    
-    const existing = db.prepare('SELECT user_id FROM brands WHERE user_id = ?').get(req.user.uid);
-    
-    if (existing) {
-      db.prepare(`
-        UPDATE brands SET 
-          name = ?, tagline = ?, archetype = ?, personality = ?, 
-          colors = ?, typography = ?, visual_style = ?, 
-          thumbnail_style = ?, content_hooks = ?, catchphrases = ?
-        WHERE user_id = ?
-      `).run(name, tagline, archetype, personality, JSON.stringify(colors), JSON.stringify(typography), visual_style, thumbnail_style, JSON.stringify(content_hooks), JSON.stringify(catchphrases), req.user.uid);
-    } else {
-      db.prepare(`
-        INSERT INTO brands (user_id, name, tagline, archetype, personality, colors, typography, visual_style, thumbnail_style, content_hooks, catchphrases)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(req.user.uid, name, tagline, archetype, personality, JSON.stringify(colors), JSON.stringify(typography), visual_style, thumbnail_style, JSON.stringify(content_hooks), JSON.stringify(catchphrases));
-    }
-    
-    res.json({ success: true });
-  });
-
-  app.get("/api/content", authenticateUser, (req: any, res) => {
-    const content = db.prepare('SELECT * FROM content WHERE user_id = ? ORDER BY created_at DESC').all(req.user.uid) as any[];
-    res.json(content);
-  });
-
-  app.post("/api/content", authenticateUser, (req: any, res) => {
-    const { title, body, type, platform, score, score_feedback } = req.body;
-    const id = uuidv4();
-    
-    db.prepare(`
-      INSERT INTO content (id, user_id, title, body, type, platform, status, score, score_feedback)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, req.user.uid, title, body, type, platform, 'draft', score, score_feedback);
-    
-    res.json({ id });
-  });
-
-  app.get("/api/analytics", authenticateUser, (req: any, res) => {
-    const analytics = db.prepare('SELECT * FROM analytics WHERE user_id = ? ORDER BY date ASC').all(req.user.uid) as any[];
-    res.json(analytics);
-  });
-
-  app.get("/api/habits", authenticateUser, (req: any, res) => {
-    const streak = db.prepare('SELECT * FROM streaks WHERE user_id = ?').get(req.user.uid);
-    const challenge = db.prepare('SELECT * FROM challenges WHERE user_id = ?').get(req.user.uid);
-    res.json({ streak, challenge });
-  });
+  //
+  // F2 honesty/dead-code cleanup: the never-called-by-the-client CRUD routes
+  // (/api/user, /api/brand, /api/content, /api/analytics CRUD, /api/habits)
+  // were removed together with the sqlite tables they read. The client owns
+  // its data in Firestore directly (users/{uid}, projects/*); the server only
+  // serves the routes src/ actually calls.
 
   // --- Gemini Video API ---
   let _ai = null;
@@ -1132,40 +1080,19 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
       const userInfo = await oauth2.userinfo.get();
 
-      // F1.4 — encrypt tokens before they touch the database
+      // F1.4 — encrypt tokens before they touch persistence
       const encAccessToken = tokens.access_token ? encryptToken(tokens.access_token) : null;
       const encRefreshToken = tokens.refresh_token ? encryptToken(tokens.refresh_token) : null;
 
-      // Save to DB
-      const existing = db.prepare('SELECT user_id FROM user_accounts WHERE user_id = ? AND platform = ?')
-        .get(userId, 'youtube') as any;
-
-      if (existing) {
-        db.prepare(`
-          UPDATE user_accounts SET 
-            access_token = ?, refresh_token = ?, expiry_date = ?, profile_data = ?
-          WHERE user_id = ? AND platform = ?
-        `).run(
-          encAccessToken,
-          encRefreshToken, 
-          tokens.expiry_date, 
-          JSON.stringify(userInfo.data), 
-          userId, 
-          'youtube'
-        );
-      } else {
-        db.prepare(`
-          INSERT INTO user_accounts (user_id, platform, access_token, refresh_token, expiry_date, profile_data)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `).run(
-          userId, 
-          'youtube', 
-          encAccessToken, 
-          encRefreshToken, 
-          tokens.expiry_date, 
-          JSON.stringify(userInfo.data)
-        );
-      }
+      // F2 — persist to Firestore `integrations/{uid}_{platform}` (upsert)
+      await upsertIntegration({
+        uid: userId,
+        platform: 'youtube',
+        access_token: encAccessToken,
+        refresh_token: encRefreshToken,
+        expiry_date: typeof tokens.expiry_date === 'number' ? tokens.expiry_date : null,
+        profile_data: JSON.stringify(userInfo.data),
+      });
 
       res.send(`
         <html>
@@ -1236,26 +1163,19 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
       const { access_token, refresh_token, expires_in, open_id } = response.data;
 
-      // F1.4 — encrypt tokens before they touch the database
+      // F1.4 — encrypt tokens before they touch persistence
       const encAccessToken = access_token ? encryptToken(access_token) : null;
       const encRefreshToken = refresh_token ? encryptToken(refresh_token) : null;
 
-      // Save to DB
-      const existing = db.prepare('SELECT user_id FROM user_accounts WHERE user_id = ? AND platform = ?')
-        .get(userId, 'tiktok') as any;
-
-      if (existing) {
-        db.prepare(`
-          UPDATE user_accounts SET 
-            access_token = ?, refresh_token = ?, expiry_date = ?, profile_data = ?
-          WHERE user_id = ? AND platform = ?
-        `).run(encAccessToken, encRefreshToken, Date.now() + expires_in * 1000, JSON.stringify({ open_id }), userId, 'tiktok');
-      } else {
-        db.prepare(`
-          INSERT INTO user_accounts (user_id, platform, access_token, refresh_token, expiry_date, profile_data)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `).run(userId, 'tiktok', encAccessToken, encRefreshToken, Date.now() + expires_in * 1000, JSON.stringify({ open_id }));
-      }
+      // F2 — persist to Firestore `integrations/{uid}_{platform}` (upsert)
+      await upsertIntegration({
+        uid: userId,
+        platform: 'tiktok',
+        access_token: encAccessToken,
+        refresh_token: encRefreshToken,
+        expiry_date: Date.now() + expires_in * 1000,
+        profile_data: JSON.stringify({ open_id }),
+      });
 
       res.send(`
         <html>
@@ -1279,12 +1199,18 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
 
-  app.get("/api/accounts", authenticateUser, (req: any, res) => {
-    const accounts = db.prepare('SELECT platform, profile_data FROM user_accounts WHERE user_id = ?').all(req.user.uid) as any[];
-    res.json(accounts.map(a => ({
-      platform: a.platform,
-      profile: JSON.parse(a.profile_data)
-    })));
+  app.get("/api/accounts", authenticateUser, async (req: any, res) => {
+    try {
+      // F2 — connected accounts live in Firestore `integrations` now
+      const accounts = await listIntegrations(req.user.uid);
+      res.json(accounts.map(a => ({
+        platform: a.platform,
+        profile: JSON.parse(a.profile_data || '{}')
+      })));
+    } catch (err: any) {
+      console.error('Accounts API Error:', err);
+      res.status(500).json({ error: err.message || 'Failed to list connected accounts' });
+    }
   });
 
   app.post("/api/publish", authenticateUser, async (req: any, res) => {
@@ -1296,16 +1222,17 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     try {
       const results: { [key: string]: { status: 'success' | 'error', message: string, url?: string } } = {};
       
-      // Get all connected accounts for the user
-      const accounts = (db.prepare('SELECT platform, access_token, profile_data FROM user_accounts WHERE user_id = ?')
-        .all(req.user.uid) as any[]).map((a) => ({
-          ...a,
-          // F1.4 — decrypt at rest tokens (legacy plaintext passes through + upgrades)
-          access_token: decryptToken(a.access_token, {
-            update: (enc) => db.prepare('UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?')
-              .run(enc, req.user.uid, a.platform),
-          }),
-        }));
+      // Get all connected accounts for the user (F2 — Firestore `integrations`)
+      const accounts = (await listIntegrations(req.user.uid)).map((a) => ({
+        platform: a.platform,
+        profile_data: a.profile_data,
+        // F1.4 — decrypt at rest tokens (legacy plaintext passes through + upgrades)
+        access_token: decryptToken(a.access_token, {
+          update: (enc) => {
+            void updateIntegrationFields(req.user.uid, a.platform, { access_token: enc }).catch((err: unknown) => console.error("[f1.4] lazy token upgrade failed:", err));
+          },
+        }),
+      }));
 
       for (const platform of platforms) {
         const lowerPlatform = platform.toLowerCase();
@@ -1368,7 +1295,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   });
 
   app.get("/api/analytics/youtube", authenticateUser, async (req: any, res) => {
-    const account = db.prepare('SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?').get(req.user.uid, 'youtube') as any;
+    const account = await getIntegration(req.user.uid, 'youtube');
     if (!account) return res.json({ views: 0, subscribers: 0, videos: 0 });
 
     try {
@@ -1378,14 +1305,16 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       );
       auth.setCredentials({
         access_token: decryptToken(account.access_token, {
-          update: (enc) => db.prepare('UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?')
-            .run(enc, req.user.uid, 'youtube'),
+          update: (enc) => {
+            void updateIntegrationFields(req.user.uid, 'youtube', { access_token: enc }).catch((err: unknown) => console.error("[f1.4] lazy token upgrade failed:", err));
+          },
         }),
         refresh_token: decryptToken(account.refresh_token, {
-          update: (enc) => db.prepare('UPDATE user_accounts SET refresh_token = ? WHERE user_id = ? AND platform = ?')
-            .run(enc, req.user.uid, 'youtube'),
+          update: (enc) => {
+            void updateIntegrationFields(req.user.uid, 'youtube', { refresh_token: enc }).catch((err: unknown) => console.error("[f1.4] lazy token upgrade failed:", err));
+          },
         }),
-        expiry_date: account.expiry_date
+        expiry_date: account.expiry_date ?? undefined
       });
 
       const youtube = google.youtube({ version: 'v3', auth });
@@ -1409,7 +1338,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   app.get("/api/analytics/tiktok", authenticateUser, async (req: any, res) => {
     // Mocking TikTok analytics for now as their API access is heavily gated
     // but demonstrating where the integration would live.
-    const account = db.prepare('SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?').get(req.user.uid, 'tiktok') as any;
+    const account = await getIntegration(req.user.uid, 'tiktok');
     if (!account) return res.json({ followers: 0, views: 0, likes: 0 });
     
     res.json({
@@ -1423,15 +1352,15 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     try {
       const userId = req.user.uid;
 
-      // 1. Fetch connected accounts
-      const accounts = db.prepare('SELECT platform, profile_data FROM user_accounts WHERE user_id = ?').all(userId) as any[];
+      // 1. Fetch connected accounts (F2 — Firestore `integrations`)
+      const accounts = await listIntegrations(userId);
       const isYoutubeConnected = accounts.some(a => a.platform === 'youtube');
       const isTiktokConnected = accounts.some(a => a.platform === 'tiktok');
 
       // 2. Fetch YouTube Stats if connected
       let youtubeStats = { views: 0, subscribers: 0, videos: 0 };
       if (isYoutubeConnected) {
-        const ytAccount = db.prepare('SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?').get(userId, 'youtube') as any;
+        const ytAccount = accounts.find(a => a.platform === 'youtube');
         if (ytAccount) {
           try {
             const auth = new google.auth.OAuth2(
@@ -1440,14 +1369,16 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
             );
             auth.setCredentials({
               access_token: decryptToken(ytAccount.access_token, {
-                update: (enc) => db.prepare('UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?')
-                  .run(enc, userId, 'youtube'),
+                update: (enc) => {
+                  void updateIntegrationFields(userId, 'youtube', { access_token: enc }).catch((err: unknown) => console.error("[f1.4] lazy token upgrade failed:", err));
+                },
               }),
               refresh_token: decryptToken(ytAccount.refresh_token, {
-                update: (enc) => db.prepare('UPDATE user_accounts SET refresh_token = ? WHERE user_id = ? AND platform = ?')
-                  .run(enc, userId, 'youtube'),
+                update: (enc) => {
+                  void updateIntegrationFields(userId, 'youtube', { refresh_token: enc }).catch((err: unknown) => console.error("[f1.4] lazy token upgrade failed:", err));
+                },
               }),
-              expiry_date: ytAccount.expiry_date
+              expiry_date: ytAccount.expiry_date ?? undefined
             });
             const youtube = google.youtube({ version: 'v3', auth });
             const response = await youtube.channels.list({
@@ -1472,75 +1403,51 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         tiktokStats = { followers: 1240, views: 45000, likes: 8900 };
       }
 
-      // 4. Fetch projects from Firestore
+      // 4. Aggregate content counts from the client's Firestore `projects`
+      // collection (F2 — the sqlite `content` table is gone). The web client
+      // writes projects on a NAMED database (firestoreDatabaseId), so the
+      // aggregation must read that same database via the admin SDK (bypasses
+      // rules, no user token needed). `brand_{uid}` docs are brand kits, not
+      // content, and are excluded — same as the client's own dashboard query.
       let publishedCount = 0;
       let scheduledCount = 0;
       let draftCount = 0;
       let grandTotal = 0;
 
       try {
-        const token = req.headers.authorization?.split('Bearer ')[1];
-        if (token) {
-          const dbId = firestoreDbId || '(default)';
-          const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery`;
-          const runQueryBody = {
-            structuredQuery: {
-              from: [{ collectionId: "projects" }],
-              where: {
-                fieldFilter: {
-                  field: { fieldPath: "userId" },
-                  op: "EQUAL",
-                  value: { stringValue: userId }
-                }
-              }
-            }
-          };
-          const response = await axios.post(url, runQueryBody, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          if (Array.isArray(response.data)) {
-            const docs = response.data.filter((item: any) => item.document);
-            grandTotal = docs.length;
-            docs.forEach((item: any) => {
-              const fields = item.document.fields || {};
-              const statusVal = fields.status?.stringValue || fields.data?.mapValue?.fields?.status?.stringValue || 'Draft';
-              const status = statusVal.toLowerCase();
-              if (status === 'published') {
-                publishedCount++;
-              } else if (status === 'scheduled') {
-                scheduledCount++;
-              } else {
-                draftCount++;
-              }
-            });
+        const projectsDb = projectsFirestore(firestoreDbId || '(default)');
+        const snap = await projectsDb
+          .collection('projects')
+          .where('userId', '==', userId)
+          .get();
+        snap.forEach((doc: any) => {
+          if (doc.id.startsWith('brand_')) return; // brand kit doc, not content
+          const data = doc.data() || {};
+          const statusVal = String(data.status || 'Draft');
+          const status = statusVal.toLowerCase();
+          if (status === 'published') {
+            publishedCount++;
+          } else if (status === 'scheduled') {
+            scheduledCount++;
+          } else {
+            draftCount++;
           }
-        } else {
-          throw new Error('No user token provided for Firestore request');
-        }
+        });
+        grandTotal = publishedCount + scheduledCount + draftCount;
       } catch (err: any) {
-        console.error('Firestore REST project query error in summary:', err?.response?.data || err?.message || err);
-        // Fallback to SQLite content table counts to be resilient
-        try {
-          const localDrafts = db.prepare("SELECT COUNT(*) as count FROM content WHERE user_id = ? AND status = 'draft'").get(userId) as any;
-          const localScheduled = db.prepare("SELECT COUNT(*) as count FROM content WHERE user_id = ? AND status = 'scheduled'").get(userId) as any;
-          const localPublished = db.prepare("SELECT COUNT(*) as count FROM content WHERE user_id = ? AND status = 'published'").get(userId) as any;
-          draftCount = localDrafts?.count || 0;
-          scheduledCount = localScheduled?.count || 0;
-          publishedCount = localPublished?.count || 0;
-          grandTotal = draftCount + scheduledCount + publishedCount;
-          console.log('Resiliently fell back to local SQLite content counts:', { draftCount, scheduledCount, publishedCount });
-        } catch (sqliteErr) {
-          console.error('Failed sqlite fallback:', sqliteErr);
-        }
+        console.error('Firestore projects aggregation failed in summary:', err?.response?.data || err?.message || err);
+        // Resilient (F2): the sqlite content table no longer exists. On
+        // failure the counts stay zero so the rest of the summary (YouTube /
+        // TikTok stats, revenue, roadmap) still renders instead of 500-ing.
       }
 
-      // 5. Fetch Brand Info to see if Brand Kit is complete
-      const brand = db.prepare('SELECT * FROM brands WHERE user_id = ?').get(userId);
-      const isBrandKitComplete = !!brand;
+      // 5. F2 honesty fix: the brand-completeness stat used to source from the
+      // sqlite `brands` table, which was ALWAYS empty for real users (the
+      // client writes brand kits to Firestore projects/brand_{uid} itself) —
+      // so the API reported a permanent false "brand kit incomplete". The
+      // stat (`isBrandKitComplete`) is removed from the response entirely;
+      // the milestones that consumed it are unchanged in shape but no longer
+      // claim a brand-kit signal the server cannot honestly see.
 
       // 6. Aggregate figures
       const totalFollowers = youtubeStats.subscribers + tiktokStats.followers;
@@ -1549,7 +1456,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const engagementRate = totalViews > 0 ? parseFloat(((totalLikes / totalViews) * 100).toFixed(2)) : 0;
 
       // Calculate milestone completions
-      const milestoneBrandKit = isBrandKitComplete;
+      const milestoneBrandKit = false; // no honest server-side brand-kit signal (brands table removed)
       const milestonePostsPublished = publishedCount >= 5;
       const milestoneFollowersReached = totalFollowers >= 100;
 
@@ -1583,7 +1490,6 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           totalFollowers,
           totalViews,
           totalRevenue,
-          isBrandKitComplete,
           goalsCompletionPercentage,
           milestones: {
             brandKit: milestoneBrandKit,
@@ -1624,10 +1530,10 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       }
     };
 
-    // 1. Database Check
+    // 1. Database Check (F2 — Firestore replaces sqlite)
     try {
       const start = Date.now();
-      db.prepare('SELECT 1').get();
+      await firestorePing();
       checks.database.status = 'healthy';
       checks.database.latency = Date.now() - start;
     } catch (err: any) {
