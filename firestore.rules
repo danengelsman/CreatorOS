@@ -48,6 +48,15 @@ service cloud.firestore {
       );
     }
 
+    // Avatar selection writes users/{uid}.activeAvatarId (AvatarGenerator.tsx).
+    // Bounded: string, <= 128 chars (Firestore doc-ID-shaped value).
+    function isSafeActiveAvatarId(data) {
+      return !('activeAvatarId' in data) || (
+        data.activeAvatarId is string &&
+        data.activeAvatarId.size() <= 128
+      );
+    }
+
     function isValidProject(data) {
       return data.keys().hasAll(['userId', 'name', 'type', 'createdAt']) &&
         data.userId == request.auth.uid &&
@@ -103,7 +112,8 @@ service cloud.firestore {
           'onboardingAnswers', 'activeAvatarId'
         ]) &&
         isValidUser(request.resource.data) &&
-        isSafeOnboardingAnswers(request.resource.data)
+        isSafeOnboardingAnswers(request.resource.data) &&
+        isSafeActiveAvatarId(request.resource.data)
       );
 
       allow delete: if isAdmin();
