@@ -1431,7 +1431,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         // F1.4 — decrypt at rest tokens (legacy plaintext passes through + upgrades)
         access_token: decryptToken(a.access_token, {
           update: (enc) => {
-            void updateIntegrationFields(req.user.uid, a.platform, { access_token: enc });
+            void updateIntegrationFields(req.user.uid, a.platform, { access_token: enc }).catch((err) => console.error("[f1.4] lazy token upgrade failed:", err));
           }
         })
       }));
@@ -1497,12 +1497,12 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       auth.setCredentials({
         access_token: decryptToken(account.access_token, {
           update: (enc) => {
-            void updateIntegrationFields(req.user.uid, "youtube", { access_token: enc });
+            void updateIntegrationFields(req.user.uid, "youtube", { access_token: enc }).catch((err) => console.error("[f1.4] lazy token upgrade failed:", err));
           }
         }),
         refresh_token: decryptToken(account.refresh_token, {
           update: (enc) => {
-            void updateIntegrationFields(req.user.uid, "youtube", { refresh_token: enc });
+            void updateIntegrationFields(req.user.uid, "youtube", { refresh_token: enc }).catch((err) => console.error("[f1.4] lazy token upgrade failed:", err));
           }
         }),
         expiry_date: account.expiry_date ?? void 0
@@ -1550,12 +1550,12 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
             auth.setCredentials({
               access_token: decryptToken(ytAccount.access_token, {
                 update: (enc) => {
-                  void updateIntegrationFields(userId, "youtube", { access_token: enc });
+                  void updateIntegrationFields(userId, "youtube", { access_token: enc }).catch((err) => console.error("[f1.4] lazy token upgrade failed:", err));
                 }
               }),
               refresh_token: decryptToken(ytAccount.refresh_token, {
                 update: (enc) => {
-                  void updateIntegrationFields(userId, "youtube", { refresh_token: enc });
+                  void updateIntegrationFields(userId, "youtube", { refresh_token: enc }).catch((err) => console.error("[f1.4] lazy token upgrade failed:", err));
                 }
               }),
               expiry_date: ytAccount.expiry_date ?? void 0
