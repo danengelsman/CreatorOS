@@ -34,6 +34,29 @@ service cloud.firestore {
         (!('avatarType' in data) || data.avatarType == null || data.avatarType in ['uploaded', 'ai_generated']);
     }
 
+    // Onboarding writes users/{uid} merged answers (niche/audience/vibe/summary).
+    // Bounded: known keys only, <= 4 entries, <= 1000 chars per string value.
+    function isSafeOnboardingAnswers(data) {
+      return !('onboardingAnswers' in data) || (
+        data.onboardingAnswers is map &&
+        data.onboardingAnswers.keys().hasOnly(['niche', 'audience', 'vibe', 'summary']) &&
+        data.onboardingAnswers.size() <= 4 &&
+        (!('niche' in data.onboardingAnswers) || (data.onboardingAnswers.niche is string && data.onboardingAnswers.niche.size() <= 1000)) &&
+        (!('audience' in data.onboardingAnswers) || (data.onboardingAnswers.audience is string && data.onboardingAnswers.audience.size() <= 1000)) &&
+        (!('vibe' in data.onboardingAnswers) || (data.onboardingAnswers.vibe is string && data.onboardingAnswers.vibe.size() <= 1000)) &&
+        (!('summary' in data.onboardingAnswers) || (data.onboardingAnswers.summary is string && data.onboardingAnswers.summary.size() <= 1000))
+      );
+    }
+
+    // Avatar selection writes users/{uid}.activeAvatarId (AvatarGenerator.tsx).
+    // Bounded: string, <= 128 chars (Firestore doc-ID-shaped value).
+    function isSafeActiveAvatarId(data) {
+      return !('activeAvatarId' in data) || (
+        data.activeAvatarId is string &&
+        data.activeAvatarId.size() <= 128
+      );
+    }
+
     function isValidProject(data) {
       return data.keys().hasAll(['userId', 'name', 'type', 'createdAt']) &&
         data.userId == request.auth.uid &&
@@ -79,12 +102,18 @@ service cloud.firestore {
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
 
       // Subscription tier and account status remain server/admin controlled.
+      // F2 fix: allowlist extended with onboardingAnswers (written by
+      // src/components/Onboarding.tsx) and activeAvatarId (written by
+      // src/components/AvatarGenerator.tsx); both were previously rejected.
       allow update: if isAdmin() || (
         isOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'displayName', 'photoURL', 'avatarType', 'lastLogin', 'updatedAt'
+          'displayName', 'photoURL', 'avatarType', 'lastLogin', 'updatedAt',
+          'onboardingAnswers', 'activeAvatarId'
         ]) &&
-        isValidUser(request.resource.data)
+        isValidUser(request.resource.data) &&
+        isSafeOnboardingAnswers(request.resource.data) &&
+        isSafeActiveAvatarId(request.resource.data)
       );
 
       allow delete: if isAdmin();
@@ -154,6 +183,31 @@ service cloud.firestore {
       allow get, list: if isAdmin();
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidAppLog(request.resource.data);
       allow update, delete: if false;
+    }
+
+    // F2 — SERVER-ONLY COLLECTIONS. Client access is fully denied below.
+    //
+    // NOTE: the server writes these collections with the firebase-admin SDK,
+    // which BYPASSES Firestore security rules entirely. These rules are NOT
+    // what authorizes the server — do not "fix" them to allow server access;
+    // they only govern web-client (JS SDK / REST as end user) access, which
+    // must stay denied. OAuth access/refresh tokens in `integrations` are
+    // encrypted at rest by the server (see F2 firestore-convergence).
+    match /integrations/{integrationId} {
+      allow read, write: if false;
+      match /{subcollection=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // Server-only daily AI quota ledger (docs: {uid}_{YYYYMMDD}). Same story:
+    // admin SDK writes bypass these rules; clients get hard-denied here and
+    // read usage via the server's own API endpoints instead.
+    match /ai_quota/{quotaDocId} {
+      allow read, write: if false;
+      match /{subcollection=**} {
+        allow read, write: if false;
+      }
     }
 
     match /{document=**} {
