@@ -1336,15 +1336,17 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   });
 
   app.get("/api/analytics/tiktok", authenticateUser, async (req: any, res) => {
-    // Mocking TikTok analytics for now as their API access is heavily gated
-    // but demonstrating where the integration would live.
+    // F3.2 (D4-A): fabricated TikTok metrics (followers/views/likes) were
+    // removed — no fake numbers ship. TikTok's display API
+    // requires audit approval (see F6.3), so until that is granted the
+    // connection is display-only and metrics are explicitly unavailable.
     const account = await getIntegration(req.user.uid, 'tiktok');
-    if (!account) return res.json({ followers: 0, views: 0, likes: 0 });
-    
+    if (!account) return res.status(404).json({ available: false, reason: 'not_connected' });
+
     res.json({
-      followers: 1240,
-      views: 45000,
-      likes: 8900
+      available: false,
+      reason: 'audit_pending',
+      message: 'TikTok analytics unavailable — TikTok requires audit approval for data access.'
     });
   });
 
@@ -1355,7 +1357,6 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       // 1. Fetch connected accounts (F2 — Firestore `integrations`)
       const accounts = await listIntegrations(userId);
       const isYoutubeConnected = accounts.some(a => a.platform === 'youtube');
-      const isTiktokConnected = accounts.some(a => a.platform === 'tiktok');
 
       // 2. Fetch YouTube Stats if connected
       let youtubeStats = { views: 0, subscribers: 0, videos: 0 };
@@ -1398,10 +1399,10 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       }
 
       // 3. TikTok Stats if connected
+      // F3.2 (D4-A): fabricated TikTok follower/view/like constants removed.
+      // The TikTok display API needs audit approval (F6.3); until then there
+      // are no real metrics to report, so the stats stay honestly zero.
       let tiktokStats = { followers: 0, views: 0, likes: 0 };
-      if (isTiktokConnected) {
-        tiktokStats = { followers: 1240, views: 45000, likes: 8900 };
-      }
 
       // 4. Aggregate content counts from the client's Firestore `projects`
       // collection (F2 — the sqlite `content` table is gone). The web client

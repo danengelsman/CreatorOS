@@ -5,9 +5,7 @@ import {
   Check, 
   Star, 
   Globe, 
-  TwitterLogo as Twitter, 
-  YoutubeLogo as Youtube, 
-  InstagramLogo as Instagram, 
+  GithubLogo,
   Lightning as Zap, 
   ShieldCheck, 
   List as Menu, 
@@ -150,7 +148,7 @@ const FAQS = [
   },
   {
     q: "Can I cancel my plan at any time?",
-    a: "Yes, you can upgrade, downgrade, or cancel your subscription at any time directly from your Profile settings with a single click. There are no hidden fees or contracts."
+    a: "There is nothing to cancel right now: CreatorOS is completely free during early access and has no subscription. If paid plans are ever introduced, that will be announced clearly before anything changes — and any early-access decision you make will be yours."
   }
 ];
 
@@ -170,18 +168,9 @@ export default function LandingPage({ navigate }: LandingPageProps) {
   const [selectedVibe, setSelectedVibe] = useState('calm');
   const [isGeneratingSandbox, setIsGeneratingSandbox] = useState(false);
   
-  // Pricing toggle state
-  const [isYearlyBilling, setIsYearlyBilling] = useState(true);
-  
   // FAQ state
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(0);
   
-  // Pre-sales Contact form state
-  const [contactEmail, setContactEmail] = useState('');
-  const [contactMessage, setContactMessage] = useState('');
-  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
-  const [contactSuccess, setContactSuccess] = useState(false);
-
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
@@ -216,18 +205,6 @@ export default function LandingPage({ navigate }: LandingPageProps) {
     navigate('/login');
   };
 
-  const handleContactSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!contactEmail || !contactMessage) return;
-    setIsSubmittingContact(true);
-    setTimeout(() => {
-      setIsSubmittingContact(false);
-      setContactSuccess(true);
-      setContactEmail('');
-      setContactMessage('');
-      setTimeout(() => setContactSuccess(false), 5000);
-    }, 1200);
-  };
 
   // Trigger a brief simulated loader when presets change in the sandbox
   const handleSandboxChange = (niche: string, vibe: string) => {
@@ -404,7 +381,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--accent)]"></span>
             </span>
-            Newest Version Live
+            Early Access · Under Active Development
           </motion.div>
 
           <motion.h1 
@@ -420,8 +397,8 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               </>
             ) : (
               <>
-                The AI studio behind <br className="hidden sm:block" />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-amber-400 animate-gradient-x">1.2M scripts</span>.
+                The AI studio for <br className="hidden sm:block" />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-amber-400 animate-gradient-x">your next video</span>.
               </>
             )}
           </motion.h1>
@@ -441,11 +418,11 @@ export default function LandingPage({ navigate }: LandingPageProps) {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
           >
-            <button 
+            <button
               onClick={handleSignIn}
               className="ios-button ios-button-filled w-full sm:w-auto h-14 px-10 text-[16px] font-semibold shadow-lg shadow-[var(--accent)]/10 hover:shadow-[var(--accent)]/20 transition-all"
             >
-              Start Free Trial
+              Start Free — Early Access
               <ArrowRight size={18} weight="bold" className="ml-1" />
             </button>
             <a 
@@ -456,28 +433,30 @@ export default function LandingPage({ navigate }: LandingPageProps) {
             </a>
           </motion.div>
 
-          {/* Core high-level stats banner */}
-          <motion.div 
+          {/* Honest product facts (F3.6): the previous banner fabricated
+              "15K+ Happy Creators / 1.2M+ Scripts Written / 4.9/5 User
+              Rating". Replaced with true, checkable product facts. */}
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.4 }}
             className="pt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto border-t border-[var(--separator)]/60 mt-16"
           >
             <div className="text-center">
-              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">15K+</span>
-              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">Happy Creators</span>
+              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">8</span>
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">AI-Powered Tools</span>
             </div>
             <div className="text-center">
-              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">30 Min</span>
-              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">Quick Setup</span>
+              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">30 Days</span>
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">Guided Challenge</span>
             </div>
             <div className="text-center">
-              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">1.2M+</span>
-              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">Scripts Written</span>
+              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">$0</span>
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">During Early Access</span>
             </div>
             <div className="text-center">
-              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">4.9/5</span>
-              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">User Rating</span>
+              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">100%</span>
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">Your Content, Your Data</span>
             </div>
           </motion.div>
         </div>
@@ -811,201 +790,51 @@ export default function LandingPage({ navigate }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Interactive Pricing Grid */}
+      {/* Pricing (F3.6): the fabricated three-tier grid ($23–$99/mo, "Save
+          20%", "Most Popular Choice", "Try Pro for Free") was removed — no
+          paid plans exist. Honest early-access pricing: free, explained. */}
       <section id="pricing" className="pt-[140px] pb-[100px] px-6 border-t border-[var(--separator)] relative overflow-hidden">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[500px] bg-[var(--accent)] rounded-[100%] filter blur-[150px] opacity-[0.08] pointer-events-none" />
-        <div className="max-w-6xl mx-auto relative z-10">
-          <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
+        <div className="max-w-3xl mx-auto relative z-10">
+          <div className="text-center max-w-2xl mx-auto mb-12 space-y-4">
             <span className="inline-block px-3 py-1 bg-emerald-500/10 text-emerald-500 text-xs font-bold rounded-full uppercase tracking-widest">
-              Friendly Plans
+              Early Access
             </span>
             <h2 className="font-serif text-[38px] sm:text-[54px] md:text-[64px] font-extrabold tracking-[-0.03em] leading-[1.1] text-[var(--label-primary)]">
-              Simple plans for every writer.
+              Free while CreatorOS is in early access.
             </h2>
             <p className="text-[16px] sm:text-[18px] text-[var(--label-secondary)] font-medium leading-relaxed">
-              Choose the plan that is right for you. Save up to 20% with our easy yearly option.
+              Every feature you see is included at no cost during early access. If paid plans are ever introduced, early users will be told first — before anything changes.
             </p>
-
-            {/* Toggle Billing */}
-            <div className="inline-flex items-center gap-3 bg-[var(--bg-tertiary)] p-1.5 rounded-2xl border border-[var(--separator)] mt-6">
-              <button 
-                onClick={() => setIsYearlyBilling(false)}
-                className={cn(
-                  "px-4 py-2 text-xs font-bold rounded-xl transition-all",
-                  !isYearlyBilling 
-                    ? "bg-[var(--bg-secondary)] text-[var(--label-primary)] shadow-sm" 
-                    : "text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
-                )}
-              >
-                Monthly Billing
-              </button>
-              <button 
-                onClick={() => setIsYearlyBilling(true)}
-                className={cn(
-                  "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5",
-                  isYearlyBilling 
-                    ? "bg-[var(--bg-secondary)] text-[var(--label-primary)] shadow-sm" 
-                    : "text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
-                )}
-              >
-                Yearly Billing
-                <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-500 text-[10px] font-extrabold rounded-md uppercase">
-                  Save 20%
-                </span>
-              </button>
-            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-            
-            {/* Free Tier */}
-            <div className="bg-[var(--bg-tertiary)] p-8 rounded-[32px] border border-[var(--separator)] shadow-sm flex flex-col justify-between space-y-8 relative">
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-xl font-bold">Free Starter Plan</h3>
-                  <p className="text-xs text-[var(--label-secondary)] font-medium mt-1">Perfect for getting started.</p>
-                </div>
-
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-serif font-bold">$0</span>
-                  <span className="text-xs text-[var(--label-tertiary)] font-bold uppercase tracking-wider">/ Lifetime</span>
-                </div>
-
-                <div className="border-t border-[var(--separator)]/60 pt-6">
-                  <ul className="space-y-3.5 text-sm text-[var(--label-secondary)] font-medium">
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-emerald-500" />
-                      1 Custom Style Guide
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-emerald-500" />
-                      Basic video intro suggestions
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-emerald-500" />
-                      Simple publishing calendar
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-emerald-500" />
-                      Access to help guides
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <button 
-                onClick={handleSignIn}
-                className="ios-button ios-button-gray w-full h-12 text-[14px] font-bold"
-              >
-                Get Started Free
-              </button>
+          <div className="bg-[var(--bg-tertiary)] p-8 rounded-[32px] border border-[var(--separator)] shadow-sm space-y-6">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-5xl font-serif font-bold">$0</span>
+              <span className="text-sm text-[var(--label-secondary)] font-bold uppercase tracking-wider">during early access</span>
             </div>
-
-            {/* Pro Tier (Popular) */}
-            <div className="bg-[var(--bg-tertiary)] p-8 rounded-[32px] border-2 border-[var(--accent)] shadow-md flex flex-col justify-between space-y-8 relative scale-100 md:scale-[1.03]">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-[var(--accent)] text-white text-[10px] font-extrabold uppercase tracking-[0.15em] rounded-full shadow-md whitespace-nowrap">
-                Most Popular Choice
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-xl font-bold flex items-center gap-2">
-                    Pro Writer Plan
-                    <span className="px-2 py-0.5 bg-amber-500/15 text-amber-500 text-[9px] font-extrabold rounded-md uppercase tracking-wider">Unlock AI</span>
-                  </h3>
-                  <p className="text-xs text-[var(--label-secondary)] font-medium mt-1">Write faster and stay consistent.</p>
-                </div>
-
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-serif font-bold">
-                    ${isYearlyBilling ? "23" : "29"}
-                  </span>
-                  <span className="text-xs text-[var(--label-tertiary)] font-bold uppercase tracking-wider">/ Month</span>
-                </div>
-
-                <div className="border-t border-[var(--separator)]/60 pt-6">
-                  <ul className="space-y-3.5 text-sm text-[var(--label-secondary)] font-medium">
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-[var(--accent)]" />
-                      <strong>Unlimited</strong> Style Guides
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-[var(--accent)]" />
-                      <strong>AI Video Intros & Checks</strong>
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-[var(--accent)]" />
-                      30-Day writing habits challenge
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-[var(--accent)]" />
-                      Progress charts & history logs
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-[var(--accent)]" />
-                      AI writing customizer
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <button 
-                onClick={handleSignIn}
-                className="ios-button ios-button-filled w-full h-12 text-[14px] font-bold"
-              >
-                Try Pro for Free
-              </button>
+            <div className="border-t border-[var(--separator)]/60 pt-6">
+              <ul className="space-y-3.5 text-sm text-[var(--label-secondary)] font-medium">
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} weight="bold" className="text-emerald-500" />
+                  Everything included — AI writing tools, style planner, publishing calendar, and the 30-day challenge
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} weight="bold" className="text-emerald-500" />
+                  No credit card, no trial clock, no locked tiers
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} weight="bold" className="text-emerald-500" />
+                  Honest product in active development — community and billing are coming soon
+                </li>
+              </ul>
             </div>
-
-            {/* Elite Tier */}
-            <div className="bg-[var(--bg-tertiary)] p-8 rounded-[32px] border border-[var(--separator)] shadow-sm flex flex-col justify-between space-y-8 relative">
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-xl font-bold">Team & Network Plan</h3>
-                  <p className="text-xs text-[var(--label-secondary)] font-medium mt-1">For teams and professional creators.</p>
-                </div>
-
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-serif font-bold">
-                    ${isYearlyBilling ? "79" : "99"}
-                  </span>
-                  <span className="text-xs text-[var(--label-tertiary)] font-bold uppercase tracking-wider">/ Month</span>
-                </div>
-
-                <div className="border-t border-[var(--separator)]/60 pt-6">
-                  <ul className="space-y-3.5 text-sm text-[var(--label-secondary)] font-medium">
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-purple-500" />
-                      All features in Pro plan
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-purple-500" />
-                      <strong>Team sharing & collaboration</strong>
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-purple-500" />
-                      Secure cloud backup storage
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-purple-500" />
-                      Custom team settings
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Check size={16} weight="bold" className="text-purple-500" />
-                      Priority support anytime
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <button 
-                onClick={handleSignIn}
-                className="ios-button ios-button-tinted w-full h-12 text-[14px] font-bold"
-              >
-                Contact Our Team
-              </button>
-            </div>
-
+            <button
+              onClick={handleSignIn}
+              className="ios-button ios-button-filled w-full h-12 text-[14px] font-bold"
+            >
+              Get Started Free
+            </button>
           </div>
         </div>
       </section>
@@ -1068,7 +897,9 @@ export default function LandingPage({ navigate }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Pre-sales Guest Support Form */}
+      {/* Contact (F3.6): the previous "pre-sales" form faked a sending
+          spinner and a "message sent successfully" banner with no backend.
+          Replaced with the real channels: email and the public repo. */}
       <section className="pt-[140px] pb-[100px] px-6 border-t border-[var(--separator)]">
         <div className="max-w-3xl mx-auto">
           <div className="bg-[var(--bg-tertiary)] rounded-[40px] border border-[var(--separator)] p-8 sm:p-12 shadow-xl relative overflow-hidden">
@@ -1080,63 +911,27 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               </div>
               <h3 className="font-serif text-[32px] sm:text-[38px] font-extrabold tracking-[-0.03em] leading-[1.1]">Have a question?</h3>
               <p className="text-[15px] text-[var(--label-secondary)] font-medium">
-                We are here to help! Our team typically replies within an hour. Send us your question below.
+                CreatorOS is built by one developer early in its journey. The honest answer beats a fake form: reach out directly and it will be read.
               </p>
             </div>
 
-            <form onSubmit={handleContactSubmit} className="space-y-5">
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--label-secondary)] ml-1">Your Email Address</label>
-                <input 
-                  type="email"
-                  required
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="ios-input w-full bg-[var(--bg-secondary)] border border-[var(--separator)] rounded-2xl px-5 h-14 text-[15px] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] transition-colors text-[var(--label-primary)]"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--label-secondary)] ml-1">Your Message</label>
-                <textarea 
-                  required
-                  rows={4}
-                  value={contactMessage}
-                  onChange={(e) => setContactMessage(e.target.value)}
-                  placeholder="How can we help you today?"
-                  className="ios-input w-full bg-[var(--bg-secondary)] border border-[var(--separator)] rounded-2xl px-5 py-4 text-[15px] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] transition-colors text-[var(--label-primary)] resize-none h-32"
-                />
-              </div>
-
-              <button 
-                type="submit"
-                disabled={isSubmittingContact || !contactEmail || !contactMessage}
-                className="ios-button ios-button-filled w-full h-14 text-[15px] font-bold flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/10"
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <a
+                href="mailto:danengelsman@gmail.com?subject=CreatorOS%20question"
+                className="ios-button ios-button-filled w-full sm:w-auto h-14 px-10 text-[15px] font-bold flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/10"
               >
-                {isSubmittingContact ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    Send Message
-                    <ArrowRight size={16} weight="bold" />
-                  </>
-                )}
-              </button>
-
-              <AnimatePresence>
-                {contactSuccess && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-2xl text-center text-sm font-bold"
-                  >
-                    Your message was sent successfully! Our team will follow up via email shortly.
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </form>
+                Email the Builder
+                <Envelope size={16} weight="bold" />
+              </a>
+              <a
+                href="https://github.com/danengelsman/CreatorOS"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ios-button ios-button-gray w-full sm:w-auto h-14 px-10 text-[15px] font-semibold"
+              >
+                Open a GitHub Issue
+              </a>
+            </div>
           </div>
         </div>
       </section>
@@ -1194,9 +989,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
             <span className="ios-label p-0 uppercase tracking-widest text-xs font-bold text-[var(--label-tertiary)]">Connect with us</span>
             <div className="flex items-center gap-3.5 justify-center sm:justify-start">
                {[
-                 { icon: Twitter, href: "https://twitter.com" },
-                 { icon: Youtube, href: "https://youtube.com" },
-                 { icon: Instagram, href: "https://instagram.com" }
+                 { icon: GithubLogo, href: "https://github.com/danengelsman/CreatorOS" }
                ].map((social, i) => (
                  <a 
                    key={i} 
@@ -1209,16 +1002,20 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                  </a>
                ))}
             </div>
-            <p className="text-[11px] text-[var(--label-tertiary)] font-semibold mt-2 block">Available internationally on all desktop platforms</p>
+            <p className="text-[11px] text-[var(--label-tertiary)] font-semibold mt-2 block">Web-based — runs in any modern desktop or mobile browser</p>
           </div>
         </div>
         
         <div className="max-w-7xl mx-auto pt-10 mt-10 border-t border-[var(--separator)] flex flex-col sm:flex-row items-center justify-between gap-4">
            <p className="text-[13px] text-[var(--label-tertiary)] font-semibold">© 2026 CreatorOS. All rights reserved.</p>
-           <p className="text-[13px] text-[var(--label-tertiary)] font-semibold flex items-center gap-1.5 underline cursor-pointer">
-             <span className="w-2 h-2 rounded-full bg-[var(--system-green)] block animate-pulse" />
-             All Systems Operational
-           </p>
+           <a
+             href="https://github.com/danengelsman/CreatorOS"
+             target="_blank"
+             rel="noopener noreferrer"
+             className="text-[13px] text-[var(--label-tertiary)] font-semibold flex items-center gap-1.5 underline hover:text-[var(--label-secondary)] transition-colors"
+           >
+             View source on GitHub
+           </a>
         </div>
       </footer>
     </div>

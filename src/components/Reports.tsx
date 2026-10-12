@@ -19,35 +19,6 @@ import { authorizedFetch, db } from '../firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, subWeeks, format, isWithinInterval } from 'date-fns';
 
-const DEMO_PROJECTS = [
-  // 5 weeks ago
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 5) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 5) },
-  // 4 weeks ago
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 4) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 4) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 4) },
-  // 3 weeks ago
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 3) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 3) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 3) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 3) },
-  // 2 weeks ago
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 2) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 2) },
-  { status: 'Scheduled', scheduledDate: subWeeks(new Date(), 2) },
-  // 1 week ago
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 1) },
-  { status: 'Scheduled', scheduledDate: subWeeks(new Date(), 1) },
-  { status: 'Scheduled', scheduledDate: subWeeks(new Date(), 1) },
-  { status: 'Draft', scheduledDate: subWeeks(new Date(), 1) },
-  // This week
-  { status: 'Published', scheduledDate: new Date() },
-  { status: 'Scheduled', scheduledDate: new Date() },
-  { status: 'Scheduled', scheduledDate: new Date() },
-  { status: 'Draft', scheduledDate: new Date() },
-];
-
 const getWeeklyGrowthData = (projectsList: any[]) => {
   const weeks = [];
   const now = new Date();
