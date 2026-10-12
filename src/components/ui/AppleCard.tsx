@@ -1,5 +1,5 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from 'motion/react';
+import React, { useState, useRef } from 'react';
+import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
 import { cn } from '../../lib/utils';
 
 interface AppleCardProps {
@@ -61,7 +61,7 @@ export default function AppleCard({
     y.set(0);
   };
 
-  const handleFlip = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleFlip = (_e: React.MouseEvent | React.TouchEvent) => {
     if (!isFlippable) {
       onClick?.();
       return;

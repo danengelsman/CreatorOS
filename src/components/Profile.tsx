@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { UserCircle as User, Envelope as Mail, Calendar, Shield, ArrowSquareOut as ExternalLink, ShareNetwork as Share2, Medal as Award, Lightning as Zap, TrendUp as TrendingUp, Globe, Camera, CircleNotch as Loader2, SignOut as LogOut, Crown, Sparkle } from '@phosphor-icons/react';
-import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
-import { auth, db, updateProfile, handleFirestoreError, OperationType, compressBase64Image } from '../firebase';
+import { UserCircle as User, Envelope as Mail, Shield, ArrowSquareOut as ExternalLink, ShareNetwork as Share2, Medal as Award, Lightning as Zap, TrendUp as TrendingUp, Globe, Camera, CircleNotch as Loader2, SignOut as LogOut, Sparkle } from '@phosphor-icons/react';
+import { AnimatePresence } from 'motion/react';
+
+import { auth, db, handleFirestoreError, OperationType, compressBase64Image } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import AvatarGenerator from './AvatarGenerator';
 import Integrations from './Integrations';

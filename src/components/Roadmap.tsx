@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapTrifold as Map, Flag, Lightning as Zap, Trophy, Star, LockKey as Lock, CheckCircle as CheckCircle2, CaretRight as ChevronRight, Target, Medal as Award } from '@phosphor-icons/react';
+import { Flag, Lightning as Zap, Trophy, LockKey as Lock, CheckCircle as CheckCircle2, CaretRight as ChevronRight, Target, Medal as Award } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 
@@ -46,7 +46,7 @@ const STAGES = [
   }
 ];
 
-export default function Roadmap({ brand, user }: { brand: any, user: any }) {
+export default function Roadmap({ brand: _brand, user }: { brand: any, user: any }) {
   const currentDay = 1;
   const completedDays = [1];
 

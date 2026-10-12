@@ -1,16 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  PaperPlaneRight as Send, 
-  CaretRight as ChevronRight, 
-  Sparkle as Sparkles, 
-  Target, 
-  Lightning as Zap, 
-  CheckCircle as CheckCircle2,
-  CircleNotch as Loader2,
-  User,
-  Robot
-} from '@phosphor-icons/react';
+import { PaperPlaneRight as Send, CaretRight as ChevronRight, Sparkle as Sparkles, CheckCircle as CheckCircle2, CircleNotch as Loader2, Robot } from '@phosphor-icons/react';
 import BrandIcon from './BrandIcon';
 import { cn } from '../lib/utils';
 import { db, serverTimestamp, handleFirestoreError, OperationType, authorizedFetch } from '../firebase';

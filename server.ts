@@ -130,8 +130,6 @@ const TIKTOK_REDIRECT_URI = `${process.env.APP_URL}/api/auth/tiktok/callback`;
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 
 function formatGeminiError(error) {
   let errorMessage = error.message || 'Unknown API Error';
@@ -438,7 +436,8 @@ async function startServer() {
 
   app.post("/api/gemini/generate", protectAIRoute, async (req: any, res) => {
     try {
-      let { model, contents, config } = req.body;
+      const { contents, config } = req.body;
+    let { model } = req.body;
       
       // Transparently rewrite deprecated models to modern standard
       if (!model || model === "gemini-2.5-flash") {
@@ -1214,7 +1213,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   });
 
   app.post("/api/publish", authenticateUser, async (req: any, res) => {
-    const { title, body, platforms } = req.body;
+    const { platforms } = req.body;
     if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
       return res.status(400).json({ error: "No target platforms specified" });
     }
@@ -1260,7 +1259,6 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           };
         } else if (lowerPlatform === 'tiktok') {
           // Authentic TikTok API draft push simulator using OAuth profile context
-          const openId = profile.open_id || 'tiktok-creator';
           results[platform] = {
             status: 'success',
             message: `Successfully pushed content draft container to TikTok! Ready for mobile review.`,

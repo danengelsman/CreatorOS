@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Sparkle, Lightning, Gauge, ArrowRight, Copy, Check, Eye, WarningCircle, TrendUp, Play, FilmScript, Target, Waves } from '@phosphor-icons/react';
+import { motion } from 'motion/react';
+import { Sparkle, Lightning, Gauge, ArrowRight, Copy, Check, Eye, WarningCircle, TrendUp, FilmScript, Target, Waves } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import { analyzeAndOptimizeRetention } from '../services/gemini';
 import { getFriendlyError } from '../lib/friendlyError';
@@ -13,12 +13,12 @@ interface RetentionHookLabProps {
   brand?: any;
 }
 
-export default function RetentionHookLab({ initialText = '', showToast, onApplyHookToEditor, onSendToScenePlanner, brand }: RetentionHookLabProps) {
+export default function RetentionHookLab({ initialText = '', showToast, onApplyHookToEditor, onSendToScenePlanner: _onSendToScenePlanner, brand }: RetentionHookLabProps) {
   const [inputText, setInputText] = useState(initialText);
   const [platform, setPlatform] = useState<'youtube' | 'tiktok' | 'reels'>('youtube');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<any | null>(null);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [copiedHookIndex, setCopiedHookIndex] = useState<number | null>(null);
 
   const handleAnalyze = async () => {

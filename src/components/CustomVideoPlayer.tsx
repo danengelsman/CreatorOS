@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, SpeakerHigh, SpeakerSlash, FastForward, Rewind, CornersOut, CircleNotch } from '@phosphor-icons/react';
-import { cn } from '../lib/utils';
+
 import localforage from 'localforage';
 
 interface CustomVideoPlayerProps {
@@ -62,7 +62,7 @@ export default function CustomVideoPlayer({ videoUrl }: CustomVideoPlayerProps) 
 
   useEffect(() => {
     if (resolvedUrl && videoRef.current && !hasError && !isLoading) {
-      videoRef.current.play().catch(e => console.log('Auto-play blocked'));
+      videoRef.current.play().catch(() => console.log('Auto-play blocked'));
       setIsPlaying(true);
     }
   }, [resolvedUrl, hasError, isLoading]);

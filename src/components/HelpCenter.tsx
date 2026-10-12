@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Lightning as Zap, Palette, PenNib as PenTool, Compass, Chat as MessageSquare, CaretRight as ChevronRight, CaretDown, MagnifyingGlass as Search, Question as HelpCircle, Sparkle as Sparkles, ShieldCheck, Layout, PaperPlaneRight as Send, X, Plus } from '@phosphor-icons/react';
+import { Lightning as Zap, Palette, PenNib as PenTool, Compass, Chat as MessageSquare, CaretRight as ChevronRight, CaretDown, MagnifyingGlass as Search, Sparkle as Sparkles, Layout, Plus } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+
 import { db, serverTimestamp, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { getFriendlyError } from '../lib/friendlyError';
@@ -26,7 +26,7 @@ const FAQS = [
 ];
 
 export default function Support({ user, navigate }: { user: any, navigate?: (path: string) => void }) {
-  const [activeSection, setActiveSection] = useState(HELP_SECTIONS[0].id);
+  const [, setActiveSection] = useState(HELP_SECTIONS[0].id);
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSupportForm, setShowSupportForm] = useState(false);

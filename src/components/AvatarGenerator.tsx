@@ -1,9 +1,9 @@
 import { apiFetch } from "../firebase";
 import React, { useState, useRef } from 'react';
-import { Image as ImageIcon, UploadSimple as Upload, ArrowsClockwise as RefreshCw, Check, DownloadSimple as Download, Trash as Trash2, X, Lightning as Zap, Palette, TextT as Type, CircleNotch as Loader2, Camera } from '@phosphor-icons/react';
-import { motion, AnimatePresence } from 'motion/react';
+import { UploadSimple as Upload, ArrowsClockwise as RefreshCw, Check, DownloadSimple as Download, Trash as Trash2, X, Lightning as Zap, Palette, TextT as Type, CircleNotch as Loader2, Camera } from '@phosphor-icons/react';
+import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
-import { auth, db, updateProfile, handleFirestoreError, OperationType, compressBase64Image } from '../firebase';
+import { auth, db, handleFirestoreError, OperationType, compressBase64Image } from '../firebase';
 import { collection, addDoc, query, where, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import BrandIcon from './BrandIcon';
 

@@ -1,16 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { 
-  Sparkle, 
-  Fire, 
-  Diamond, 
-  MagicWand, 
-  CaretRight, 
-  Compass, 
-  ArrowClockwise,
-  Users,
-  Smiley
-} from '@phosphor-icons/react';
+import { Sparkle, Fire, Diamond, MagicWand, CaretRight, ArrowClockwise, Users, Smiley } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 
 export interface NicheSpark {

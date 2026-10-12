@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  CheckCircle, 
-  Circle, 
-  Plus, 
-  Trash, 
-  Fire, 
-  Sparkle, 
-  ArrowCounterClockwise,
-  Check
-} from '@phosphor-icons/react';
+import { Plus, Trash, Fire, Sparkle, ArrowCounterClockwise, Check } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import Confetti from './Confetti';
 import { 

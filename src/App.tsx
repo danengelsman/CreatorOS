@@ -1,36 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  UsersThree,
-  UsersThree as Users2, 
-  ChartPie as PieChart, 
-  Gear as Settings,
-  List as AlignLeft,
-  XCircle,
-  List as Menu,
-  X,
-  CurrencyDollar as DollarSign,
-  Trophy,
-  SignOut as LogOut,
-  CircleNotch as Loader2,
-  UserCircle,
-  House,
-  PenNib,
-  Hexagon,
-  Path,
-  ChatsCircle,
-  ChartLineUp,
-  BookOpen,
-  Sparkle,
-  ShieldCheck,
-  Recycle,
-  Lightbulb,
-  Lightning,
-  VideoCamera
-} from '@phosphor-icons/react';
+import { UsersThree, List as Menu, X, CurrencyDollar as DollarSign, SignOut as LogOut, CircleNotch as Loader2, UserCircle, House, PenNib, Hexagon, Path, ChatsCircle, ChartLineUp, BookOpen, Sparkle, ShieldCheck, Recycle, Lightbulb, Lightning, VideoCamera } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { auth, onAuthStateChanged, completeGoogleRedirect, db, logout, FirebaseUser, handleFirestoreError, OperationType } from './firebase';
-import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, collection, query, where } from 'firebase/firestore';
 
 // Components
 import Dashboard from './components/Dashboard';

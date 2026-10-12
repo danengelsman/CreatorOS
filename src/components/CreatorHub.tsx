@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar as CalendarIcon, Plus, CaretLeft as ChevronLeft, CaretRight as ChevronRight, Clock, CheckCircle as CheckCircle2, Stack as Layers, ShareNetwork as Share2, DotsThreeVertical as MoreVertical, Funnel as Filter } from '@phosphor-icons/react';
-import { HubIcon } from './IdentityIcons';
+import { Plus, CaretLeft as ChevronLeft, CaretRight as ChevronRight } from '@phosphor-icons/react';
+
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 

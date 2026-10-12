@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { VideoCamera, Sparkle, Target, ListChecks, FileVideo, UploadSimple, PauseCircle, PlayCircle, WarningCircle, CheckCircle } from '@phosphor-icons/react';
+import { motion } from 'motion/react';
+import { VideoCamera, Sparkle, Target, ListChecks, FileVideo, UploadSimple, WarningCircle, CheckCircle } from '@phosphor-icons/react';
 import { analyzeVideo } from '../services/gemini';
 import Markdown from 'react-markdown';
 import { getFriendlyError } from '../lib/friendlyError';

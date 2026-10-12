@@ -1,20 +1,19 @@
 import { apiFetch } from "../firebase";
-import React, { useState, useRef, useEffect } from 'react';
-import { PaperPlaneRight as Send, CheckCircle as CheckCircle2, ArrowsClockwise as RefreshCw, TextT as Type, Hash, Image as ImageIcon, CaretRight as ChevronRight, DownloadSimple as Download, Microphone as Mic, SpeakerHigh as Volume2, SpeakerSlash, Rewind, FastForward, VideoCamera as VideoIcon, Play, CircleNotch as Loader2, FloppyDisk as Save, Sparkle as Sparkles, MagnifyingGlass as Search, GearSix as Settings, DotsThree as MoreHorizontal, Lightbulb, Article, FilmScript, LockKey, Plus, TrendUp, X, Lightning, Cards } from '@phosphor-icons/react';
+import React, { useState, useEffect } from 'react';
+import { CheckCircle as CheckCircle2, DownloadSimple as Download, Sparkle as Sparkles, Lightbulb, X, Lightning, Cards } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
-import { scoreContent, quickPolish, remixContent, optimizeSearchTerms, generateSpeech, transcribeAudio, generateVideo, getOperationStatus, generateContentIdeas, generateSmartSuggestions } from '../services/gemini';
+import { scoreContent } from '../services/gemini';
 import { cn } from '../lib/utils';
-import { db, serverTimestamp, handleFirestoreError, OperationType } from '../firebase';
-import { doc, setDoc, collection, addDoc, getDocs, query, where, orderBy, updateDoc } from 'firebase/firestore';
+import { db, serverTimestamp } from '../firebase';
+import { doc, collection, addDoc, getDocs, query, where, orderBy, updateDoc } from 'firebase/firestore';
 import VideoStudio from "./VideoStudio";
-import BrandIcon from './BrandIcon';
 import CalendarView from './CalendarView';
 import CustomVideoPlayer from './CustomVideoPlayer';
 import ScenePlanner from './ScenePlanner';
 import RetentionHookLab from './RetentionHookLab';
 import localforage from 'localforage';
 import Confetti from './Confetti';
-import ContentEditorView, { PLATFORMS } from './ContentEditorView';
+import ContentEditorView from './ContentEditorView';
 import AIToolPanel from './AIToolPanel';
 import ContentIdeaGenerator from './ContentIdeaGenerator';
 import ViralTemplatesLibrary from './ViralTemplatesLibrary';
@@ -34,11 +33,9 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
   const [scoreData, setScoreData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPolishing, setIsPolishing] = useState(false);
-  const [isGeneratingSpeech, setIsGeneratingSpeech] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const audioChunks = useRef<Blob[]>([]);
 
   const loadVideoHistory = async () => {
     if (!user) return;

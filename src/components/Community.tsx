@@ -1,6 +1,6 @@
 import React from 'react';
-import { Users, ChatsCircle as MessageCircle, Trophy, Lightning as Zap, MagnifyingGlass as Search, ArrowUpRight, Globe, CaretRight as ChevronRight, ChartLine as LineChart, Chats as MessageCircleMore } from '@phosphor-icons/react';
-import { cn } from '../lib/utils';
+import { Users, ChatsCircle as MessageCircle, Lightning as Zap, Globe } from '@phosphor-icons/react';
+
 import BrandIcon from './BrandIcon';
 
 const LEADERBOARD = [

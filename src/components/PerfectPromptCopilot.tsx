@@ -1,9 +1,9 @@
 import { apiFetch } from "../firebase";
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Copy, Check, Sparkle, Clock, Star, Tag, CaretLeft, CaretRight, MagicWand, Plus, ThumbsUp, X, ArrowRight, Play } from '@phosphor-icons/react';
+import { Copy, Check, Sparkle, Star, Tag, CaretLeft, CaretRight, MagicWand, X, ArrowRight } from '@phosphor-icons/react';
 import { db, serverTimestamp } from '../firebase';
-import { collection, addDoc, query, where, getDocs, orderBy, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 

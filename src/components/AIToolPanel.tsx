@@ -12,7 +12,6 @@ import {
   MagnifyingGlass as Search,
   Play,
   DownloadSimple as Download,
-  LockKey
 } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import { generateSmartSuggestions, optimizeSearchTerms } from '../services/gemini';
@@ -381,7 +380,6 @@ export default function AIToolPanel({
                   {p.icon}
                 </div>
                 <span className="font-semibold">{p.distributionLabel}</span>
-                {false && <span className="text-[10px] uppercase font-bold tracking-wider bg-[var(--accent)]/10 text-[var(--accent)] px-2 py-0.5 rounded-full ml-2 flex items-center gap-1"><LockKey size={10} weight="bold"/> Pro</span>}
               </div>
               {p.id === platform ? (
                 <div className="w-2 h-2 rounded-full bg-[var(--accent)] mr-2" />

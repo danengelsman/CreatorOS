@@ -8,9 +8,8 @@ import { execSync } from 'node:child_process';
 
 execSync('npm run build:server', { stdio: 'inherit' });
 
-let drift = '';
 try {
-  drift = execSync('git diff --exit-code -- api/_server.js', { encoding: 'utf8' });
+  execSync('git diff --exit-code -- api/_server.js', { stdio: 'inherit' });
 } catch {
   console.error(
     '\n[check:artifact] STALE: api/_server.js does not match server.ts.\n' +

@@ -75,8 +75,12 @@ export default tseslint.config(
       // ES2019 and error details are already logged inside most handlers.
       "@typescript-eslint/no-unused-vars": [
         "error",
-        { caughtErrors: "none" },
+        { caughtErrors: "none", argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+      // Best-effort cleanup / optional-parse catches are intentionally empty
+      // (temp-file unlink, JSON.parse fallbacks). A comment in every one of
+      // them is noise; re-enable if an empty catch ever swallows a real error.
+      "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
 );

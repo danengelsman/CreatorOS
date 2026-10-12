@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lightbulb, Sparkle, Clock, TrendUp, ChartLineUp, ArrowRight, Play, CheckCircle, ArrowsClockwise as RefreshCw } from '@phosphor-icons/react';
+import { Lightbulb, Sparkle, Clock, TrendUp, ArrowRight, ArrowsClockwise as RefreshCw } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { authorizedFetch, apiFetch } from '../firebase';
 import { cn } from '../lib/utils';
@@ -9,7 +9,7 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
   const [ideas, setIdeas] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("Analyzing trends and performance...");
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [, setAnalytics] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
   // Quick idea feature
@@ -21,7 +21,7 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
   // IDLE TIMER: 30 seconds for demo purposes
   const IDLE_TIMEOUT = 30000;
 
-  const resetIdleTimer = () => {
+  const _resetIdleTimer = () => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     setIsIdle(false);
     idleTimerRef.current = setTimeout(() => {

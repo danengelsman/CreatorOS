@@ -1,36 +1,12 @@
 import { apiFetch } from "../firebase";
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, updateDoc, doc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, authorizedFetch } from '../firebase';
+import { db, authorizedFetch } from '../firebase';
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { getFriendlyError } from '../lib/friendlyError';
-import {
-  Youtube,
-  Instagram,
-  Twitter,
-  Flame,
-  Plus,
-  Trash2,
-  Clock, 
-  Sparkles, 
-  Check, 
-  CheckCircle, 
-  RefreshCw, 
-  Smartphone, 
-  Globe, 
-  ChevronLeft, 
-  ChevronRight, 
-  X,
-  Search,
-  Calendar as CalendarIcon,
-  Video,
-  FileText,
-  AlertCircle,
-  CloudUpload,
-  ExternalLink
-} from 'lucide-react';
+import { Youtube, Instagram, Twitter, Flame, Plus, Trash2, Clock, Sparkles, Check, CheckCircle, RefreshCw, Smartphone, ChevronLeft, ChevronRight, X, Search, Calendar as CalendarIcon, Video, AlertCircle, CloudUpload, ExternalLink } from 'lucide-react';
 
 // Platform configurations with industry-accepted colors
 export const getPlatformStyle = (platform: string) => {
@@ -318,7 +294,7 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
     if (!newEventTitle || !selectedDate || !user) return;
     
     try {
-      const docRef = await addDoc(collection(db, 'projects'), {
+      await addDoc(collection(db, 'projects'), {
         userId: user.uid,
         name: newEventTitle,
         type: 'content',
@@ -817,7 +793,7 @@ Return your response strictly in the following JSON format:
 
         {/* Calendar Grid */}
         <div className="flex-1 grid grid-cols-7 grid-rows-5 bg-[var(--separator)]/30 gap-[1px]">
-          {days.slice(0, 35).map((day, i) => {
+          {days.slice(0, 35).map((day) => {
             const dayEvents = scheduledEvents.filter(e => isSameDay(e.scheduledDate, day));
             return (
               <div 

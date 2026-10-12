@@ -1,52 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChartBar as BarChart3, ChartLine as LineChart, CurrencyDollar as DollarSign, ChartPie as PieChart, ArrowUpRight, DownloadSimple as Download, Calendar, CaretDown as ChevronDown, Sparkle as Sparkles, CaretRight as ChevronRight, Pulse as Activity, TrendUp as TrendingUp, Brain, CalendarCheck, WarningCircle } from '@phosphor-icons/react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  Cell,
-  Line,
-  ComposedChart,
-  Legend
-} from 'recharts';
-import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import React, { useState, useEffect } from 'react';
+import { DownloadSimple as Download, CaretRight as ChevronRight, Pulse as Activity, TrendUp as TrendingUp, Brain, CalendarCheck, WarningCircle } from '@phosphor-icons/react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart, Legend } from 'recharts';
+
+
 import { authorizedFetch, db } from '../firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, subWeeks, format, isWithinInterval } from 'date-fns';
 
-const DEMO_PROJECTS = [
-  // 5 weeks ago
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 5) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 5) },
-  // 4 weeks ago
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 4) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 4) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 4) },
-  // 3 weeks ago
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 3) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 3) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 3) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 3) },
-  // 2 weeks ago
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 2) },
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 2) },
-  { status: 'Scheduled', scheduledDate: subWeeks(new Date(), 2) },
-  // 1 week ago
-  { status: 'Published', scheduledDate: subWeeks(new Date(), 1) },
-  { status: 'Scheduled', scheduledDate: subWeeks(new Date(), 1) },
-  { status: 'Scheduled', scheduledDate: subWeeks(new Date(), 1) },
-  { status: 'Draft', scheduledDate: subWeeks(new Date(), 1) },
-  // This week
-  { status: 'Published', scheduledDate: new Date() },
-  { status: 'Scheduled', scheduledDate: new Date() },
-  { status: 'Scheduled', scheduledDate: new Date() },
-  { status: 'Draft', scheduledDate: new Date() },
-];
 
 const getWeeklyGrowthData = (projectsList: any[]) => {
   const weeks = [];
@@ -118,7 +78,7 @@ export default function Intelligence({ user }: { user: any }) {
   const [youtubeStats, setYoutubeStats] = useState<any>(null);
   const [tiktokStats, setTiktokStats] = useState<any>(null);
   const [summary, setSummary] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   
   const [projects, setProjects] = useState<any[]>([]);
   const [isProjectsLoading, setIsProjectsLoading] = useState(true);

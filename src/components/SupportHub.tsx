@@ -1,29 +1,9 @@
 import { apiFetch } from "../firebase";
 import React, { useState, useEffect } from 'react';
-import { 
-  Chat as MessageSquare, 
-  UserCircle as User, 
-  Clock, 
-  CheckCircle as CheckCircle2, 
-  Brain, 
-  PaperPlaneRight as Send, 
-  WarningCircle as AlertCircle, 
-  MagnifyingGlass as Search, 
-  Funnel as Filter, 
-  CaretRight as ChevronRight, 
-  ShieldCheck,
-  Terminal,
-  Play,
-  Cpu,
-  CircleNotch as Loader2,
-  Database,
-  Key,
-  Globe,
-  XCircle
-} from '@phosphor-icons/react';
+import { Chat as MessageSquare, UserCircle as User, Clock, CheckCircle as CheckCircle2, Brain, PaperPlaneRight as Send, WarningCircle as AlertCircle, MagnifyingGlass as Search, CaretRight as ChevronRight, ShieldCheck, Terminal, Play, Cpu, CircleNotch as Loader2, Database, Key, Globe, XCircle } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, serverTimestamp, where } from 'firebase/firestore';
 import { cn } from '../lib/utils';
 import { getFriendlyError } from '../lib/friendlyError';
 

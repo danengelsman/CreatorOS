@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowsClockwise, Copy, Check } from '@phosphor-icons/react';
 import { repurposeContent } from '../services/gemini';
-import { cn } from '../lib/utils';
+
 import { motion, AnimatePresence } from 'motion/react';
 import { getFriendlyError } from '../lib/friendlyError';
 

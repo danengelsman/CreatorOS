@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { YoutubeLogo as Youtube, MusicNotes, InstagramLogo, TwitterLogo, ArrowSquareOut as ExternalLink, CheckCircle as CheckCircle2, WarningCircle as AlertCircle, ArrowsClockwise as RefreshCw, Plus } from '@phosphor-icons/react';
-import { motion, AnimatePresence } from 'motion/react';
+import { YoutubeLogo as Youtube, MusicNotes, InstagramLogo, TwitterLogo, CheckCircle as CheckCircle2 } from '@phosphor-icons/react';
+import { motion } from 'motion/react';
 import { authorizedFetch } from '../firebase';
 import { cn } from '../lib/utils';
 
@@ -11,7 +11,7 @@ interface ConnectedAccount {
 
 export default function Integrations() {
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
 
   useEffect(() => {

@@ -1,39 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  ArrowRight, 
-  Check, 
-  Star, 
-  Globe, 
-  TwitterLogo as Twitter, 
-  YoutubeLogo as Youtube, 
-  InstagramLogo as Instagram, 
-  Lightning as Zap, 
-  ShieldCheck, 
-  List as Menu, 
-  X, 
-  CaretRight as ChevronRight, 
-  TrendUp as TrendingUp, 
-  Target, 
-  Palette, 
-  BookOpen, 
-  Sparkle,
-  ChatCircleText,
-  Clock,
-  ArrowCircleUp,
-  User,
-  Plus,
-  Envelope,
-  Code,
-  CookingPot,
-  ChartLineUp,
-  Drop,
-  PaintBrush,
-  GraduationCap
-} from '@phosphor-icons/react';
+import { ArrowRight, Check, Globe, TwitterLogo as Twitter, YoutubeLogo as Youtube, InstagramLogo as Instagram, List as Menu, X, CaretRight as ChevronRight, TrendUp as TrendingUp, Palette, Sparkle, ChatCircleText, Clock, Plus, Envelope, Code, CookingPot, ChartLineUp, Drop, PaintBrush, GraduationCap } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import BrandIcon from './BrandIcon';
-import { loginWithGoogle } from '../firebase';
+
 
 // Sandbox presets for the interactive Brand Kit planner
 const SANDBOX_PRESETS: Record<string, Record<string, any>> = {

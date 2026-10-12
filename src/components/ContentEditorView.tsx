@@ -12,7 +12,6 @@ import {
   FilmScript, 
   Lightning, 
   FloppyDisk as Save,
-  LockKey
 } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import BrandIcon from './BrandIcon';
@@ -66,7 +65,7 @@ export interface ContentEditorViewProps {
 export default function ContentEditorView({
   title, setTitle,
   body, setBody,
-  platform, setPlatform,
+  platform, setPlatform: _setPlatform,
   brand, showToast,
   setStudioTab,
   isSaving, onPublish,
@@ -82,7 +81,7 @@ export default function ContentEditorView({
   const [brainstormIdeas, setBrainstormIdeas] = useState<any[] | null>(null);
   
   const [isRecording, setIsRecording] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [, setIsTranscribing] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
@@ -314,7 +313,6 @@ export default function ContentEditorView({
             >
               <div className="shrink-0 flex items-center justify-center w-5 h-5">{p.icon}</div>
               <span>{p.label}</span>
-              {false && <LockKey size={14} className="ml-1 opacity-50 shrink-0" />}
             </button>
           ))}
         </div>

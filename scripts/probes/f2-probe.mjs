@@ -74,7 +74,7 @@ function colOf(dbId, col) {
   return _dbs[dbId][col];
 }
 
-function matchingDocs(dbId, colName, field, value) {
+function _matchingDocs(dbId, colName, field, value) {
   const col = _dbs[dbId]?.[colName] || {};
   const out = [];
   for (const [id, data] of Object.entries(col)) {
