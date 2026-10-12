@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { UserCircle as User, Envelope as Mail, Calendar, Shield, ArrowSquareOut as ExternalLink, ShareNetwork as Share2, Medal as Award, Lightning as Zap, TrendUp as TrendingUp, Globe, Camera, CircleNotch as Loader2, SignOut as LogOut, Crown, Sparkle } from '@phosphor-icons/react';
+import { UserCircle as User, Envelope as Mail, Calendar, Shield, ArrowSquareOut as ExternalLink, ShareNetwork as Share2, Medal as Award, Lightning as Zap, TrendUp as TrendingUp, Globe, Camera, CircleNotch as Loader2, SignOut as LogOut, Crown, Sparkle, Clock } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { auth, db, updateProfile, handleFirestoreError, OperationType, compressBase64Image } from '../firebase';
@@ -7,10 +7,11 @@ import { doc, updateDoc } from 'firebase/firestore';
 import AvatarGenerator from './AvatarGenerator';
 import Integrations from './Integrations';
 import { authorizedFetch } from '../firebase';
+import { fetchDailyGoalsFromCloud, getLocalDailyGoals } from '../services/dailyGoals';
 
 import { User as FirebaseUser } from 'firebase/auth';
 
-export default function Profile({ user, userData, brand }: { user: FirebaseUser, userData: any, brand: any }) {
+export default function Profile({ user, userData, brand, projects = [] }: { user: FirebaseUser, userData: any, brand: any, projects?: any[] }) {
   const [isUploading, setIsUploading] = useState(false);
   const [showAvatarGenerator, setShowAvatarGenerator] = useState(false);
   const [stats, setStats] = useState({ reach: '---', score: '0', streak: '0' });
@@ -19,29 +20,43 @@ export default function Profile({ user, userData, brand }: { user: FirebaseUser,
   React.useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [yt, tt] = await Promise.all([
-          authorizedFetch('/api/analytics/youtube').catch(() => null),
-          authorizedFetch('/api/analytics/tiktok').catch(() => null)
-        ]);
-        
+        // F3.2 (D4-A): TikTok analytics are unavailable (TikTok requires audit
+        // approval for data access), so reach reflects YouTube only — no
+        // fabricated platform stats.
+        const yt = await authorizedFetch('/api/analytics/youtube').catch(() => null);
+
         let totalViews = 0;
         if (yt?.views) totalViews += yt.views;
-        if (tt?.views) totalViews += tt.views;
 
-        const formattedReach = totalViews > 1000 
-          ? `${(totalViews / 1000).toFixed(1)}K` 
+        const formattedReach = totalViews > 1000
+          ? `${(totalViews / 1000).toFixed(1)}K`
           : totalViews.toString();
+
+        // Real data: writing streak from the daily-goals store (no hardcoded
+        // zeros presented as live stats).
+        const cloud = user?.uid ? await fetchDailyGoalsFromCloud(user.uid).catch(() => null) : null;
+        const goals = cloud ?? getLocalDailyGoals();
 
         setStats(prev => ({
           ...prev,
-          reach: totalViews > 0 ? formattedReach : '---'
+          reach: totalViews > 0 ? formattedReach : '---',
+          streak: String(goals.streak ?? 0)
         }));
       } catch (error) {
         console.error('Error fetching profile stats:', error);
       }
     };
     fetchStats();
-  }, []);
+  }, [user?.uid]);
+
+  // Content Score: average of the real scores stored on the user's own
+  // projects. 0 when none exist — never a fabricated number.
+  const contentScore = React.useMemo(() => {
+    if (!projects || projects.length === 0) return 0;
+    const scored = projects.filter(p => typeof p?.data?.contentScore === 'number');
+    if (scored.length === 0) return 0;
+    return Math.round(scored.reduce((sum: number, p: any) => sum + p.data.contentScore, 0) / scored.length);
+  }, [projects]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -171,7 +186,7 @@ export default function Profile({ user, userData, brand }: { user: FirebaseUser,
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { label: 'Total Reach', value: stats.reach, icon: TrendingUp, color: 'text-[var(--accent)]' },
-          { label: 'Content Score', value: stats.score, icon: Award, color: 'text-[var(--accent)]' },
+          { label: 'Content Score', value: String(contentScore), icon: Award, color: 'text-[var(--accent)]' },
           { label: 'Streak Days', value: stats.streak, icon: Zap, color: 'text-[var(--system-green)]' },
         ].map((stat, i) => (
           <div key={i} className="ios-card bg-[var(--bg-secondary)] p-6 flex flex-col gap-1">
@@ -202,15 +217,16 @@ export default function Profile({ user, userData, brand }: { user: FirebaseUser,
               <ExternalLink size={16} strokeWidth={1.5} className="text-[var(--label-tertiary)]" />
             </div>
             <div className="p-4 bg-[var(--bg-secondary)]/50">
-              <div className="p-3 bg-[var(--bg-tertiary)] rounded-xl border border-[var(--separator)] mb-4">
-                <code className="text-[13px] font-mono text-[var(--accent)] font-bold break-all">
-                  creatoros.app/profile/{user?.uid?.slice(0, 8)}
-                </code>
+              <div className="p-3 bg-[var(--bg-tertiary)] rounded-xl border border-[var(--separator)] mb-4 flex items-center gap-3">
+                <Clock size={16} className="text-[var(--label-secondary)] flex-shrink-0" />
+                <p className="text-[13px] font-medium text-[var(--label-secondary)]">Public portfolios are not available yet.</p>
               </div>
               <p className="text-[14px] text-[var(--label-secondary)] leading-relaxed mb-4">
-                Your portfolio is live. Content published in Studio is featured here automatically.
+                Your work stays private to your account. A shareable portfolio page is planned, not live.
               </p>
-              <button className="ios-button ios-button-tinted w-full mt-4">Customize URL</button>
+              <button className="ios-button ios-button-tinted w-full mt-4" disabled>
+                Coming Soon
+              </button>
             </div>
           </div>
         </section>
@@ -243,9 +259,10 @@ export default function Profile({ user, userData, brand }: { user: FirebaseUser,
                 </div>
                 <span className="text-[17px] font-medium">Auto-Publish</span>
               </div>
-              <div className="w-12 h-6 bg-[var(--accent)] rounded-full relative">
-                <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm" />
-              </div>
+              {/* Honesty sweep: this was a static toggle rendered in the ON
+                  position with no state or handler behind it — it implied
+                  auto-publishing that does not exist. Now labeled as planned. */}
+              <span className="text-[13px] font-medium text-[var(--label-secondary)]">Planned</span>
             </div>
           </div>
           <div className="mt-8">

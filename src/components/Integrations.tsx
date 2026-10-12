@@ -66,51 +66,51 @@ export default function Integrations() {
     }
   };
 
-  const [handles, setHandles] = useState<{ [key: string]: string }>({});
-  const [handleInput, setHandleInput] = useState<{ [key: string]: string }>({});
-
-  const isConnected = (platform: string) => accounts.some(a => a.platform === platform) || handles[platform];
+  const isConnected = (platform: string) => accounts.some(a => a.platform === platform);
   const getAccount = (platform: string) => accounts.find(a => a.platform === platform);
 
-  const handleSoftConnect = (platform: string) => {
-    const handle = handleInput[platform];
-    if (!handle) return;
-    setHandles(prev => ({ ...prev, [platform]: handle }));
-    // In a real app, we'd save this to the DB
-  };
-
+  // Honesty sweep (D4-A): descriptions state what each integration really
+  // does today. Instagram/X have no OAuth wiring — they are labeled coming
+  // soon instead of offering Connect buttons that would start the TikTok flow.
+  // The old "track anonymously" handle input was removed: it saved nothing
+  // (client state only) while implying real tracking.
   const platforms = [
     {
       id: 'youtube',
       name: 'YouTube',
       icon: Youtube,
       color: 'text-[#FF0000]',
-      description: 'Fetch channel statistics, views, and subscriber growth.',
-      scopes: ['Read Analytics', 'View Channel Statistics']
+      description: 'Connect your channel to sync real statistics: views, subscribers, and videos.',
+      scopes: ['Read Analytics', 'View Channel Statistics'],
+      live: true
     },
     {
       id: 'tiktok',
       name: 'TikTok',
       icon: MusicNotes,
       color: 'text-zinc-900 dark:text-white',
-      description: 'Monitor video performance and audience engagement.',
-      scopes: ['View Profile', 'Video Analytics']
+      description: 'Connect your TikTok account for display. Analytics are unavailable — TikTok requires audit approval for data access.',
+      scopes: ['View Profile'],
+      live: true,
+      analyticsPending: true
     },
     {
       id: 'instagram',
       name: 'Instagram',
       icon: InstagramLogo,
       color: 'text-[#E1306C]',
-      description: 'Track Reels performance and follower growth.',
-      scopes: ['Read Insights', 'View Profile']
+      description: 'Not connected yet. Instagram integration is planned.',
+      scopes: [],
+      comingSoon: true
     },
     {
       id: 'twitter',
       name: 'X (Twitter)',
       icon: TwitterLogo,
       color: 'text-zinc-900 dark:text-white',
-      description: 'Monitor post reach and engagement metrics.',
-      scopes: ['Read Analytics', 'View Profile']
+      description: 'Not connected yet. X (Twitter) integration is planned.',
+      scopes: [],
+      comingSoon: true
     }
   ];
 
@@ -119,7 +119,7 @@ export default function Integrations() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-serif text-[28px] font-semibold tracking-[-0.015em]">Integrations</h2>
-          <p className="text-sm text-[var(--label-secondary)]">Connect your platforms to sync real-time analytics.</p>
+          <p className="text-sm text-[var(--label-secondary)]">Connect YouTube and TikTok to link your accounts.</p>
         </div>
       </div>
 
@@ -167,7 +167,11 @@ export default function Integrations() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {!connected ? (
+                  {platform.comingSoon ? (
+                    <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-[var(--label-secondary)] bg-[var(--bg-tertiary)] border border-[var(--separator)]">
+                      Coming Soon
+                    </span>
+                  ) : !connected ? (
                     <button
                       onClick={() => handleConnect(platform.id)}
                       disabled={isBusy}
@@ -186,9 +190,9 @@ export default function Integrations() {
                   )}
                   {isVerified && (
                     <div className="w-10 h-10 rounded-full bg-[var(--bg-primary)] overflow-hidden border border-white/5">
-                      <img loading="lazy" 
-                        src={account?.profile?.picture || `https://ui-avatars.com/api/?name=${platform.name}` || undefined} 
-                        alt="" 
+                      <img loading="lazy"
+                        src={account?.profile?.picture || `https://ui-avatars.com/api/?name=${platform.name}` || undefined}
+                        alt=""
                         className="w-full h-full object-cover"
                       />
                     </div>
@@ -196,27 +200,12 @@ export default function Integrations() {
                 </div>
               </div>
 
-              {!connected && (
-                <div className="pt-4 border-t border-[var(--separator)] flex flex-col gap-3">
-                  <p className="text-[11px] font-bold text-[var(--label-tertiary)] uppercase tracking-widest">Or track anonymously (Newbie Friendly)</p>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--label-tertiary)] font-bold">@</span>
-                      <input 
-                        type="text"
-                        placeholder="your_handle"
-                        value={handleInput[platform.id] || ''}
-                        onChange={(e) => setHandleInput(prev => ({ ...prev, [platform.id]: e.target.value }))}
-                        className="w-full pl-7 pr-4 py-2 bg-[var(--bg-primary)] text-sm rounded-xl outline-none border border-transparent focus:border-[var(--accent)] transition-all"
-                      />
-                    </div>
-                    <button 
-                      onClick={() => handleSoftConnect(platform.id)}
-                      className="ios-button ios-button-gray p-2"
-                    >
-                      Track Handle
-                    </button>
-                  </div>
+              {platform.analyticsPending && (
+                <div className="pt-3 border-t border-[var(--separator)] flex items-start gap-2">
+                  <AlertCircle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-[12px] text-[var(--label-secondary)]">
+                    TikTok analytics unavailable — TikTok requires audit approval for data access.
+                  </p>
                 </div>
               )}
             </motion.div>

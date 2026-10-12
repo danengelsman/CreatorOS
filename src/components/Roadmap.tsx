@@ -46,9 +46,14 @@ const STAGES = [
   }
 ];
 
-export default function Roadmap({ brand, user }: { brand: any, user: any }) {
-  const currentDay = 1;
-  const completedDays = [1];
+export default function Roadmap({ brand, user, projects = [] }: { brand: any, user: any, projects?: any[] }) {
+  // F6.4 (honesty sweep): this used to hardcode currentDay = 1 and
+  // completedDays = [1] — fabricated progress for every user. Real progress
+  // is derived from actual content created in the workspace: each finished
+  // piece of content marks one day of the 30-day challenge done.
+  const completedCount = Math.min(30, projects.length);
+  const completedDays = Array.from({ length: completedCount }, (_, i) => i + 1);
+  const currentDay = Math.min(30, completedCount + 1);
 
   return (
     <div className="space-y-8 pb-20">
@@ -68,11 +73,11 @@ export default function Roadmap({ brand, user }: { brand: any, user: any }) {
                 cx="50%" cy="50%" r="42%" fill="none" stroke="var(--system-green)" strokeWidth="6"
                 strokeDasharray="264%"
                 initial={{ strokeDashoffset: "264%" }}
-                animate={{ strokeDashoffset: `${264 - (264 * 1) / 30}%` }}
+                animate={{ strokeDashoffset: `${264 - (264 * completedCount) / 30}%` }}
                 strokeLinecap="round"
               />
             </svg>
-            <span className="absolute text-[20px] font-bold tracking-tighter">1/30</span>
+            <span className="absolute text-[20px] font-bold tracking-tighter">{completedCount}/30</span>
         </div>
       </section>
 

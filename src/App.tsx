@@ -60,6 +60,12 @@ const RetentionHookLab = React.lazy(() => import('./components/RetentionHookLab'
 const VideoAnalyzer = React.lazy(() => import('./components/VideoAnalyzer'));
 import { ErrorBoundary } from './components/ErrorBoundary';
 
+// F3.3 (D4-A): the Community view is a facade (hardcoded sample leaderboard,
+// sample "Active" counter, no-op composer). It ships
+// disabled behind a build flag until the real Firestore-backed community
+// lands (F6.1).
+export const FEATURE_COMMUNITY = import.meta.env.VITE_FEATURE_COMMUNITY === 'true';
+
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: House, component: Dashboard },
   { id: 'first_dollar', label: 'First Dollar', icon: DollarSign, component: FirstDollarDashboard },
@@ -71,7 +77,7 @@ const NAV_ITEMS = [
   { id: 'ideas', label: 'Ideas', icon: Lightbulb, component: VideoIdeas },
   { id: 'roadmap', label: 'Roadmap', icon: Path, component: Roadmap },
   { id: 'hub', label: 'Creator Hub', icon: UsersThree, component: CreatorHub, locked: true },
-  { id: 'community', label: 'Community', icon: ChatsCircle, component: Community },
+  { id: 'community', label: FEATURE_COMMUNITY ? 'Community' : 'Community (soon)', icon: ChatsCircle, component: Community, locked: !FEATURE_COMMUNITY },
   { id: 'reports', label: 'Reports', icon: ChartLineUp, component: Reports },
   { id: 'help', label: 'Help', icon: BookOpen, component: HelpCenter },
   { id: 'prompts', label: 'Co-Pilot', icon: Sparkle, component: PerfectPromptCopilot },
@@ -494,7 +500,12 @@ export default function App() {
                             <button
                               key={item.id}
                               onClick={() => {
-                                if (item.locked && !isDeveloper && projects.length === 0) return;
+                                // F3.3: the gated Community entry is never
+                                // navigable. 'hub' keeps its original unlock
+                                // behavior (developers, or users with content).
+                                const communityLocked = item.id === 'community' && !FEATURE_COMMUNITY;
+                                const hubUnlocked = item.id === 'hub' && (isDeveloper || projects.length > 0);
+                                if (communityLocked || (item.locked && !hubUnlocked)) return;
                                 switchTab(item.id);
                                 setIsMobileMenuOpen(false);
                               }}

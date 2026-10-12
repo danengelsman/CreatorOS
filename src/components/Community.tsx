@@ -4,11 +4,11 @@ import { cn } from '../lib/utils';
 import BrandIcon from './BrandIcon';
 
 const LEADERBOARD = [
-  { name: 'Alex Rivera', niche: 'Tech Productivity', streak: 42, score: 98, avatar: 'https://picsum.photos/seed/alex/100/100' },
-  { name: 'Sarah Chen', niche: 'Digital Art', streak: 31, score: 95, avatar: 'https://picsum.photos/seed/sarah/100/100' },
-  { name: 'Marcus Thorne', niche: 'Solo Entrepreneurship', streak: 28, score: 92, avatar: 'https://picsum.photos/seed/marcus/100/100' },
-  { name: 'Elena Rodriguez', niche: 'Sustainable Living', streak: 25, score: 90, avatar: 'https://picsum.photos/seed/elena/100/100' },
-];
+  { name: 'Creator One', niche: 'Tech Productivity', streak: 42, score: 98, avatar: '' },
+  { name: 'Creator Two', niche: 'Digital Art', streak: 31, score: 95, avatar: '' },
+  { name: 'Creator Three', niche: 'Solo Entrepreneurship', streak: 28, score: 92, avatar: '' },
+  { name: 'Creator Four', niche: 'Sustainable Living', streak: 25, score: 90, avatar: '' },
+].map(entry => ({ ...entry, name: `${entry.name} — sample data`, niche: `${entry.niche} — sample data` }));
 
 export default function Community({ user, userData, setActiveTab }: { user: any, userData: any, setActiveTab: (tab: string) => void }) {
   return (
@@ -38,7 +38,7 @@ export default function Community({ user, userData, setActiveTab }: { user: any,
               <span className="ios-label uppercase">Live Momentum</span>
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-[var(--system-green)] rounded-full animate-pulse" />
-                <span className="text-[12px] font-bold text-[var(--system-green)] uppercase tracking-wider">1,204 Active</span>
+                <span className="text-[12px] font-bold text-[var(--system-green)] uppercase tracking-wider">Sample counter</span>
               </div>
             </div>
             

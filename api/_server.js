@@ -1525,11 +1525,11 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   });
   app.get("/api/analytics/tiktok", authenticateUser, async (req, res) => {
     const account = await getIntegration(req.user.uid, "tiktok");
-    if (!account) return res.json({ followers: 0, views: 0, likes: 0 });
+    if (!account) return res.status(404).json({ available: false, reason: "not_connected" });
     res.json({
-      followers: 1240,
-      views: 45e3,
-      likes: 8900
+      available: false,
+      reason: "audit_pending",
+      message: "TikTok analytics unavailable \u2014 TikTok requires audit approval for data access."
     });
   });
   app.get("/api/analytics/summary", authenticateUser, async (req, res) => {
@@ -1537,7 +1537,6 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const userId = req.user.uid;
       const accounts = await listIntegrations(userId);
       const isYoutubeConnected = accounts.some((a) => a.platform === "youtube");
-      const isTiktokConnected = accounts.some((a) => a.platform === "tiktok");
       let youtubeStats = { views: 0, subscribers: 0, videos: 0 };
       if (isYoutubeConnected) {
         const ytAccount = accounts.find((a) => a.platform === "youtube");
@@ -1577,9 +1576,6 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         }
       }
       let tiktokStats = { followers: 0, views: 0, likes: 0 };
-      if (isTiktokConnected) {
-        tiktokStats = { followers: 1240, views: 45e3, likes: 8900 };
-      }
       let publishedCount = 0;
       let scheduledCount = 0;
       let draftCount = 0;

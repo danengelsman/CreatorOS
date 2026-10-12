@@ -13,7 +13,6 @@ import {
   CaretRight as ChevronRight, 
   ShieldCheck,
   Terminal,
-  Play,
   Cpu,
   CircleNotch as Loader2,
   Database,
@@ -42,11 +41,6 @@ export default function SupportHub({ user }: { user: any }) {
   const [isCheckingDiagnostics, setIsCheckingDiagnostics] = useState(false);
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
 
-  // Playwright simulator states
-  const [playwrightLogs, setPlaywrightLogs] = useState<string[]>([]);
-  const [isTestingPlaywright, setIsTestingPlaywright] = useState(false);
-  const [testScenario, setTestScenario] = useState<'e2e' | 'auth' | 'ai'>('e2e');
-
   const runDiagnosticsCheck = async () => {
     setIsCheckingDiagnostics(true);
     setDiagnosticsError(null);
@@ -60,65 +54,6 @@ export default function SupportHub({ user }: { user: any }) {
     } finally {
       setIsCheckingDiagnostics(false);
     }
-  };
-
-  const runPlaywrightSimulation = async () => {
-    setIsTestingPlaywright(true);
-    setPlaywrightLogs([]);
-    
-    const scenarios = {
-      e2e: [
-        { text: '🚀 [PLAYWRIGHT] Initializing browser automation agent (chromium)...', delay: 350 },
-        { text: '🌐 [PLAYWRIGHT] Navigating to target environment: ' + (window.location.origin), delay: 500 },
-        { text: '🎯 [PLAYWRIGHT] Page load complete. Evaluating DOM tree structure...', delay: 400 },
-        { text: '🔍 [PLAYWRIGHT] Checking main layout containers: "header", "main", "footer"', delay: 350 },
-        { text: '✅ [PLAYWRIGHT] Page title contains matches "CreatorOS" successfully (82ms)', delay: 400 },
-        { text: '🖱️ [PLAYWRIGHT] Locating navigation tab: "Create" button', delay: 350 },
-        { text: '👉 [PLAYWRIGHT] Simulating click event on "Create" workspace icon...', delay: 400 },
-        { text: '📦 [PLAYWRIGHT] Verifying ContentStudio is mounted and input area is focusable...', delay: 500 },
-        { text: '✅ [PLAYWRIGHT] ContentStudio inputs and tone select fields are active', delay: 350 },
-        { text: '🖱️ [PLAYWRIGHT] Locating navigation tab: "Repurpose" button', delay: 300 },
-        { text: '👉 [PLAYWRIGHT] Simulating click event on "Repurpose" tab...', delay: 350 },
-        { text: '✅ [PLAYWRIGHT] ContentRepurposer view loaded correctly without console exceptions', delay: 350 },
-        { text: '🎉 [PLAYWRIGHT] All 12 automated navigation steps executed successfully!', delay: 400 },
-        { text: '⭐ [PLAYWRIGHT] E2E status: PASS (100% assertions satisfied in 4.9s)', delay: 200 }
-      ],
-      auth: [
-        { text: '🔐 [PLAYWRIGHT] Initializing secure authentication runner...', delay: 350 },
-        { text: '👤 [PLAYWRIGHT] Current Firebase User ID verified: ' + (user?.uid || 'anonymous'), delay: 400 },
-        { text: '📦 [PLAYWRIGHT] Fetching Firestore ID token...', delay: 400 },
-        { text: '💾 [PLAYWRIGHT] Testing local DB credentials handshake...', delay: 350 },
-        { text: '✅ [PLAYWRIGHT] Token signature matched and validated against Firebase Admin SDK', delay: 400 },
-        { text: '🛡️ [PLAYWRIGHT] Testing firestore.rules security boundaries...', delay: 500 },
-        { text: '🚫 [PLAYWRIGHT] Attempting unauthorized access to /users/other_user_id...', delay: 400 },
-        { text: '✅ [PLAYWRIGHT] Access correctly denied by Firestore rules engine (403 Forbidden)', delay: 350 },
-        { text: '🔓 [PLAYWRIGHT] Attempting authorized read to /users/' + (user?.uid), delay: 400 },
-        { text: '✅ [PLAYWRIGHT] Access granted successfully (200 OK)', delay: 350 },
-        { text: '🎉 [PLAYWRIGHT] Security and auth regression testing complete!', delay: 400 },
-        { text: '⭐ [PLAYWRIGHT] Authentication status: PASS (0 security vulnerabilities detected)', delay: 200 }
-      ],
-      ai: [
-        { text: '🧠 [PLAYWRIGHT] Starting AI generative model regression checks...', delay: 350 },
-        { text: '📡 [PLAYWRIGHT] Testing backend proxy endpoint: /api/gemini/generate...', delay: 500 },
-        { text: '🤖 [PLAYWRIGHT] Model defined: gemini-3.8-flash', delay: 300 },
-        { text: '💬 [PLAYWRIGHT] Sending payload: { contents: "respond with healthy" }...', delay: 400 },
-        { text: '⏳ [PLAYWRIGHT] Waiting for API gateway response...', delay: 550 },
-        { text: '✅ [PLAYWRIGHT] Gemini API response parsed successfully. Received: "healthy"', delay: 350 },
-        { text: '📈 [PLAYWRIGHT] Gemini API latency benchmark: ' + (diagnosticsData?.gemini?.latency || 450) + 'ms', delay: 350 },
-        { text: '🔍 [PLAYWRIGHT] Validating output mime-type: "application/json" structure compliance', delay: 400 },
-        { text: '✅ [PLAYWRIGHT] JSON properties "score" and "feedback" contain expected schemas', delay: 350 },
-        { text: '🚀 [PLAYWRIGHT] Testing transcription and video model states...', delay: 400 },
-        { text: '🎉 [PLAYWRIGHT] AI functional validations passed without degradation!', delay: 400 },
-        { text: '⭐ [PLAYWRIGHT] AI Engine status: PASS (Model pipeline is 100% operational)', delay: 200 }
-      ]
-    };
-
-    const currentScenario = scenarios[testScenario];
-    for (let i = 0; i < currentScenario.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, currentScenario[i].delay));
-      setPlaywrightLogs(prev => [...prev, currentScenario[i].text]);
-    }
-    setIsTestingPlaywright(false);
   };
 
   useEffect(() => {
@@ -243,7 +178,7 @@ export default function SupportHub({ user }: { user: any }) {
             )}
           >
             <Cpu size={16} />
-            Diagnostics & E2E Testing
+            Diagnostics
           </button>
         </div>
         <span className="px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] rounded text-[10px] font-black uppercase tracking-widest">
@@ -467,8 +402,8 @@ export default function SupportHub({ user }: { user: any }) {
                     <Database size={20} strokeWidth={1.5} />
                   </div>
                   <div>
-                    <h3 className="text-[14px] font-bold">SQLite Handshake</h3>
-                    <p className="text-[11px] text-[var(--label-secondary)]">Local structured persistence</p>
+                    <h3 className="text-[14px] font-bold">Firestore Handshake</h3>
+                    <p className="text-[11px] text-[var(--label-secondary)]">Live data persistence (F2)</p>
                   </div>
                 </div>
                 <div className="mt-6 flex items-center justify-between">
@@ -620,65 +555,64 @@ export default function SupportHub({ user }: { user: any }) {
                 </div>
               </div>
 
-              {/* Simulated Automated Playwright Testing Panel */}
+              {/* Build Information (F3.4): real version + commit metadata.
+                  The previous scripted "E2E simulator" (fake PASS logs, fake
+                  "no fake statuses") was removed — nothing misleading ships. */}
               <div className="lg:col-span-2 ios-card p-6 bg-[var(--bg-secondary)] border border-[var(--separator)] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Terminal size={18} className="text-[var(--accent)]" />
-                      <h3 className="text-[15px] font-serif font-bold">Playwright E2E Regression Simulator</h3>
+                      <h3 className="text-[15px] font-serif font-bold">Build Information</h3>
                     </div>
-                    {/* Scenario Picker */}
-                    <div className="flex items-center gap-2">
-                      <select 
-                        value={testScenario} 
-                        onChange={(e) => setTestScenario(e.target.value as any)}
-                        disabled={isTestingPlaywright}
-                        className="bg-[var(--bg-primary)] border border-[var(--separator)] rounded-lg p-1.5 text-xs outline-none"
-                      >
-                        <option value="e2e">E2E UI & Navigation Suite</option>
-                        <option value="auth">Security Rules & Handshake Suite</option>
-                        <option value="ai">AI Model Regression Suite</option>
-                      </select>
-                      <button
-                        onClick={runPlaywrightSimulation}
-                        disabled={isTestingPlaywright}
-                        className="ios-button ios-button-filled h-8 px-3 text-xs flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        {isTestingPlaywright ? (
-                          <>
-                            <Loader2 size={13} className="animate-spin" />
-                            Testing...
-                          </>
-                        ) : (
-                          <>
-                            <Play size={13} />
-                            Run Tests
-                          </>
-                        )}
-                      </button>
-                    </div>
+                    <a
+                      href="https://github.com/danengelsman/CreatorOS"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ios-button ios-button-gray h-8 px-3 text-xs flex items-center gap-1.5"
+                    >
+                      <Globe size={13} />
+                      View Source
+                    </a>
                   </div>
 
-                  {/* High-contrast Terminal Box */}
-                  <div className="bg-[#111] text-[#4af626] font-mono text-[12px] p-5 rounded-2xl border border-black min-h-[220px] max-h-[300px] overflow-y-auto shadow-inner leading-relaxed select-text flex flex-col gap-1 custom-scrollbar">
-                    {playwrightLogs.length === 0 ? (
-                      <div className="text-[#8e8e93] italic flex flex-col items-center justify-center h-full min-h-[180px] text-center">
-                        <Terminal size={32} className="mb-2 opacity-50" />
-                        <p>Select a scenario and click "Run Tests" to execute simulated browser validation checks.</p>
-                      </div>
-                    ) : (
-                      playwrightLogs.map((log, idx) => (
-                        <div key={idx} className="border-l border-green-500/30 pl-3 animate-fade-in whitespace-pre-wrap">
-                          {log}
-                        </div>
-                      ))
-                    )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-[var(--bg-primary)] rounded-xl border border-[var(--separator)] p-4">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[var(--label-tertiary)]">App Version</p>
+                      <p className="text-[15px] font-mono font-bold mt-1">{__APP_VERSION__ || 'development build'}</p>
+                    </div>
+                    <div className="bg-[var(--bg-primary)] rounded-xl border border-[var(--separator)] p-4">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[var(--label-tertiary)]">Git Commit</p>
+                      {__GIT_COMMIT__ ? (
+                        <a
+                          href={`https://github.com/danengelsman/CreatorOS/commit/${__GIT_COMMIT__}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[15px] font-mono font-bold mt-1 text-[var(--accent)] hover:underline inline-block"
+                        >
+                          {__GIT_COMMIT__}
+                        </a>
+                      ) : (
+                        <p className="text-[15px] font-mono font-bold mt-1">—</p>
+                      )}
+                    </div>
+                    <div className="bg-[var(--bg-primary)] rounded-xl border border-[var(--separator)] p-4 sm:col-span-2">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[var(--label-tertiary)]">Deployment</p>
+                      <a
+                        href="https://creator-os-delta-lilac.vercel.app"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[13px] font-mono font-bold mt-1 text-[var(--accent)] hover:underline break-all inline-block"
+                      >
+                        creator-os-delta-lilac.vercel.app
+                      </a>
+                      <p className="text-[11px] text-[var(--label-secondary)] mt-1">Hosted on Vercel</p>
+                    </div>
                   </div>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between text-[11px] text-[var(--label-tertiary)] flex-wrap gap-2 pt-4 border-t border-[var(--separator)]/50">
-                  <span>Status: {isTestingPlaywright ? 'EXECUTING AUTOMATED SUITE' : playwrightLogs.length > 0 ? 'INTEGRITY SUITE COMPLETE' : 'AWAITING STABILITY TRACE'}</span>
+                  <span>End-to-end tests run locally via Playwright (`npm run test:e2e`).</span>
                   <span>Assert Library: @playwright/test</span>
                 </div>
               </div>
