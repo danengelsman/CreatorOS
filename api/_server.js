@@ -1,96 +1,12 @@
 // server.ts
 import express from "express";
 import multer from "multer";
-
-// src/db.ts
-import Database from "better-sqlite3";
-var dbPath = process.env.VERCEL ? "/tmp/creator_os.db" : "creator_os.db";
-var db = new Database(dbPath);
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    email TEXT UNIQUE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS brands (
-    user_id TEXT PRIMARY KEY,
-    name TEXT,
-    tagline TEXT,
-    archetype TEXT,
-    personality TEXT,
-    colors TEXT, -- JSON string
-    typography TEXT, -- JSON string
-    visual_style TEXT,
-    thumbnail_style TEXT,
-    content_hooks TEXT, -- JSON string
-    catchphrases TEXT, -- JSON string
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS content (
-    id TEXT PRIMARY KEY,
-    user_id TEXT,
-    title TEXT,
-    body TEXT,
-    type TEXT, -- 'post', 'script', 'video'
-    platform TEXT, -- 'tiktok', 'instagram', 'youtube', 'linkedin', 'twitter'
-    status TEXT, -- 'draft', 'scheduled', 'published'
-    score INTEGER,
-    score_feedback TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    published_at DATETIME,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS analytics (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT,
-    date DATE DEFAULT CURRENT_DATE,
-    followers INTEGER DEFAULT 0,
-    impressions INTEGER DEFAULT 0,
-    engagement INTEGER DEFAULT 0,
-    revenue_est REAL DEFAULT 0,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS streaks (
-    user_id TEXT PRIMARY KEY,
-    current_streak INTEGER DEFAULT 0,
-    longest_streak INTEGER DEFAULT 0,
-    last_publish_date DATE,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS challenges (
-    user_id TEXT PRIMARY KEY,
-    day_number INTEGER DEFAULT 1,
-    stage TEXT DEFAULT 'idea_discovery', -- 'idea_discovery', 'writing', 'publishing', 'growth', 'monetization'
-    completed_days TEXT, -- JSON array of completed day numbers
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS user_accounts (
-    user_id TEXT,
-    platform TEXT, -- 'youtube', 'tiktok', etc.
-    access_token TEXT,
-    refresh_token TEXT,
-    expiry_date INTEGER,
-    profile_data TEXT, -- JSON string
-    PRIMARY KEY (user_id, platform),
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-`);
-var db_default = db;
-
-// server.ts
-import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import fs from "fs";
 import { google } from "googleapis";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
-import admin2 from "firebase-admin";
+import admin4 from "firebase-admin";
 import axios from "axios";
 
 // src/server/oauth-state.ts
@@ -268,7 +184,77 @@ function decryptToken(serialized, legacy) {
   }
 }
 
+// src/server/firestore.ts
+import admin2 from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
+var INTEGRATIONS_COLLECTION = "integrations";
+function serverFirestore() {
+  if (admin2.apps.length === 0) {
+    throw new Error("Firebase admin not initialized \u2014 cannot access Firestore");
+  }
+  return admin2.firestore();
+}
+var _projectsDbs = /* @__PURE__ */ new Map();
+function projectsFirestore(databaseId) {
+  let instance = _projectsDbs.get(databaseId);
+  if (!instance) {
+    if (admin2.apps.length === 0) {
+      throw new Error("Firebase admin not initialized \u2014 cannot access Firestore");
+    }
+    instance = getFirestore(admin2.app(), databaseId);
+    _projectsDbs.set(databaseId, instance);
+  }
+  return instance;
+}
+function integrationDocId(uid, platform) {
+  return `${uid}_${platform}`;
+}
+function integrationCol() {
+  return serverFirestore().collection(INTEGRATIONS_COLLECTION);
+}
+function rowFromDoc(id, data) {
+  return {
+    platform: typeof data?.platform === "string" ? data.platform : id.slice(id.lastIndexOf("_") + 1),
+    access_token: typeof data?.access_token === "string" ? data.access_token : null,
+    refresh_token: typeof data?.refresh_token === "string" ? data.refresh_token : null,
+    expiry_date: typeof data?.expiry_date === "number" ? data.expiry_date : null,
+    profile_data: typeof data?.profile_data === "string" ? data.profile_data : null,
+    updated_at: typeof data?.updated_at === "string" ? data.updated_at : ""
+  };
+}
+async function upsertIntegration(input) {
+  const ref = integrationCol().doc(integrationDocId(input.uid, input.platform));
+  await ref.set({
+    uid: input.uid,
+    platform: input.platform,
+    access_token: input.access_token ?? null,
+    refresh_token: input.refresh_token ?? null,
+    expiry_date: typeof input.expiry_date === "number" ? input.expiry_date : null,
+    profile_data: input.profile_data ?? null,
+    updated_at: (/* @__PURE__ */ new Date()).toISOString()
+  }, { merge: true });
+}
+async function updateIntegrationFields(uid, platform, patch) {
+  const ref = integrationCol().doc(integrationDocId(uid, platform));
+  await ref.set({ ...patch, updated_at: (/* @__PURE__ */ new Date()).toISOString() }, { merge: true });
+}
+async function getIntegration(uid, platform) {
+  const snap = await integrationCol().doc(integrationDocId(uid, platform)).get();
+  if (!snap.exists) return null;
+  return rowFromDoc(snap.id, snap.data());
+}
+async function listIntegrations(uid) {
+  const snap = await integrationCol().where("uid", "==", uid).get();
+  const rows = [];
+  snap.forEach((doc) => rows.push(rowFromDoc(doc.id, doc.data())));
+  return rows;
+}
+async function firestorePing() {
+  await integrationCol().doc("_health_ping").get();
+}
+
 // src/server/quotaLedger.ts
+import admin3 from "firebase-admin";
 var DAILY_BUDGET_DEFAULT = 25e4;
 var ROUTE_COST_ESTIMATES = {
   "/api/gemini/generate": 4e3,
@@ -295,100 +281,141 @@ function msUntilLocalMidnight(now = /* @__PURE__ */ new Date()) {
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
   return Math.max(1, tomorrow.getTime() - now.getTime());
 }
+function quotaDocIdFor(uid, now = /* @__PURE__ */ new Date()) {
+  const k = dayKeyFor(now);
+  const compact = `${k.slice(0, 4)}${k.slice(5, 7)}${k.slice(8, 10)}`;
+  return `${uid}_${compact}`;
+}
 var QuotaLedger = class {
   constructor(deps) {
-    this.db = deps.db;
     this.getDailyBudget = deps.getDailyBudget ?? (() => {
       const raw = Number(process.env.DAILY_AI_BUDGET_TOKENS);
       return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DAILY_BUDGET_DEFAULT;
     });
     this.nowFn = deps.now ?? (() => /* @__PURE__ */ new Date());
-    this.ensureSchema();
+    this.store = deps.firestore ? new FirestoreQuotaStore(deps.firestore) : null;
   }
-  ensureSchema() {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS ai_usage_ledger (
-        user_id TEXT NOT NULL,
-        day TEXT NOT NULL,
-        route TEXT NOT NULL,
-        calls INTEGER NOT NULL DEFAULT 0,
-        tokens INTEGER NOT NULL DEFAULT 0,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (user_id, day, route)
-      );
-      CREATE INDEX IF NOT EXISTS idx_ai_usage_ledger_user_day
-        ON ai_usage_ledger (user_id, day);
-    `);
+  getStore() {
+    if (!this.store) this.store = defaultStore();
+    return this.store;
   }
-  usedToday(userId) {
-    try {
-      const day = dayKeyFor(this.nowFn());
-      const row = this.db.prepare("SELECT COALESCE(SUM(tokens), 0) AS total FROM ai_usage_ledger WHERE user_id = ? AND day = ?").get(userId, day);
-      return Number(row?.total || 0);
-    } catch {
-      return 0;
-    }
+  /** Sum of tokens used today. Store failures propagate to the caller. */
+  async usedToday(userId) {
+    return this.getStore().readUsedToday(userId, this.nowFn());
   }
-  check(userId) {
+  /**
+   * Gate check used by quotaGuardMiddleware. Fail-closed: on any store error
+   * the user is reported NOT allowed with the usedToday = -1 sentinel.
+   */
+  async check(userId) {
     const dailyBudget = this.getDailyBudget();
-    let usedToday = 0;
+    const now = this.nowFn();
+    const retryAfterSeconds = Math.ceil(msUntilLocalMidnight(now) / 1e3);
     try {
-      usedToday = this.usedToday(userId);
-    } catch {
-      usedToday = 0;
+      const usedToday = await this.getStore().readUsedToday(userId, now);
+      return { allowed: usedToday < dailyBudget, usedToday, dailyBudget, retryAfterSeconds };
+    } catch (err) {
+      console.error("quota ledger read failed (fail-closed):", err);
+      return { allowed: false, usedToday: -1, dailyBudget, retryAfterSeconds };
     }
-    const allowed = usedToday < dailyBudget;
-    return {
-      allowed,
-      usedToday,
-      dailyBudget,
-      retryAfterSeconds: Math.ceil(msUntilLocalMidnight(this.nowFn()) / 1e3)
-    };
   }
   /**
    * Debit the ledger. `tokens` may come from real Gemini usageMetadata or the
-   * per-route estimate. Best-effort: swallows its own errors (fail-open).
+   * per-route estimate. Transactional create-or-increment in Firestore.
+   * Best-effort: swallows its own errors (fail-open).
    */
   record(userId, route, tokens) {
-    try {
-      const safeTokens = Math.max(0, Math.min(Math.floor(Number(tokens) || 0), 5e6));
-      const day = dayKeyFor(this.nowFn());
-      this.db.prepare(`
-          INSERT INTO ai_usage_ledger (user_id, day, route, calls, tokens, updated_at)
-          VALUES (?, ?, ?, 1, ?, CURRENT_TIMESTAMP)
-          ON CONFLICT(user_id, day, route) DO UPDATE SET
-            calls = calls + 1,
-            tokens = tokens + excluded.tokens,
-            updated_at = CURRENT_TIMESTAMP
-        `).run(userId, day, route, safeTokens);
-    } catch (err) {
-      console.error("quota ledger record failed (fail-open):", err);
-    }
+    const safeTokens = Math.max(0, Math.min(Math.floor(Number(tokens) || 0), 5e6));
+    const day = dayKeyFor(this.nowFn());
+    this.getStore().increment(userId, day, route, safeTokens).catch((err) => console.error("quota ledger record failed (fail-open):", err));
   }
-  /** Admin/diagnostics snapshot for one user. */
-  snapshot(userId) {
+  /** Admin/diagnostics snapshot for one user (today), tokens-descending. */
+  async snapshot(userId) {
     try {
-      const day = dayKeyFor(this.nowFn());
-      return this.db.prepare("SELECT route, calls, tokens FROM ai_usage_ledger WHERE user_id = ? AND day = ? ORDER BY tokens DESC").all(userId, day);
+      const doc = await this.getStore().readDoc(userId, this.nowFn());
+      return Object.entries(doc?.routes || {}).map(([route, row]) => ({ route, calls: row.calls, tokens: row.tokens })).sort((a, b) => b.tokens - a.tokens);
     } catch {
       return [];
     }
   }
 };
+var FirestoreQuotaStore = class {
+  constructor(firestore) {
+    this.firestore = firestore;
+  }
+  col() {
+    return this.firestore.collection("ai_quota");
+  }
+  async readDoc(userId, now) {
+    const snap = await this.col().doc(quotaDocIdFor(userId, now)).get();
+    if (!snap || !snap.exists) return null;
+    return normalizeQuotaDoc(userId, dayKeyFor(now), snap.data());
+  }
+  async readUsedToday(userId, now) {
+    const doc = await this.readDoc(userId, now);
+    return doc ? doc.usedToday : 0;
+  }
+  async increment(userId, day, route, tokens) {
+    const ref = this.col().doc(quotaDocIdFor(userId, /* @__PURE__ */ new Date()));
+    await this.firestore.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap || !snap.exists) {
+        tx.set(ref, {
+          uid: userId,
+          day,
+          usedToday: tokens,
+          routes: { [route]: { calls: 1, tokens } },
+          updated_at: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        return;
+      }
+      const doc = normalizeQuotaDoc(userId, day, snap.data());
+      const row = doc.routes[route] || { calls: 0, tokens: 0 };
+      const routes = { ...doc.routes };
+      routes[route] = { calls: row.calls + 1, tokens: row.tokens + tokens };
+      const usedToday = Object.values(routes).reduce((a, r) => a + r.tokens, 0);
+      tx.update(ref, { usedToday, routes, updated_at: (/* @__PURE__ */ new Date()).toISOString() });
+    });
+  }
+};
+function normalizeQuotaDoc(uid, day, data) {
+  const routes = {};
+  const raw = data?.routes && typeof data.routes === "object" ? data.routes : {};
+  for (const [route, row] of Object.entries(raw)) {
+    routes[route] = { calls: Number(row?.calls) || 0, tokens: Number(row?.tokens) || 0 };
+  }
+  const summed = Object.values(routes).reduce((a, r) => a + r.tokens, 0);
+  const used = Number(data?.usedToday);
+  return {
+    uid: typeof data?.uid === "string" ? data.uid : uid,
+    day: typeof data?.day === "string" ? data.day : day,
+    usedToday: Number.isFinite(used) ? used : summed,
+    routes,
+    updated_at: typeof data?.updated_at === "string" ? data.updated_at : ""
+  };
+}
+function defaultStore() {
+  if (admin3.apps.length === 0) {
+    throw new Error("Firebase admin not initialized \u2014 quota ledger unavailable");
+  }
+  return new FirestoreQuotaStore(admin3.firestore());
+}
 function quotaGuardMiddleware(ledger) {
-  return function quotaGuard(req, res, next) {
+  return async function quotaGuard(req, res, next) {
     const uid = req.user?.uid;
     if (!uid) return next();
-    const check = ledger.check(uid);
+    const check = await ledger.check(uid);
     res.setHeader("X-Quota-Limit", String(check.dailyBudget));
-    res.setHeader("X-Quota-Used", String(check.usedToday));
+    res.setHeader("X-Quota-Used", check.usedToday >= 0 ? String(check.usedToday) : "unknown");
     if (!check.allowed) {
       res.setHeader("Retry-After", String(check.retryAfterSeconds));
+      const overBudget = check.usedToday >= 0;
       return res.status(429).json({
-        error: "Daily AI quota exhausted. Your allowance resets at midnight.",
+        error: overBudget ? "Daily AI quota exhausted. Your allowance resets at midnight." : "Daily AI quota check temporarily unavailable. Please retry shortly.",
         retryAfterSeconds: check.retryAfterSeconds,
-        usedToday: check.usedToday,
-        dailyBudget: check.dailyBudget
+        usedToday: overBudget ? check.usedToday : 0,
+        dailyBudget: check.dailyBudget,
+        ...overBudget ? {} : { reason: "quota_store_unavailable" }
       });
     }
     next();
@@ -472,9 +499,9 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const svc = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8"));
-    admin2.initializeApp({ credential: admin2.credential.cert(svc), projectId });
+    admin4.initializeApp({ credential: admin4.credential.cert(svc), projectId });
   } else {
-    admin2.initializeApp({ projectId });
+    admin4.initializeApp({ projectId });
   }
 } catch (e) {
   console.error("admin init failed:", e);
@@ -537,12 +564,8 @@ async function startServer() {
     }
     const token = authHeader.split("Bearer ")[1];
     try {
-      const decodedToken = await admin2.auth().verifyIdToken(token);
+      const decodedToken = await admin4.auth().verifyIdToken(token);
       req.user = decodedToken;
-      const userExists = db_default.prepare("SELECT id FROM users WHERE id = ?").get(decodedToken.uid);
-      if (!userExists) {
-        db_default.prepare("INSERT INTO users (id, email) VALUES (?, ?)").run(decodedToken.uid, decodedToken.email);
-      }
       next();
     } catch (error) {
       console.error("Auth Error:", error);
@@ -604,7 +627,7 @@ async function startServer() {
       return false;
     }
   }
-  const quotaLedger = new QuotaLedger({ db: db_default });
+  const quotaLedger = new QuotaLedger({ firestore: serverFirestore() });
   const quotaGuard = quotaGuardMiddleware(quotaLedger);
   const protectAIRoute = async (req, res, next) => {
     const route = req.path;
@@ -615,7 +638,7 @@ async function startServer() {
     const token = authHeader.slice("Bearer ".length).trim();
     if (!token) return res.status(401).json({ error: "Authentication required" });
     try {
-      const decodedToken = await admin2.auth().verifyIdToken(token);
+      const decodedToken = await admin4.auth().verifyIdToken(token);
       req.user = decodedToken;
       const rate = consumeRateLimit(decodedToken.uid, route);
       res.setHeader("X-RateLimit-Limit", String(AI_RATE_LIMITS[route] ?? AI_DEFAULT_LIMIT));
@@ -652,55 +675,6 @@ async function startServer() {
     } catch {
     }
   };
-  app.get("/api/user", authenticateUser, (req, res) => {
-    const user = db_default.prepare("SELECT * FROM users WHERE id = ?").get(req.user.uid);
-    res.json(user);
-  });
-  app.get("/api/brand", authenticateUser, (req, res) => {
-    const brand = db_default.prepare("SELECT * FROM brands WHERE user_id = ?").get(req.user.uid);
-    res.json(brand || null);
-  });
-  app.post("/api/brand", authenticateUser, (req, res) => {
-    const { name, tagline, archetype, personality, colors, typography, visual_style, thumbnail_style, content_hooks, catchphrases } = req.body;
-    const existing = db_default.prepare("SELECT user_id FROM brands WHERE user_id = ?").get(req.user.uid);
-    if (existing) {
-      db_default.prepare(`
-        UPDATE brands SET 
-          name = ?, tagline = ?, archetype = ?, personality = ?, 
-          colors = ?, typography = ?, visual_style = ?, 
-          thumbnail_style = ?, content_hooks = ?, catchphrases = ?
-        WHERE user_id = ?
-      `).run(name, tagline, archetype, personality, JSON.stringify(colors), JSON.stringify(typography), visual_style, thumbnail_style, JSON.stringify(content_hooks), JSON.stringify(catchphrases), req.user.uid);
-    } else {
-      db_default.prepare(`
-        INSERT INTO brands (user_id, name, tagline, archetype, personality, colors, typography, visual_style, thumbnail_style, content_hooks, catchphrases)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(req.user.uid, name, tagline, archetype, personality, JSON.stringify(colors), JSON.stringify(typography), visual_style, thumbnail_style, JSON.stringify(content_hooks), JSON.stringify(catchphrases));
-    }
-    res.json({ success: true });
-  });
-  app.get("/api/content", authenticateUser, (req, res) => {
-    const content = db_default.prepare("SELECT * FROM content WHERE user_id = ? ORDER BY created_at DESC").all(req.user.uid);
-    res.json(content);
-  });
-  app.post("/api/content", authenticateUser, (req, res) => {
-    const { title, body, type, platform, score, score_feedback } = req.body;
-    const id = uuidv4();
-    db_default.prepare(`
-      INSERT INTO content (id, user_id, title, body, type, platform, status, score, score_feedback)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, req.user.uid, title, body, type, platform, "draft", score, score_feedback);
-    res.json({ id });
-  });
-  app.get("/api/analytics", authenticateUser, (req, res) => {
-    const analytics = db_default.prepare("SELECT * FROM analytics WHERE user_id = ? ORDER BY date ASC").all(req.user.uid);
-    res.json(analytics);
-  });
-  app.get("/api/habits", authenticateUser, (req, res) => {
-    const streak = db_default.prepare("SELECT * FROM streaks WHERE user_id = ?").get(req.user.uid);
-    const challenge = db_default.prepare("SELECT * FROM challenges WHERE user_id = ?").get(req.user.uid);
-    res.json({ streak, challenge });
-  });
   let _ai = null;
   const getAI = async () => {
     if (!_ai) {
@@ -1339,33 +1313,14 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const userInfo = await oauth2.userinfo.get();
       const encAccessToken = tokens.access_token ? encryptToken(tokens.access_token) : null;
       const encRefreshToken = tokens.refresh_token ? encryptToken(tokens.refresh_token) : null;
-      const existing = db_default.prepare("SELECT user_id FROM user_accounts WHERE user_id = ? AND platform = ?").get(userId, "youtube");
-      if (existing) {
-        db_default.prepare(`
-          UPDATE user_accounts SET 
-            access_token = ?, refresh_token = ?, expiry_date = ?, profile_data = ?
-          WHERE user_id = ? AND platform = ?
-        `).run(
-          encAccessToken,
-          encRefreshToken,
-          tokens.expiry_date,
-          JSON.stringify(userInfo.data),
-          userId,
-          "youtube"
-        );
-      } else {
-        db_default.prepare(`
-          INSERT INTO user_accounts (user_id, platform, access_token, refresh_token, expiry_date, profile_data)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `).run(
-          userId,
-          "youtube",
-          encAccessToken,
-          encRefreshToken,
-          tokens.expiry_date,
-          JSON.stringify(userInfo.data)
-        );
-      }
+      await upsertIntegration({
+        uid: userId,
+        platform: "youtube",
+        access_token: encAccessToken,
+        refresh_token: encRefreshToken,
+        expiry_date: typeof tokens.expiry_date === "number" ? tokens.expiry_date : null,
+        profile_data: JSON.stringify(userInfo.data)
+      });
       res.send(`
         <html>
           <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #F9F9F8;">
@@ -1422,19 +1377,14 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const { access_token, refresh_token, expires_in, open_id } = response.data;
       const encAccessToken = access_token ? encryptToken(access_token) : null;
       const encRefreshToken = refresh_token ? encryptToken(refresh_token) : null;
-      const existing = db_default.prepare("SELECT user_id FROM user_accounts WHERE user_id = ? AND platform = ?").get(userId, "tiktok");
-      if (existing) {
-        db_default.prepare(`
-          UPDATE user_accounts SET 
-            access_token = ?, refresh_token = ?, expiry_date = ?, profile_data = ?
-          WHERE user_id = ? AND platform = ?
-        `).run(encAccessToken, encRefreshToken, Date.now() + expires_in * 1e3, JSON.stringify({ open_id }), userId, "tiktok");
-      } else {
-        db_default.prepare(`
-          INSERT INTO user_accounts (user_id, platform, access_token, refresh_token, expiry_date, profile_data)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `).run(userId, "tiktok", encAccessToken, encRefreshToken, Date.now() + expires_in * 1e3, JSON.stringify({ open_id }));
-      }
+      await upsertIntegration({
+        uid: userId,
+        platform: "tiktok",
+        access_token: encAccessToken,
+        refresh_token: encRefreshToken,
+        expiry_date: Date.now() + expires_in * 1e3,
+        profile_data: JSON.stringify({ open_id })
+      });
       res.send(`
         <html>
           <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #F9F9F8;">
@@ -1456,12 +1406,17 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       res.status(500).send("TikTok Authentication failed");
     }
   });
-  app.get("/api/accounts", authenticateUser, (req, res) => {
-    const accounts = db_default.prepare("SELECT platform, profile_data FROM user_accounts WHERE user_id = ?").all(req.user.uid);
-    res.json(accounts.map((a) => ({
-      platform: a.platform,
-      profile: JSON.parse(a.profile_data)
-    })));
+  app.get("/api/accounts", authenticateUser, async (req, res) => {
+    try {
+      const accounts = await listIntegrations(req.user.uid);
+      res.json(accounts.map((a) => ({
+        platform: a.platform,
+        profile: JSON.parse(a.profile_data || "{}")
+      })));
+    } catch (err) {
+      console.error("Accounts API Error:", err);
+      res.status(500).json({ error: err.message || "Failed to list connected accounts" });
+    }
   });
   app.post("/api/publish", authenticateUser, async (req, res) => {
     const { title, body, platforms } = req.body;
@@ -1470,11 +1425,14 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
     try {
       const results = {};
-      const accounts = db_default.prepare("SELECT platform, access_token, profile_data FROM user_accounts WHERE user_id = ?").all(req.user.uid).map((a) => ({
-        ...a,
+      const accounts = (await listIntegrations(req.user.uid)).map((a) => ({
+        platform: a.platform,
+        profile_data: a.profile_data,
         // F1.4 — decrypt at rest tokens (legacy plaintext passes through + upgrades)
         access_token: decryptToken(a.access_token, {
-          update: (enc) => db_default.prepare("UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?").run(enc, req.user.uid, a.platform)
+          update: (enc) => {
+            void updateIntegrationFields(req.user.uid, a.platform, { access_token: enc });
+          }
         })
       }));
       for (const platform of platforms) {
@@ -1529,7 +1487,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
   app.get("/api/analytics/youtube", authenticateUser, async (req, res) => {
-    const account = db_default.prepare("SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?").get(req.user.uid, "youtube");
+    const account = await getIntegration(req.user.uid, "youtube");
     if (!account) return res.json({ views: 0, subscribers: 0, videos: 0 });
     try {
       const auth = new google.auth.OAuth2(
@@ -1538,12 +1496,16 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       );
       auth.setCredentials({
         access_token: decryptToken(account.access_token, {
-          update: (enc) => db_default.prepare("UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?").run(enc, req.user.uid, "youtube")
+          update: (enc) => {
+            void updateIntegrationFields(req.user.uid, "youtube", { access_token: enc });
+          }
         }),
         refresh_token: decryptToken(account.refresh_token, {
-          update: (enc) => db_default.prepare("UPDATE user_accounts SET refresh_token = ? WHERE user_id = ? AND platform = ?").run(enc, req.user.uid, "youtube")
+          update: (enc) => {
+            void updateIntegrationFields(req.user.uid, "youtube", { refresh_token: enc });
+          }
         }),
-        expiry_date: account.expiry_date
+        expiry_date: account.expiry_date ?? void 0
       });
       const youtube = google.youtube({ version: "v3", auth });
       const response = await youtube.channels.list({
@@ -1562,7 +1524,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
   app.get("/api/analytics/tiktok", authenticateUser, async (req, res) => {
-    const account = db_default.prepare("SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?").get(req.user.uid, "tiktok");
+    const account = await getIntegration(req.user.uid, "tiktok");
     if (!account) return res.json({ followers: 0, views: 0, likes: 0 });
     res.json({
       followers: 1240,
@@ -1573,12 +1535,12 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   app.get("/api/analytics/summary", authenticateUser, async (req, res) => {
     try {
       const userId = req.user.uid;
-      const accounts = db_default.prepare("SELECT platform, profile_data FROM user_accounts WHERE user_id = ?").all(userId);
+      const accounts = await listIntegrations(userId);
       const isYoutubeConnected = accounts.some((a) => a.platform === "youtube");
       const isTiktokConnected = accounts.some((a) => a.platform === "tiktok");
       let youtubeStats = { views: 0, subscribers: 0, videos: 0 };
       if (isYoutubeConnected) {
-        const ytAccount = db_default.prepare("SELECT * FROM user_accounts WHERE user_id = ? AND platform = ?").get(userId, "youtube");
+        const ytAccount = accounts.find((a) => a.platform === "youtube");
         if (ytAccount) {
           try {
             const auth = new google.auth.OAuth2(
@@ -1587,12 +1549,16 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
             );
             auth.setCredentials({
               access_token: decryptToken(ytAccount.access_token, {
-                update: (enc) => db_default.prepare("UPDATE user_accounts SET access_token = ? WHERE user_id = ? AND platform = ?").run(enc, userId, "youtube")
+                update: (enc) => {
+                  void updateIntegrationFields(userId, "youtube", { access_token: enc });
+                }
               }),
               refresh_token: decryptToken(ytAccount.refresh_token, {
-                update: (enc) => db_default.prepare("UPDATE user_accounts SET refresh_token = ? WHERE user_id = ? AND platform = ?").run(enc, userId, "youtube")
+                update: (enc) => {
+                  void updateIntegrationFields(userId, "youtube", { refresh_token: enc });
+                }
               }),
-              expiry_date: ytAccount.expiry_date
+              expiry_date: ytAccount.expiry_date ?? void 0
             });
             const youtube = google.youtube({ version: "v3", auth });
             const response = await youtube.channels.list({
@@ -1619,69 +1585,30 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       let draftCount = 0;
       let grandTotal = 0;
       try {
-        const token = req.headers.authorization?.split("Bearer ")[1];
-        if (token) {
-          const dbId = firestoreDbId || "(default)";
-          const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery`;
-          const runQueryBody = {
-            structuredQuery: {
-              from: [{ collectionId: "projects" }],
-              where: {
-                fieldFilter: {
-                  field: { fieldPath: "userId" },
-                  op: "EQUAL",
-                  value: { stringValue: userId }
-                }
-              }
-            }
-          };
-          const response = await axios.post(url, runQueryBody, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json"
-            }
-          });
-          if (Array.isArray(response.data)) {
-            const docs = response.data.filter((item) => item.document);
-            grandTotal = docs.length;
-            docs.forEach((item) => {
-              const fields = item.document.fields || {};
-              const statusVal = fields.status?.stringValue || fields.data?.mapValue?.fields?.status?.stringValue || "Draft";
-              const status = statusVal.toLowerCase();
-              if (status === "published") {
-                publishedCount++;
-              } else if (status === "scheduled") {
-                scheduledCount++;
-              } else {
-                draftCount++;
-              }
-            });
+        const projectsDb = projectsFirestore(firestoreDbId || "(default)");
+        const snap = await projectsDb.collection("projects").where("userId", "==", userId).get();
+        snap.forEach((doc) => {
+          if (doc.id.startsWith("brand_")) return;
+          const data = doc.data() || {};
+          const statusVal = String(data.status || "Draft");
+          const status = statusVal.toLowerCase();
+          if (status === "published") {
+            publishedCount++;
+          } else if (status === "scheduled") {
+            scheduledCount++;
+          } else {
+            draftCount++;
           }
-        } else {
-          throw new Error("No user token provided for Firestore request");
-        }
+        });
+        grandTotal = publishedCount + scheduledCount + draftCount;
       } catch (err) {
-        console.error("Firestore REST project query error in summary:", err?.response?.data || err?.message || err);
-        try {
-          const localDrafts = db_default.prepare("SELECT COUNT(*) as count FROM content WHERE user_id = ? AND status = 'draft'").get(userId);
-          const localScheduled = db_default.prepare("SELECT COUNT(*) as count FROM content WHERE user_id = ? AND status = 'scheduled'").get(userId);
-          const localPublished = db_default.prepare("SELECT COUNT(*) as count FROM content WHERE user_id = ? AND status = 'published'").get(userId);
-          draftCount = localDrafts?.count || 0;
-          scheduledCount = localScheduled?.count || 0;
-          publishedCount = localPublished?.count || 0;
-          grandTotal = draftCount + scheduledCount + publishedCount;
-          console.log("Resiliently fell back to local SQLite content counts:", { draftCount, scheduledCount, publishedCount });
-        } catch (sqliteErr) {
-          console.error("Failed sqlite fallback:", sqliteErr);
-        }
+        console.error("Firestore projects aggregation failed in summary:", err?.response?.data || err?.message || err);
       }
-      const brand = db_default.prepare("SELECT * FROM brands WHERE user_id = ?").get(userId);
-      const isBrandKitComplete = !!brand;
       const totalFollowers = youtubeStats.subscribers + tiktokStats.followers;
       const totalViews = youtubeStats.views + tiktokStats.views;
       const totalLikes = tiktokStats.likes;
       const engagementRate = totalViews > 0 ? parseFloat((totalLikes / totalViews * 100).toFixed(2)) : 0;
-      const milestoneBrandKit = isBrandKitComplete;
+      const milestoneBrandKit = false;
       const milestonePostsPublished = publishedCount >= 5;
       const milestoneFollowersReached = totalFollowers >= 100;
       let completedMilestones = 0;
@@ -1709,7 +1636,6 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           totalFollowers,
           totalViews,
           totalRevenue,
-          isBrandKitComplete,
           goalsCompletionPercentage,
           milestones: {
             brandKit: milestoneBrandKit,
@@ -1750,7 +1676,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     };
     try {
       const start = Date.now();
-      db_default.prepare("SELECT 1").get();
+      await firestorePing();
       checks.database.status = "healthy";
       checks.database.latency = Date.now() - start;
     } catch (err) {
@@ -1758,7 +1684,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       checks.database.error = err.message;
     }
     try {
-      if (admin2.apps.length > 0) {
+      if (admin4.apps.length > 0) {
         checks.firebase.status = "healthy";
       } else {
         checks.firebase.status = "unhealthy";
