@@ -1,26 +1,53 @@
 # CreatorOS — Project State & Handoff
 
-**Updated:** 2026-10-04 · **Purpose:** lossless handoff for any fresh conversation. Read this plus `PRODUCTION_READINESS_PLAN.md` before doing anything.
+**Updated:** 2026-10-12 · **Purpose:** lossless handoff for any fresh conversation. Read this plus `PRODUCTION_READINESS_PLAN.md` before doing anything.
 
 ## Repo state
-- Path: `C:\Users\ADMIN\Documents\CreatorOS_Repo` · branch `main` @ `dbcf30d` — clean, in sync with origin (`github.com/danengelsman/CreatorOS`)
+- Path: `C:\Users\ADMIN\Documents\CreatorOS_Repo` · branch `main` @ `5827564` — clean, in sync with origin (`github.com/danengelsman/CreatorOS`)
 - Git identity fixed (repo-local + global): `Daniel Engelsman <danengelsman@gmail.com>` — OpenClaw commits now attribute correctly
 - History rewrite (2026-10-03): all 51 commits on `main` are Daniel as author+committer; content verified byte-identical (tree `b6bbdb47…`)
 - **Safety backup:** `C:\Users\ADMIN\Documents\CreatorOS_Repo_backup_pre-rewrite_20261003.bundle` (full pre-rewrite history). Delete after ~2 stable weeks in production.
+- Phase-3 work was done in a second worktree: `C:\Users\ADMIN\Documents\CreatorOS_wt_honesty` (branch `week3-fabricated-data`, squash-merged via PR #3)
 
 ## Open items
 1. ~~**D0 / F0.1:** remote branch `vercel/install-vercel-speed-insights-k29xze`~~ **DONE 2026-10-04:** rebuilt on current main (cherry-picked bot commit, force-pushed). Old tip was `af7537a`; new tip `c4c151c` — branch history now 52 Daniel + 1 Vercel, no Mick lineage.
 2. ~~Untracked in workspace: `APP_EVALUATION.md`, `PRODUCTION_READINESS_PLAN.md`, this file~~ **DONE 2026-10-04:** committed. `UIUX_FORK_BRIEF.md` intentionally left untracked (design decision pending). `.zwork/` + `.hermes/` gitignored.
+3. **Admin claim migration pending:** run `npx tsx scripts/set-admin-claim.ts <uid>` once, then Dan signs out/in — until then admin-gated Firestore paths (user delete, support ticket admin updates, app_logs read) deny for him.
+4. `ARCHITECTURE.md` in the main worktree is untracked — commit it or delete it.
 
 ## Week 1 executed (2026-10-04, commit `785c211`)
 - **F1.1 DONE** — intrinsic route security in server.ts: `protectAIRoute` (auth + per-user/route rate limits + model allowlist + 50MB upload cap + googleapis URI allowlist) on all 7 AI routes. Verified live: unauth → 401, garbage token → 401, evil origin → 403.
 - **F1.2 DONE** — production boot exits 1 on missing GEMINI_API_KEY / APP_URL / FIREBASE_SERVICE_ACCOUNT (verified). **Requires `FIREBASE_SERVICE_ACCOUNT` (base64 service-account JSON) in Vercel env vars — if the deployed API returns 500 "Server failed to start", that env var is missing.**
-- **F1.6 DONE** — debug leak removed; /test rule deleted; admin = custom claim `admin:true` (run `npx tsx scripts/set-admin-claim.ts <uid>` once, then Dan signs out/in); CORS scoped to /api; security headers in vercel.json.
+- **F1.6 DONE** — debug leak removed; /test rule deleted; admin = custom claim `admin:true`; CORS scoped to /api; security headers in vercel.json.
 - **F0.3 DONE** — bun.lock deleted, version 0.1.0-beta, dead buildCommand removed.
-- **F0.4 DONE** — `npm run check:artifact` gate works (verified stale→fresh cycle).
+- **F0.4 DONE** — `npm run check:artifact` gate works (verified stale→fresh cycle). Note: the gate diffs worktree vs index — it passes only after the regenerated `api/_server.js` is staged/committed.
 - **F0.2 DONE** — dead scripts → scripts/archive/, probes → scripts/probes/ (README warns they hit live services), tsconfig excludes scripts/.
 - **PREREQ for deploy:** Vercel env must include FIREBASE_SERVICE_ACCOUNT + GEMINI_API_KEY + APP_URL (fail-fast boot). google/TikTok client keys warn-only.
-- **Admin claim migration pending:** firestore.rules now require `admin:true` claim — until Dan runs set-admin-claim.ts and re-logs-in, admin-gated Firestore paths (user delete, support ticket admin updates, app_logs read) deny for him.
+
+## Week 2 executed (commits `597b40f`…`348acb3`, merged to main 2026-10-05..10-12)
+- **F1.3 DONE** — OAuth state HMAC: single-use, 10-min TTL, replay-rejected (`833817e`).
+- **F1.4 DONE** — AES-256-GCM token encryption at rest with lazy re-encrypt on read, crash-guarded (`833817e`, `f25cb83`).
+- **F1.5 DONE** — per-user daily AI quota ledger (Firestore `ai_quota`), 429 + retryAfter (`525d63d`).
+- **F1.7 DONE** — unified authenticated API client: Bearer attach, one refresh-retry on 401, RateLimitError on 429, `creatoros:auth-expired` → forced sign-out (`597b40f`).
+- **F2.x DONE (D3-A)** — persistence converged on Firestore via admin SDK; sqlite dropped; server-only rules for `integrations`/`ai_quota`; brand-completeness stat removed from summary (no honest server-side signal) (`2eb69cd`, `9040f63`, `c758d9e`).
+- Video generation work landed on main: Replicate wan-2.2 / prunaai p-video engines, granular live progress, fail-fast on free-tier limits, `REPLICATE_VIDEO_MODEL` env-configurable.
+- Env vars now expected in Vercel: `OAUTH_STATE_SECRET`, `TOKEN_ENCRYPTION_KEY` (added 2026-10-11, redeployed to snapshot).
+
+## Week 3 executed (2026-10-12, PR #3, squash commit `9ef9683`, merge `5827564`)
+- **F3.1 DONE** — fabricated JSON-LD `aggregateRating 4.9 / 15,200 reviews` removed from index.html; placeholder `creatoros.com/.app` replaced with the real deploy URL; fictional "CreatorOS Inc." author and 404 logo URL dropped.
+- **F3.2 DONE** — fabricated TikTok metrics (`1240/45000/8900`) removed from server.ts. `GET /api/analytics/tiktok` now returns an honest unavailable state: `404 {available:false, reason:'not_connected'}` when no account, `200 {available:false, reason:'audit_pending', message:'TikTok analytics unavailable — TikTok requires audit approval for data access.'}` when connected. Summary keeps honest zeros. Reconnect TikTok analytics for real via F6.3.
+- **F3.3 DONE** — Community gated behind `VITE_FEATURE_COMMUNITY=true` (default off): nav reads "Community (soon)", entry non-navigable (Creator Hub keeps its original unlock semantics: developer or users with content). Facade sample rows relabeled as sample data, picsum avatar URLs removed. Real community = F6.1.
+- **F3.4 DONE** — SupportHub scripted "PASS (0 security vulnerabilities)" test-log playback deleted. Replaced with a real Build Information panel: package version + git SHA injected at build time via vite `define` (`__APP_VERSION__` / `__GIT_COMMIT__` bare globals — member expressions are NOT replaced by define), real links to repo / commit / deploy. "SQLite Handshake" card relabeled "Firestore Handshake". New files: `src/globals.d.ts`, `src/vite-env.d.ts` (repo had no Vite client types).
+- **F3.5 DONE** — dead `DEMO_PROJECTS` deleted from Reports.tsx; honest empty states preserved.
+- **F3.6 DONE** — LandingPage honesty pass: fake stats banner (15K+ creators / 1.2M+ scripts / 4.9 rating), three-tier pricing with monthly/yearly billing theater, fake "message sent" contact form, "All Systems Operational", placeholder social links, "Newest Version Live" pill, "Start Free Trial" CTA and "cancel your subscription" FAQ all replaced with honest early-access copy ($0, no billing exists) and real contact channels (mailto + GitHub issues).
+- **Honesty sweep (same D4-A policy, beyond the six)** — Roadmap: hardcoded `currentDay=1` / `completedDays=[1]` / "1/30" ring now derive from real project count. Profile: Total Reach no longer adds fake TikTok reach (YouTube only); Content Score = real average of project `data.contentScore`; Streak from real dailyGoals store; "Your portfolio is live" card now says portfolios are not available yet; static ON Auto-Publish toggle now labeled "Planned". Integrations: honest per-platform descriptions; Instagram/X show "Coming Soon" instead of Connect buttons that actually fired TikTok OAuth; removed the saves-nothing "track anonymously" handle input and the "Passive Tracking" badge.
+- **Verification (all green):** `tsc --noEmit` 0 errors; `npm run build` exit 0; `build:server` + `check:artifact` fresh; grep battery over src/ + index.html + server.ts + api/ + built dist/ finds zero fabricated strings (aggregateRating, TikTok constants, DEMO_PROJECTS, picsum, fake PASS strings, placeholder domains).
+- **Deployed:** merged 2026-10-12; Vercel production deployment of `5827564` confirmed; unauth `POST /api/gemini/generate` on prod returns **401** (re-verified post-merge).
+
+## Flagged for later (found during the Phase-3 sweep, not fixed)
+- Reports "AI Insights" cards are static editorial text with no data behind them — wire to real data or reframe as generic tips.
+- `summary.totalRevenue` / `revenueStreams` are heuristic projections (e.g. +$5 if followers>10, +$150 if ≥5000), not measured earnings — needs an API-shape decision.
+- Non-functional controls: Reports "Export Intelligence PDF", Profile "Edit Account" (no handlers).
 
 ## Documents
 - `APP_EVALUATION.md` — full diagnosis (features, security, data layer, tooling) with file:line evidence
@@ -30,5 +57,4 @@
 D0-A rebuild bot branch · D1-A archive dead scripts · **D2-A intrinsic route-level security** · **D3-A Firestore-only data layer** · **D4-A remove/gate all fabricated data** · D5-A smoke-gate CI (emulators) · D6-A Firestore logging · D7-A TanStack Router · D8-A Zustand slices · **D9-A create-focused public launch** · D10-C defer billing
 
 ## Next action
-Say: *"Execute Week 2"* → F1.3 (OAuth state HMAC), F1.4 (token encryption at rest), F1.5 (coverage gaps + quota ledger), F1.7 (unified API client), F2.x (D3-A Firestore convergence). Gate: end-of-week-2 security+data audit (fresh unauth probes → 401; no /tmp writes).
-Immediate post-deploy check: unauth `POST /api/gemini/generate` on https://creator-os-delta-lilac.vercel.app must return **401** (500 ⇒ add FIREBASE_SERVICE_ACCOUNT to Vercel env).
+Say: *"Execute Week 4"* → F4.1 (real CI: typecheck + lint + build + emulator e2e on every PR), F4.2 (repair or remove ESLint), F4.3 (Prettier + pre-commit), then F4.4–F4.7 (unit tests, e2e hygiene, zod contracts, observability). Gate: end of week 4 — CI red/green decides merges; a fabricated-data grep across `src/` + `index.html` returns zero (that grep now exists in the PR #3 verification and should become a CI check).
