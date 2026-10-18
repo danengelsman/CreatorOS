@@ -73,6 +73,7 @@
     "@vercel/node": "^17.0.0",
     "autoprefixer": "^10.4.21",
     "drizzle-kit": "^0.31.10",
+    "firebase-tools": "^15.34.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.10",

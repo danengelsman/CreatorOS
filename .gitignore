@@ -17,3 +17,8 @@ uploads/
 .hermes/
 
 .vercel
+
+# Playwright generated artifacts (uploaded from CI on failure instead)
+playwright-report/
+test-results/
+

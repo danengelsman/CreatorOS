@@ -50,12 +50,45 @@ jobs:
       # is configured in package.json. No test runner exists yet, so there is
       # nothing to run — do not add a fake/passing step in the meantime.
 
-      # TODO (Week 4, F4.5): add the Playwright e2e smoke job here once the
-      # specs run against the Firebase Emulator Suite with mocked Gemini —
-      # they currently hit live Firebase auth and embed credentials, so
-      # wiring them now would make every CI run red. When that job lands,
-      # upload playwright-report/ and test-results/ on failure with
-      # actions/upload-artifact@v4 (if: failure()).
+  # F4.5 — E2E smoke against the Firebase Emulator Suite. The specs never hit
+  # live backends: Firebase runs locally (auth :9099, firestore :8080, started
+  # by playwright.config.ts webServer) with a seeded test user, and every
+  # /api/* route is mocked via page.route. Chromium only (D5-A: smoke-sized,
+  # no full browser matrix).
+  e2e-smoke:
+    name: E2E smoke (Firebase emulators + mocked APIs, chromium only)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Java (required by the Firebase emulators) is preinstalled on
+      # ubuntu-latest runners; firebase-tools comes from devDependencies.
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e suite (emulators + mocked APIs)
+        run: npx playwright test --project=chromium
+
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
 
   format:
     name: Prettier check (non-blocking until repo-wide format pass)

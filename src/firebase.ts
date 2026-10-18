@@ -1,26 +1,68 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, serverTimestamp, getDocFromServer } from 'firebase/firestore';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+  connectAuthEmulator,
+  User as FirebaseUser,
+} from 'firebase/auth';
+import {
+  getFirestore,
+  doc,
+  serverTimestamp,
+  getDocFromServer,
+  connectFirestoreEmulator,
+} from 'firebase/firestore';
 // Storage not available
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Ensure the authDomain matches the active runtime host:
 // In Vercel deployments, use the configured Vercel domain with its /__/auth rewrites.
 // In dev preview/localhost, use the official Firebase domain to prevent iframe cross-origin locks.
-const resolvedAuthDomain = (typeof window !== 'undefined' && (
-  window.location.hostname.includes('vercel.app') ||
-  window.location.hostname === firebaseConfig.authDomain
-)) ? (firebaseConfig.authDomain || `${firebaseConfig.projectId}.firebaseapp.com`)
-   : `${firebaseConfig.projectId}.firebaseapp.com`;
+const resolvedAuthDomain =
+  typeof window !== 'undefined' &&
+  (window.location.hostname.includes('vercel.app') ||
+    window.location.hostname === firebaseConfig.authDomain)
+    ? firebaseConfig.authDomain || `${firebaseConfig.projectId}.firebaseapp.com`
+    : `${firebaseConfig.projectId}.firebaseapp.com`;
+
+// F4.5: Firebase Emulator Suite detection. vite.config.ts inlines the two
+// emulator host env vars at dev/build time (see its `define` block), so this
+// check is static in the browser bundle and needs no runtime `process` object.
+// When the vars are unset — local dev without emulators and every production
+// deployment — both are '' and the app talks to real Firebase exactly as before.
+const authEmulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+const firestoreEmulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
+const isEmulatorMode = Boolean(authEmulatorHost || firestoreEmulatorHost);
+// `demo-` prefix projects only ever exist inside the emulator suite.
+const EMULATOR_PROJECT_ID = 'demo-creatoros';
 
 const app = initializeApp({
   ...firebaseConfig,
-  authDomain: resolvedAuthDomain
+  authDomain: resolvedAuthDomain,
+  ...(isEmulatorMode ? { projectId: EMULATOR_PROJECT_ID } : {}),
 });
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = isEmulatorMode
+  ? getFirestore(app) // the emulator only serves the (default) database
+  : getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+if (authEmulatorHost) {
+  connectAuthEmulator(auth, `http://${authEmulatorHost}`, { disableWarnings: true });
+}
+if (firestoreEmulatorHost) {
+  const [fsHost, fsPort] = firestoreEmulatorHost.split(':');
+  connectFirestoreEmulator(db, fsHost, Number(fsPort) || 8080);
+}
 
 /**
  * Prefer the popup flow because it works reliably on third-party hosts such as
@@ -31,10 +73,7 @@ export const loginWithGoogle = async () => {
   try {
     return await signInWithPopup(auth, googleProvider);
   } catch (error: any) {
-    if (
-      error?.code === 'auth/popup-blocked' ||
-      error?.code === 'auth/cancelled-popup-request'
-    ) {
+    if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/cancelled-popup-request') {
       // Vercel serves this SPA from `/`; returning directly to a client-side
       // route such as `/login` would otherwise produce a platform 404.
       if (window.location.pathname !== '/') {
@@ -52,9 +91,7 @@ export const loginWithGoogle = async () => {
 export const completeGoogleRedirect = async () => {
   try {
     const redirectPromise = getRedirectResult(auth);
-    const timeoutPromise = new Promise<null>((resolve) => 
-      setTimeout(() => resolve(null), 2500)
-    );
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
     return await Promise.race([redirectPromise, timeoutPromise]);
   } catch (error) {
     console.warn('Redirect check finished or skipped:', error);
@@ -62,14 +99,20 @@ export const completeGoogleRedirect = async () => {
   }
 };
 
-export const loginWithEmail = (email: string, pass: string) => signInWithEmailAndPassword(auth, email, pass);
-export const registerWithEmail = (email: string, pass: string) => createUserWithEmailAndPassword(auth, email, pass);
+export const loginWithEmail = (email: string, pass: string) =>
+  signInWithEmailAndPassword(auth, email, pass);
+export const registerWithEmail = (email: string, pass: string) =>
+  createUserWithEmailAndPassword(auth, email, pass);
 export const logout = () => signOut(auth);
 
 /**
  * Compresses a base64 image string to ensure it fits within Firestore's 1MB limit.
  */
-export async function compressBase64Image(base64Str: string, maxWidth = 800, quality = 0.8): Promise<string> {
+export async function compressBase64Image(
+  base64Str: string,
+  maxWidth = 800,
+  quality = 0.8,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = base64Str;
@@ -123,7 +166,11 @@ export interface FirestoreErrorInfo {
   };
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null,
+) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -132,15 +179,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
       emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
       tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
+      providerInfo:
+        auth.currentUser?.providerData.map((provider) => ({
+          providerId: provider.providerId,
+          displayName: provider.displayName,
+          email: provider.email,
+          photoUrl: provider.photoURL,
+        })) || [],
     },
     operationType,
-    path
+    path,
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
@@ -155,10 +203,16 @@ export async function testConnection() {
     }
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes('the client is offline') || error.message.includes('unavailable')) {
+      if (
+        error.message.includes('the client is offline') ||
+        error.message.includes('unavailable')
+      ) {
         // Log info rather than error to avoid false positive error triggers when client is offline/reconnecting
         console.info('Firestore operating in offline cache mode.');
-      } else if (error.message.toLowerCase().includes('permission') || (error as any).code === 'permission-denied') {
+      } else if (
+        error.message.toLowerCase().includes('permission') ||
+        (error as any).code === 'permission-denied'
+      ) {
         console.log('Firestore connection established (Permission Denied as expected).');
       } else {
         console.warn('Firestore connection check notice:', error.message);
