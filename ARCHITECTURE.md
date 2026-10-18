@@ -28,8 +28,7 @@ graph TB
     end
 
     subgraph "Data Layer"
-        R[Firebase Firestore<br/>Client Store]
-        S[SQLite (better-sqlite3)<br/>Server Store<br/>Ephemeral on Vercel]
+        R[Firebase Firestore<br/>Single Source of Truth<br/>client SDK + admin SDK]
         T[PostgreSQL + Drizzle<br/>Unused Scaffolding]
     end
 
@@ -169,29 +168,16 @@ graph TB
         B --> H[Creator Journey State]
     end
 
-    subgraph "Server Side (SQLite)"
-        I[better-sqlite3] --> J[users Table]
-        I --> K[brands Table]
-        I --> L[content Table]
-        I --> M[analytics Table]
-        I --> N[streaks Table]
-        I --> O[challenges Table]
-        I --> P[user_accounts Table<br/>OAuth Tokens]
-        I --> Q[ai_usage_ledger Table<br/>Quota Tracking]
+    subgraph "Server Side (Firestore Admin SDK)"
+        I[firebase-admin] --> J[integrations/uid_platform<br/>OAuth Tokens - AES-256-GCM Encrypted]
+        I --> Q[ai_quota/uid_day<br/>Daily Token Budget Ledger]
+        I --> P[Server-Only Firestore Rules<br/>No Direct Client Access]
     end
 
     subgraph "Unused Scaffolding"
         R[PostgreSQL] --> S[Drizzle ORM]
-        S --> T[schema.ts]
+        S --> T[src/db schema.ts]
     end
-
-    subgraph "Deployment Issue"
-        U[Vercel Serverless] --> V[/tmp/creator_os.db]
-        V --> W[Ephemeral Storage<br/>Data Loss Between Invocations]
-    end
-
-    I --> U
-    style W fill:#ff6b6b
 ```
 
 ## AI Integration Flow
@@ -253,7 +239,8 @@ sequenceDiagram
 
     SRV->>FA: verifyIdToken(token)
     FA-->>SRV: Decoded Token
-    SRV->>SRV: Check user in SQLite
+    SRV->>FS: Read user profile via admin SDK (Firestore)
+    FS-->>SRV: User Data
     SRV-->>AC: 200 OK + User Data
     AC-->>UI: User Data
 
@@ -283,7 +270,7 @@ graph TB
         B --> C[Monkey-patch Express.post]
         C --> D[server.ts]
         D --> E[Vite Dev Server<br/>HMR]
-        D --> F[SQLite: creator_os.db<br/>Persistent]
+        D --> F[Firebase Firestore<br/>via admin SDK]
     end
 
     subgraph "Vercel Production"
@@ -293,13 +280,12 @@ graph TB
         I --> K[api/_server.js<br/>Server Bundle]
         L[API Routes] --> K
         M[Static Assets] --> J
-        K --> N[SQLite: /tmp/creator_os.db<br/>Ephemeral!]
+        K --> N[Firebase Firestore<br/>admin SDK - persistent]
     end
 
-    subgraph "Security Warning"
-        O[security-entry.ts] -->|Not Used in Vercel| P[Bypassed]
-        Q[Intrinsic Protection in server.ts] -->|Applied| R[Works]
-        style P fill:#ff6b6b
+    subgraph "Security Entry Points"
+        O[security-entry.ts<br/>Dev-only wrapper: boot guards + dev middleware] -->|Local dev only| P[Active]
+        Q[Intrinsic Protection in server.ts<br/>F1.1: auth, rate limits, quotas] -->|Production path| R[Active]
         style R fill:#51cf66
     end
 
@@ -414,7 +400,7 @@ graph TB
     end
 
     subgraph "Quota Management"
-        J[Per-User Daily Budget] --> K[SQLite Ledger]
+        J[Per-User Daily Budget] --> K[Firestore ai_quota Ledger]
         K --> L[Token Accounting]
         L --> M[Usage Metadata]
         M --> N[429 at Midnight Reset]
@@ -439,34 +425,34 @@ graph TB
 
 ## Known Issues & Technical Debt
 
-Based on the APP_EVALUATION.md:
+Based on the APP_EVALUATION.md. **Status updated 2026-10-17 (post-Week 3):** the
+three former critical/high items below are **fixed and verified in production**
+(Weeks 1–2: F1.1 route security, F1.3 signed OAuth state, F1.4 encrypted
+tokens, F2.x Firestore convergence — see `PROJECT_STATE.md`). What remains:
 
-1. **Critical: Unauthenticated Gemini Abuse in Production**
-   - Vercel deploys server.ts directly without security-entry.ts wrapper
-   - Gemini routes may lack intrinsic protection in some paths
-   - Fix: Move all auth + rate limiting into server.ts route handlers
-
-2. **High: Server Data Loss on Vercel**
-   - SQLite at /tmp/creator_os.db is ephemeral
-   - Server writes vanish between invocations
-   - Split-brain: Client uses Firestore, Server uses SQLite
-   - Fix: Converge on Firestore for all persistence
-
-3. **High: OAuth Account-Linking Forgery**
-   - OAuth state = userId without session binding
-   - Tokens stored plaintext in SQLite
-   - Fix: Signed, session-bound state; encrypt tokens
+1. **RESOLVED (F1.1):** All Gemini routes carry intrinsic auth + rate limits
+   inside `server.ts`; production gate probes return 401 for unauthenticated
+   and forged-token requests.
+2. **RESOLVED (F2.x):** Persistence is Firestore-only via the admin SDK —
+   sqlite is removed; no ephemeral-data loss.
+3. **RESOLVED (F1.3 + F1.4):** OAuth state is HMAC-signed, single-use,
+   10-minute TTL; tokens are AES-256-GCM encrypted at rest in Firestore.
 
 4. **Medium: TypeScript Strict Mode Off**
    - 157 `any` types in codebase
-   - AI payloads unvalidated
+   - AI payloads unvalidated (zod contracts queued as F4.6)
    - Fix: Enable strict mode incrementally; add zod schemas
 
 5. **Medium: Navigation Ephemeral**
    - Tabs aren't URLs
    - No deep links
    - Back button doesn't restore state
-   - Fix: Implement proper router with URL-based routing
+   - Fix: Implement proper router with URL-based routing (D7-A TanStack Router)
+
+6. **Medium: Gemini model IDs not audited**
+   - The model allowlist/model selection has not been verified against
+     current official Google model documentation (active vs deprecated)
+   - Fix: Audit every model ID against ai.google.dev before further changes
 
 ## Tech Stack Summary
 
@@ -475,7 +461,7 @@ Based on the APP_EVALUATION.md:
 | Frontend | React 19, Vite, TypeScript, Tailwind CSS, Motion (framer-motion) |
 | Backend | Node.js, Express, TypeScript |
 | Auth | Firebase Authentication (Client + Admin SDK) |
-| Database | Firebase Firestore (Client), SQLite (Server - ephemeral) |
+| Database | Firebase Firestore (client SDK + admin SDK — single source of truth) |
 | AI | Google GenAI SDK (Gemini 3.8-flash, 3.1-flash-lite) |
 | OAuth | Google OAuth2, TikTok OAuth |
 | Deployment | Vercel (serverless functions) |
@@ -490,7 +476,7 @@ CreatorOS_Repo/
 │   ├── main.tsx                 # Entry point
 │   ├── App.tsx                  # Root component + router
 │   ├── firebase.ts              # Firebase client config
-│   ├── db.ts                    # SQLite server database
+│   ├── db/                      # Legacy Drizzle scaffolding (unused — see D3-A)
 │   ├── components/              # 46 React components
 │   │   ├── Dashboard.tsx
 │   │   ├── ContentStudio.tsx
