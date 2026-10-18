@@ -64,10 +64,12 @@ export default defineConfig({
       // Requires Java (JDK 21+, firebase-tools requirement). In CI,
       // ubuntu-latest runners ship it; locally set JAVA_HOME if Java is not
       // on the PATH. Readiness is polled on the Auth emulator root (200).
+      // 240s: the JVM's cold first boot can approach the old 120s ceiling on
+      // slower Windows machines.
       command: `npx firebase emulators:start --project ${EMULATOR_PROJECT_ID} --only auth,firestore`,
       url: `http://${FIREBASE_AUTH_EMULATOR_HOST}/`,
       reuseExistingServer: !process.env.CI,
-      timeout: 120 * 1000,
+      timeout: 240 * 1000,
       stdout: 'pipe',
       env: {
         FIREBASE_AUTH_EMULATOR_HOST,
@@ -82,6 +84,11 @@ export default defineConfig({
       env: {
         FIREBASE_AUTH_EMULATOR_HOST,
         FIRESTORE_EMULATOR_HOST,
+        // Local dev has no gitignored .env in CI checkouts; without APP_URL the
+        // server's same-origin CORS allowlist is empty and every real /api call
+        // (e.g. Phase A /api/auth/revoke-all) is rejected with "Origin not
+        // allowed". This mirrors a normal local dev boot.
+        APP_URL: 'http://localhost:3000',
       },
     },
   ],

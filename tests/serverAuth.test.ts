@@ -15,6 +15,9 @@ import type { Server } from 'node:http';
 // --- Hoisted mock state (vi.mock factories are hoisted above these imports) ---
 const adminState = vi.hoisted(() => ({
   verifyIdToken: vi.fn(),
+  verifySessionCookie: vi.fn(),
+  createSessionCookie: vi.fn(),
+  revokeRefreshTokens: vi.fn(),
 }));
 
 const fsState = vi.hoisted(() => ({
@@ -29,7 +32,12 @@ vi.mock('firebase-admin', () => ({
     apps: [{ name: 'mock-admin-app' }],
     initializeApp: vi.fn(),
     credential: { cert: vi.fn(() => ({ mocked: 'credential' })) },
-    auth: () => ({ verifyIdToken: adminState.verifyIdToken }),
+    auth: () => ({
+      verifyIdToken: adminState.verifyIdToken,
+      verifySessionCookie: adminState.verifySessionCookie,
+      createSessionCookie: adminState.createSessionCookie,
+      revokeRefreshTokens: adminState.revokeRefreshTokens,
+    }),
     firestore: () => ({}),
   },
 }));
@@ -91,6 +99,23 @@ adminState.verifyIdToken.mockImplementation(async (token: string) => {
   throw new Error('Firebase ID token could not be decoded');
 });
 
+// Session cookies: "valid.session-cookie" resolves (mimics a non-revoked
+// Firebase session cookie); anything else — including revoked-looking values —
+// is rejected, mirroring verifySessionCookie(..., { checkRevoked: true }).
+adminState.verifySessionCookie.mockImplementation(async (cookie: string) => {
+  if (cookie === 'valid.session-cookie') {
+    return { uid: 'cookie-user', aud: 'test-project', sub: cookie };
+  }
+  throw new Error('Session cookie has been revoked');
+});
+
+// Minting echoes the request so tests can assert what was minted.
+adminState.createSessionCookie.mockImplementation(
+  async (idToken: string, options: { expiresIn: number }) =>
+    `minted.${idToken}.${options.expiresIn}`,
+);
+adminState.revokeRefreshTokens.mockImplementation(async () => undefined);
+
 async function get(path: string, token?: string): Promise<Response> {
   return fetch(`${baseUrl}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -128,6 +153,10 @@ afterEach(() => {
   fsState.quotaDoc = null;
   fsState.quotaFail = false;
   fsState.listIntegrations.mockReset();
+  adminState.createSessionCookie.mockClear();
+  adminState.revokeRefreshTokens.mockClear();
+  adminState.verifySessionCookie.mockClear();
+  adminState.revokeRefreshTokens.mockImplementation(async () => undefined);
 });
 
 describe('authenticateUser middleware (via GET /api/accounts)', () => {
@@ -253,5 +282,117 @@ describe('protectAIRoute middleware (AI routes)', () => {
     const body = await res.json();
     expect(body.reason).toBe('quota_store_unavailable');
     expect(res.headers.get('x-quota-used')).toBe('unknown');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase A — session-cookie hardening: POST /api/auth/session (exchange),
+// authenticateUser accepting creatoros_session, POST /api/auth/revoke-all.
+// Same pattern as above: real Express app, fully mocked firebase-admin.
+// ---------------------------------------------------------------------------
+
+async function getWithCookie(path: string, cookie: string): Promise<Response> {
+  return fetch(`${baseUrl}${path}`, { headers: { Cookie: cookie } });
+}
+
+describe('POST /api/auth/session (session-cookie exchange)', () => {
+  it('401s with "Unauthorized" when no Bearer token is sent', async () => {
+    const res = await postJson('/api/auth/session', {});
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Unauthorized' });
+    expect(adminState.verifyIdToken).not.toHaveBeenCalled();
+    expect(adminState.createSessionCookie).not.toHaveBeenCalled();
+  });
+
+  it('401s with "Invalid token" when verification fails and never mints', async () => {
+    const res = await postJson('/api/auth/session', {}, 'bogus-token');
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Invalid token' });
+    expect(adminState.verifyIdToken).toHaveBeenCalledWith('bogus-token');
+    expect(adminState.createSessionCookie).not.toHaveBeenCalled();
+  });
+
+  it('mints a 14-day HttpOnly Secure SameSite=Lax cookie from a valid ID token', async () => {
+    const res = await postJson('/api/auth/session', {}, 'valid.session-user');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, expiresIn: 14 * 24 * 60 * 60 });
+    expect(adminState.createSessionCookie).toHaveBeenCalledWith('valid.session-user', {
+      expiresIn: 14 * 24 * 60 * 60 * 1000,
+    });
+    const setCookie = res.headers.get('set-cookie') || '';
+    expect(setCookie).toContain(
+      `creatoros_session=minted.valid.session-user.${14 * 24 * 60 * 60 * 1000}`,
+    );
+    expect(setCookie).toContain('HttpOnly');
+    expect(setCookie).toContain('Secure');
+    expect(setCookie).toContain('SameSite=Lax');
+    expect(setCookie).toContain(`Max-Age=${14 * 24 * 60 * 60}`);
+    expect(setCookie).toContain('Path=/');
+  });
+});
+
+describe('authenticateUser with the session cookie', () => {
+  it('serves the route from a valid creatoros_session cookie (revocation-checked)', async () => {
+    fsState.listIntegrations.mockResolvedValue([]);
+
+    const res = await getWithCookie('/api/accounts', 'creatoros_session=valid.session-cookie');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+    expect(adminState.verifySessionCookie).toHaveBeenCalledWith('valid.session-cookie', true);
+    expect(adminState.verifyIdToken).not.toHaveBeenCalled();
+    expect(fsState.listIntegrations).toHaveBeenCalledWith('cookie-user');
+  });
+
+  it('401s with "Invalid token" when the cookie fails verification (e.g. revoked)', async () => {
+    const res = await getWithCookie('/api/accounts', 'creatoros_session=revoked-or-garbage');
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Invalid token' });
+    expect(adminState.revokeRefreshTokens).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/auth/revoke-all', () => {
+  it('401s unauthenticated and never revokes', async () => {
+    const res = await postJson('/api/auth/revoke-all', {});
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Unauthorized' });
+    expect(adminState.revokeRefreshTokens).not.toHaveBeenCalled();
+  });
+
+  it('401s with "Invalid token" for a bad Bearer token and never revokes', async () => {
+    const res = await postJson('/api/auth/revoke-all', {}, 'not-a-real-token');
+
+    expect(res.status).toBe(401);
+    expect(adminState.revokeRefreshTokens).not.toHaveBeenCalled();
+  });
+
+  it('revokes refresh tokens and clears the session cookie for an authenticated user', async () => {
+    const res = await postJson('/api/auth/revoke-all', {}, 'valid.user-revoke');
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(adminState.revokeRefreshTokens).toHaveBeenCalledWith('user-revoke');
+    const setCookie = res.headers.get('set-cookie') || '';
+    expect(setCookie).toContain('creatoros_session=');
+    expect(setCookie).toContain('Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+  });
+
+  it('500s when revocation fails, without clearing the cookie silently', async () => {
+    adminState.revokeRefreshTokens.mockImplementation(async () => {
+      throw new Error('backend unavailable');
+    });
+
+    const res = await postJson('/api/auth/revoke-all', {}, 'valid.user-revoke-fail');
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'Could not revoke sessions. Please try again.' });
+    expect(adminState.revokeRefreshTokens).toHaveBeenCalledWith('user-revoke-fail');
   });
 });

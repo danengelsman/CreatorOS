@@ -10,15 +10,19 @@ export const TEST_USER_EMAIL = 'e2e-smoke@demo-creatoros.test';
 export const TEST_USER_PASSWORD = 'EmulatorOnly-Not-A-Secret';
 
 /**
- * F4.5b: Auth-emulator harness helpers.
+ * Phase A + F4.5b: auth-emulator harness helpers.
  *
- * The Login UI currently only supports signing IN with an existing account.
- * Account creation and password-reset flows do not exist in the UI yet, so
- * specs that need a throwaway identity create it directly against the Auth
- * emulator REST API — the same un-scoped `/v1/accounts:*` endpoints
- * e2e/global-setup.ts uses for seeding. When sign-up / forgot-password UI
- * lands, e2e/auth.spec.ts (test.fixme) documents the UI flows that should
- * replace these direct calls.
+ * Phase A (email/password UI) added registration flows: fresh addresses per
+ * run (register must exercise the SIGN-UP path, not email-already-in-use) and
+ * a password satisfying the shipped policy (>= 8 chars, not in the bundled
+ * common-password list).
+ *
+ * Before that UI existed, specs needing a throwaway identity created it
+ * directly against the Auth emulator REST API — the same un-scoped
+ * `/v1/accounts:*` endpoints e2e/global-setup.ts uses for seeding. Those
+ * direct-call helpers remain; e2e/auth.spec.ts (test.fixme) documents the
+ * UI-driven flows that the Phase A Login UI now enables (flipping them live
+ * is a follow-up).
  */
 export const AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099';
 
@@ -90,4 +94,15 @@ export function requestPasswordReset(email: string): Promise<EmulatorAuthResult>
  */
 export function uniqueEmulatorEmail(prefix = 'e2e'): string {
   return `${prefix}+${Date.now()}-${Math.floor(Math.random() * 1e9)}@demo-creatoros.test`;
+}
+
+/**
+ * Phase A — email/password registration flows. Fresh addresses per run (the
+ * emulator keeps accounts for the whole run, and register must exercise the
+ * SIGN-UP path, not email-already-in-use). The password must satisfy the
+ * shipped password policy: >= 8 chars, not in the bundled common-password list.
+ */
+export const PHASE_A_TEST_PASSWORD = 'EmulatorOnly-Not-A-Secret';
+export function freshPhaseAEmail(): string {
+  return `e2e-auth-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@demo-creatoros.test`;
 }

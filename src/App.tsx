@@ -29,6 +29,7 @@ import {
   completeGoogleRedirect,
   db,
   logout,
+  sendVerificationEmail,
   FirebaseUser,
   handleFirestoreError,
   OperationType,
@@ -138,6 +139,11 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  // Phase A — soft email-verification nudge for email/password users.
+  const [verificationBannerDismissed, setVerificationBannerDismissed] = useState(false);
+  const [verificationSendState, setVerificationSendState] = useState<'idle' | 'sending' | 'sent'>(
+    'idle',
+  );
 
   // Handle browser back/forward
   useEffect(() => {
@@ -327,6 +333,27 @@ export default function App() {
   }, [user]);
 
   const isDeveloper = user?.email && DEVELOPER_EMAILS.includes(user.email);
+  // Phase A — soft nudge only for password-provider accounts that aren't
+  // verified yet. Google accounts are always verified; nothing blocks here.
+  const needsEmailVerification = Boolean(
+    user && !user.emailVerified && (user.providerData[0]?.providerId ?? 'password') === 'password',
+  );
+  const showVerificationBanner =
+    needsEmailVerification && !verificationBannerDismissed && verificationSendState !== 'sent';
+
+  const handleResendVerification = async () => {
+    if (!user || verificationSendState === 'sending') return;
+    setVerificationSendState('sending');
+    try {
+      await sendVerificationEmail(user);
+      // Sent — collapse the banner (onAuthStateChanged refreshes emailVerified
+      // after the user clicks the link and returns).
+      setVerificationSendState('sent');
+    } catch (error) {
+      console.warn('Resend verification failed:', error);
+      setVerificationSendState('idle');
+    }
+  };
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.devOnly || isDeveloper);
 
   const ActiveComponent =
@@ -509,6 +536,47 @@ export default function App() {
               </div>
             </div>
           </header>
+
+          {/* Phase A — soft email-verification nudge (never a hard block). */}
+          {showVerificationBanner && (
+            <div
+              className="fixed lg:absolute top-[calc(env(safe-area-inset-top,0px)+52px)] left-0 right-0 z-[55] px-4 lg:px-10"
+              data-testid="email-verification-banner"
+            >
+              <div className="max-w-[1400px] mx-auto mt-2 flex items-center justify-between gap-3 p-3 rounded-xl border border-[var(--separator)] bg-[var(--bg-secondary)] ios-card">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                    style={{
+                      background: 'color-mix(in srgb, var(--system-green) 12%, transparent)',
+                      color: 'var(--system-green)',
+                    }}
+                  >
+                    <ShieldCheck size={18} strokeWidth={1.5} />
+                  </div>
+                  <p className="text-[13px] font-medium text-[var(--label-secondary)] truncate">
+                    Verify your email address ({user?.email}) to secure your account.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleResendVerification}
+                    disabled={verificationSendState === 'sending'}
+                    className="ios-button ios-button-tinted h-8 px-3 text-[13px]"
+                  >
+                    {verificationSendState === 'sending' ? 'Sending…' : 'Resend email'}
+                  </button>
+                  <button
+                    onClick={() => setVerificationBannerDismissed(true)}
+                    aria-label="Dismiss verification banner"
+                    className="p-2 text-[var(--label-tertiary)] hover:text-[var(--label-primary)] transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <AnimatePresence>
             {isMobileMenuOpen && (

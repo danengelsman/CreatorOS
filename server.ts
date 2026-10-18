@@ -28,6 +28,11 @@ import {
   extractTokensUsed,
   ROUTE_COST_ESTIMATES,
 } from './src/server/quotaLedger';
+import {
+  extractSessionToken,
+  createSessionExchangeHandler,
+  createRevokeAllHandler,
+} from './src/server/sessionAuth';
 
 dotenv.config();
 
@@ -45,6 +50,17 @@ try {
   }
 } catch (err) {
   console.error('Error reading firebase-applet-config.json:', err);
+}
+
+// Phase A / F4.5 — emulator mode must verify against the EMULATOR project.
+// The client bundle pins projectId to `demo-creatoros` whenever the emulator
+// env vars are set (src/firebase.ts), and the Auth emulator mints tokens with
+// that `aud`. If the admin SDK keeps the production project id, every
+// verifyIdToken fails with an "incorrect aud" error — which the client then
+// treats as an expired session and force-signs the user out mid-flow. Same
+// override, same trigger, so dev/e2e and production stay consistent.
+if (process.env.FIREBASE_AUTH_EMULATOR_HOST || process.env.FIRESTORE_EMULATOR_HOST) {
+  projectId = 'demo-creatoros';
 }
 
 // F1.2 — Fail-fast credential boot. In production the server must never start
@@ -217,15 +233,23 @@ async function startServer() {
   app.use(cookieParser());
 
   // Firebase Auth Middleware
+  // Phase A: accepts a Firebase session cookie (creatoros_session, minted by
+  // POST /api/auth/session) OR the original Bearer ID token. Cookies are
+  // verified with checkRevoked so "Sign out of all devices" takes effect
+  // immediately; Bearer tokens keep the SDK default (valid up to their 1h TTL).
   const authenticateUser = async (req: any, res: any, next: any) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const sessionToken = extractSessionToken(req);
+    const hasBearer = Boolean(authHeader?.startsWith('Bearer '));
+    if (!hasBearer && !sessionToken) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const token = authHeader.split('Bearer ')[1];
+    const token = hasBearer ? authHeader.split('Bearer ')[1] : (sessionToken as string);
     try {
-      const decodedToken = await admin.auth().verifyIdToken(token);
+      const decodedToken = hasBearer
+        ? await admin.auth().verifyIdToken(token)
+        : await admin.auth().verifySessionCookie(token, true);
       req.user = decodedToken;
       // F2: the users table is gone — the client maintains users/{uid} in
       // Firestore directly; no server-side user row is needed.
@@ -1170,6 +1194,13 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   });
 
   // --- OAuth & Social Integration ---
+
+  // Phase A — Firebase session-cookie hardening.
+  // Exchange a fresh ID token for a 14-day httpOnly session cookie (absolute
+  // timeout — see src/server/sessionAuth.ts), and let an authenticated user
+  // revoke every refresh token ("Sign out of all devices").
+  app.post('/api/auth/session', createSessionExchangeHandler(admin.auth()));
+  app.post('/api/auth/revoke-all', authenticateUser, createRevokeAllHandler(admin.auth()));
 
   app.get('/api/auth/google/url', authenticateUser, (req: any, res) => {
     const url = oauth2Client.generateAuthUrl({

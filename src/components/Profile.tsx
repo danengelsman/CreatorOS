@@ -1,20 +1,65 @@
 import React, { useState, useRef } from 'react';
-import { UserCircle as User, Envelope as Mail, Shield, ArrowSquareOut as ExternalLink, ShareNetwork as Share2, Medal as Award, Lightning as Zap, TrendUp as TrendingUp, Globe, Camera, CircleNotch as Loader2, SignOut as LogOut, Sparkle, Clock } from '@phosphor-icons/react';
+import {
+  UserCircle as User,
+  Envelope as Mail,
+  Shield,
+  ArrowSquareOut as ExternalLink,
+  ShareNetwork as Share2,
+  Medal as Award,
+  Lightning as Zap,
+  TrendUp as TrendingUp,
+  Globe,
+  Camera,
+  CircleNotch as Loader2,
+  SignOut as LogOut,
+  Sparkle,
+  Clock,
+} from '@phosphor-icons/react';
 import { AnimatePresence } from 'motion/react';
 import { auth, db, handleFirestoreError, OperationType, compressBase64Image } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import AvatarGenerator from './AvatarGenerator';
 import Integrations from './Integrations';
 import { authorizedFetch } from '../firebase';
+import { revokeAllSessions } from '../lib/apiClient';
 import { fetchDailyGoalsFromCloud, getLocalDailyGoals } from '../services/dailyGoals';
 
 import { User as FirebaseUser } from 'firebase/auth';
 
-export default function Profile({ user, userData, brand, projects = [] }: { user: FirebaseUser, userData: any, brand: any, projects?: any[] }) {
+export default function Profile({
+  user,
+  userData,
+  brand,
+  projects = [],
+}: {
+  user: FirebaseUser;
+  userData: any;
+  brand: any;
+  projects?: any[];
+}) {
   const [isUploading, setIsUploading] = useState(false);
   const [showAvatarGenerator, setShowAvatarGenerator] = useState(false);
   const [stats, setStats] = useState({ reach: '---', score: '0', streak: '0' });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Phase A — "Sign out of all devices" (revokes every refresh token).
+  const [isRevokingAll, setIsRevokingAll] = useState(false);
+  const [revokeError, setRevokeError] = useState('');
+
+  const handleRevokeAllSessions = async () => {
+    if (isRevokingAll) return;
+    setIsRevokingAll(true);
+    setRevokeError('');
+    try {
+      // Server revokes every refresh token for this user and clears the
+      // session cookie; signing out locally returns to the login view.
+      await revokeAllSessions();
+      await auth.signOut();
+    } catch (error: any) {
+      console.error('Sign out of all devices failed:', error);
+      setRevokeError(error?.message || "Couldn't sign out everywhere. Please try again.");
+      setIsRevokingAll(false);
+    }
+  };
 
   React.useEffect(() => {
     const fetchStats = async () => {
@@ -27,19 +72,18 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
         let totalViews = 0;
         if (yt?.views) totalViews += yt.views;
 
-        const formattedReach = totalViews > 1000
-          ? `${(totalViews / 1000).toFixed(1)}K`
-          : totalViews.toString();
+        const formattedReach =
+          totalViews > 1000 ? `${(totalViews / 1000).toFixed(1)}K` : totalViews.toString();
 
         // Real data: writing streak from the daily-goals store (no hardcoded
         // zeros presented as live stats).
         const cloud = user?.uid ? await fetchDailyGoalsFromCloud(user.uid).catch(() => null) : null;
         const goals = cloud ?? getLocalDailyGoals();
 
-        setStats(prev => ({
+        setStats((prev) => ({
           ...prev,
           reach: totalViews > 0 ? formattedReach : '---',
-          streak: String(goals.streak ?? 0)
+          streak: String(goals.streak ?? 0),
         }));
       } catch (error) {
         console.error('Error fetching profile stats:', error);
@@ -52,9 +96,11 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
   // projects. 0 when none exist — never a fabricated number.
   const contentScore = React.useMemo(() => {
     if (!projects || projects.length === 0) return 0;
-    const scored = projects.filter(p => typeof p?.data?.contentScore === 'number');
+    const scored = projects.filter((p) => typeof p?.data?.contentScore === 'number');
     if (scored.length === 0) return 0;
-    return Math.round(scored.reduce((sum: number, p: any) => sum + p.data.contentScore, 0) / scored.length);
+    return Math.round(
+      scored.reduce((sum: number, p: any) => sum + p.data.contentScore, 0) / scored.length,
+    );
   }, [projects]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,16 +113,16 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
       const reader = new FileReader();
       reader.onloadend = async () => {
         const rawBase64 = reader.result as string;
-        
+
         try {
           const compressedBase64 = await compressBase64Image(rawBase64);
-          
+
           // 1. Update Firestore User Document
           const userRef = doc(db, 'users', auth.currentUser!.uid);
           await updateDoc(userRef, {
             photoURL: compressedBase64,
             avatarType: 'uploaded',
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           });
         } catch (error) {
           handleFirestoreError(error, OperationType.UPDATE, `users/${auth.currentUser?.uid}`);
@@ -84,7 +130,7 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      console.error("Error uploading photo:", error);
+      console.error('Error uploading photo:', error);
     } finally {
       setIsUploading(false);
     }
@@ -94,10 +140,7 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
     <div className="flex flex-col gap-10">
       <AnimatePresence>
         {showAvatarGenerator && (
-          <AvatarGenerator 
-            onClose={() => setShowAvatarGenerator(false)} 
-            onAvatarSet={() => {}} 
-          />
+          <AvatarGenerator onClose={() => setShowAvatarGenerator(false)} onAvatarSet={() => {}} />
         )}
       </AnimatePresence>
 
@@ -105,10 +148,10 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
         <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
           <div className="relative shrink-0">
             <div className="relative w-32 h-32 rounded-3xl overflow-hidden ios-elevated border-4 border-white/10 flex items-center justify-center bg-[var(--bg-tertiary)]">
-              {(userData?.photoURL || user?.photoURL) ? (
-                <img 
-                  src={userData?.photoURL || user?.photoURL || undefined} 
-                  alt={userData?.displayName || user?.displayName || 'User'} 
+              {userData?.photoURL || user?.photoURL ? (
+                <img
+                  src={userData?.photoURL || user?.photoURL || undefined}
+                  alt={userData?.displayName || user?.displayName || 'User'}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
@@ -121,7 +164,7 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
                 </div>
               )}
               <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                <button 
+                <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
                   className="ios-button ios-button-gray p-3"
@@ -130,19 +173,21 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
                 </button>
               </div>
             </div>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handlePhotoUpload} 
-              accept="image/*" 
-              className="hidden" 
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handlePhotoUpload}
+              accept="image/*"
+              className="hidden"
             />
           </div>
-          
+
           <div className="flex-1 text-center md:text-left space-y-4">
             <div>
               <div className="flex flex-col sm:flex-row items-center md:items-start md:justify-start gap-2 mb-2">
-                <h1 className="font-serif text-[36px] font-semibold tracking-[-0.015em] text-[var(--label-primary)]">{userData?.displayName || user?.displayName || 'Creator'}</h1>
+                <h1 className="font-serif text-[36px] font-semibold tracking-[-0.015em] text-[var(--label-primary)]">
+                  {userData?.displayName || user?.displayName || 'Creator'}
+                </h1>
                 <div className="flex gap-2 items-center">
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium text-[var(--label-secondary)] bg-[var(--bg-secondary)] border border-[var(--separator)]">
                     Free Plan
@@ -154,28 +199,30 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
                 {user?.email}
               </p>
             </div>
-            
+
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
               <span className="px-3 py-1 bg-[var(--bg-tertiary)] rounded-full text-[13px] font-semibold text-[var(--label-secondary)] border border-[var(--separator)]">
                 {brand?.archetype || 'Visionary'}
               </span>
               <span className="px-3 py-1 bg-[var(--bg-tertiary)] rounded-full text-[13px] font-semibold text-[var(--label-secondary)] border border-[var(--separator)]">
-                Joined {new Date(user?.metadata.creationTime || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                Joined{' '}
+                {new Date(user?.metadata.creationTime || Date.now()).toLocaleDateString('en-US', {
+                  month: 'long',
+                  year: 'numeric',
+                })}
               </span>
             </div>
           </div>
 
           <div className="flex flex-col gap-3 min-w-[200px]">
-            <button 
+            <button
               onClick={() => setShowAvatarGenerator(true)}
               className="ios-button ios-button-tinted w-full"
             >
               <Sparkle size={18} weight="duotone" className="mr-2" />
               AI Avatar Generator
             </button>
-            <button className="ios-button ios-button-gray w-full">
-              Edit Account
-            </button>
+            <button className="ios-button ios-button-gray w-full">Edit Account</button>
           </div>
         </div>
 
@@ -184,13 +231,30 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: 'Total Reach', value: stats.reach, icon: TrendingUp, color: 'text-[var(--accent)]' },
-          { label: 'Content Score', value: String(contentScore), icon: Award, color: 'text-[var(--accent)]' },
-          { label: 'Streak Days', value: stats.streak, icon: Zap, color: 'text-[var(--system-green)]' },
+          {
+            label: 'Total Reach',
+            value: stats.reach,
+            icon: TrendingUp,
+            color: 'text-[var(--accent)]',
+          },
+          {
+            label: 'Content Score',
+            value: String(contentScore),
+            icon: Award,
+            color: 'text-[var(--accent)]',
+          },
+          {
+            label: 'Streak Days',
+            value: stats.streak,
+            icon: Zap,
+            color: 'text-[var(--system-green)]',
+          },
         ].map((stat, i) => (
           <div key={i} className="ios-card bg-[var(--bg-secondary)] p-6 flex flex-col gap-1">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-[0.2em]">{stat.label}</span>
+              <span className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-[0.2em]">
+                {stat.label}
+              </span>
               <stat.icon size={18} strokeWidth={1.5} className={stat.color} />
             </div>
             <p className="text-[28px] font-bold tracking-tight">{stat.value}</p>
@@ -208,7 +272,13 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
           <div className="ios-card bg-[var(--bg-tertiary)] overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-[var(--separator)]">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)'}}>
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{
+                    background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
+                    color: 'var(--accent)',
+                  }}
+                >
                   <Globe size={18} strokeWidth={1.5} />
                 </div>
                 <span className="text-[17px] font-medium">Public Portfolio</span>
@@ -218,10 +288,13 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
             <div className="p-4 bg-[var(--bg-secondary)]/50">
               <div className="p-3 bg-[var(--bg-tertiary)] rounded-xl border border-[var(--separator)] mb-4 flex items-center gap-3">
                 <Clock size={16} className="text-[var(--label-secondary)] flex-shrink-0" />
-                <p className="text-[13px] font-medium text-[var(--label-secondary)]">Public portfolios are not available yet.</p>
+                <p className="text-[13px] font-medium text-[var(--label-secondary)]">
+                  Public portfolios are not available yet.
+                </p>
               </div>
               <p className="text-[14px] text-[var(--label-secondary)] leading-relaxed mb-4">
-                Your work stays private to your account. A shareable portfolio page is planned, not live.
+                Your work stays private to your account. A shareable portfolio page is planned, not
+                live.
               </p>
               <button className="ios-button ios-button-tinted w-full mt-4" disabled>
                 Coming Soon
@@ -235,25 +308,47 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
           <div className="ios-card bg-[var(--bg-tertiary)] divide-y divide-[var(--separator)]">
             <div className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)'}}>
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{
+                    background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
+                    color: 'var(--accent)',
+                  }}
+                >
                   <Award size={18} strokeWidth={1.5} />
                 </div>
                 <span className="text-[17px] font-medium">Current Plan</span>
               </div>
-              <span className="text-[17px] font-serif italic text-[var(--label-primary)]">Free Plan</span>
+              <span className="text-[17px] font-serif italic text-[var(--label-primary)]">
+                Free Plan
+              </span>
             </div>
             <div className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{background: 'color-mix(in srgb, var(--system-green) 12%, transparent)', color: 'var(--system-green)'}}>
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{
+                    background: 'color-mix(in srgb, var(--system-green) 12%, transparent)',
+                    color: 'var(--system-green)',
+                  }}
+                >
                   <Shield size={18} strokeWidth={1.5} />
                 </div>
                 <span className="text-[17px] font-medium">Status</span>
               </div>
-              <span className="text-[17px] font-serif italic text-[var(--system-green)]">Active</span>
+              <span className="text-[17px] font-serif italic text-[var(--system-green)]">
+                Active
+              </span>
             </div>
             <div className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)'}}>
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{
+                    background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
+                    color: 'var(--accent)',
+                  }}
+                >
                   <Share2 size={18} strokeWidth={1.5} />
                 </div>
                 <span className="text-[17px] font-medium">Auto-Publish</span>
@@ -265,17 +360,42 @@ export default function Profile({ user, userData, brand, projects = [] }: { user
             </div>
           </div>
           <div className="mt-8">
-            <button 
+            <button
               onClick={() => auth.signOut()}
               className="ios-button ios-button-tinted w-full mt-6"
               style={{
                 color: 'var(--system-red)',
-                background: 'color-mix(in srgb, var(--system-red) 8%, transparent)'
+                background: 'color-mix(in srgb, var(--system-red) 8%, transparent)',
               }}
             >
               <LogOut size={17} strokeWidth={1.5} className="mr-2" />
               Sign Out
             </button>
+            <button
+              onClick={handleRevokeAllSessions}
+              disabled={isRevokingAll}
+              className="ios-button ios-button-tinted w-full mt-3"
+              style={{
+                color: 'var(--system-red)',
+                background: 'color-mix(in srgb, var(--system-red) 8%, transparent)',
+                opacity: isRevokingAll ? 0.6 : 1,
+              }}
+              data-testid="sign-out-all-devices"
+            >
+              {isRevokingAll ? (
+                <Loader2 size={17} strokeWidth={1.5} className="mr-2 animate-spin" />
+              ) : (
+                <LogOut size={17} strokeWidth={1.5} className="mr-2" />
+              )}
+              Sign out of all devices
+            </button>
+            {revokeError && (
+              <p className="mt-2 text-[13px] text-[var(--system-red)] font-medium">{revokeError}</p>
+            )}
+            <p className="mt-2 text-[12px] text-[var(--label-tertiary)] leading-relaxed">
+              Revokes every active session — including sessions on other devices. Sessions expire
+              automatically after 14 days.
+            </p>
           </div>
         </section>
       </div>
