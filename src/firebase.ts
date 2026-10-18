@@ -7,6 +7,8 @@ import {
   getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
   updateProfile,
@@ -104,6 +106,20 @@ export const loginWithEmail = (email: string, pass: string) =>
 export const registerWithEmail = (email: string, pass: string) =>
   createUserWithEmailAndPassword(auth, email, pass);
 export const logout = () => signOut(auth);
+
+/**
+ * Phase A — email-verification nudge (soft, never a hard block). Sent right
+ * after email/password signup and re-sendable from the in-app banner.
+ */
+export const sendVerificationEmail = (user: FirebaseUser) => sendEmailVerification(user);
+
+/**
+ * Phase A — password reset. Firebase returns a generic success even for
+ * unknown emails (anti-enumeration); callers must still catch
+ * auth/user-not-found (older configs) and show the SAME generic copy either
+ * way. See Login.tsx.
+ */
+export const sendResetEmail = (email: string) => sendPasswordResetEmail(auth, email);
 
 /**
  * Compresses a base64 image string to ensure it fits within Firestore's 1MB limit.

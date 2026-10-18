@@ -428,6 +428,74 @@ function extractTokensUsed(response) {
   return typeof total === "number" && Number.isFinite(total) && total > 0 ? Math.floor(total) : null;
 }
 
+// src/server/sessionAuth.ts
+var SESSION_COOKIE_NAME = "creatoros_session";
+var SESSION_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
+function extractSessionToken(req) {
+  const raw = req.cookies?.[SESSION_COOKIE_NAME];
+  return typeof raw === "string" && raw.length > 0 ? raw : void 0;
+}
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    maxAge: SESSION_MAX_AGE_SECONDS * 1e3,
+    path: "/"
+  };
+}
+function setSessionCookie(res, cookieValue) {
+  res.cookie(SESSION_COOKIE_NAME, cookieValue, sessionCookieOptions());
+}
+function clearSessionCookie(res) {
+  res.clearCookie(SESSION_COOKIE_NAME, {
+    ...sessionCookieOptions(),
+    maxAge: void 0
+  });
+}
+function createSessionExchangeHandler(adminAuth) {
+  return async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const idToken = authHeader.slice("Bearer ".length).trim();
+    if (!idToken) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    try {
+      await adminAuth.verifyIdToken(idToken);
+      const sessionCookie = await adminAuth.createSessionCookie(idToken, {
+        expiresIn: SESSION_MAX_AGE_SECONDS * 1e3
+      });
+      setSessionCookie(res, sessionCookie);
+      return res.status(200).json({ ok: true, expiresIn: SESSION_MAX_AGE_SECONDS });
+    } catch (error) {
+      console.error("Session exchange failed:", error);
+      return res.status(401).json({ error: "Invalid token" });
+    }
+  };
+}
+function createRevokeAllHandler(adminAuth) {
+  return async (req, res) => {
+    const uid = req.user?.uid;
+    if (!uid) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    try {
+      await adminAuth.revokeRefreshTokens(uid);
+      clearSessionCookie(res);
+      return res.status(200).json({
+        ok: true,
+        message: "Signed out everywhere. Please sign in again on any device you still trust."
+      });
+    } catch (error) {
+      console.error("Revoke-all failed:", error);
+      return res.status(500).json({ error: "Could not revoke sessions. Please try again." });
+    }
+  };
+}
+
 // server.ts
 import { fileURLToPath } from "url";
 var createViteServer = null;
@@ -445,6 +513,9 @@ try {
   }
 } catch (err) {
   console.error("Error reading firebase-applet-config.json:", err);
+}
+if (process.env.FIREBASE_AUTH_EMULATOR_HOST || process.env.FIRESTORE_EMULATOR_HOST) {
+  projectId = "demo-creatoros";
 }
 if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
   const problems = [];
@@ -575,12 +646,14 @@ async function startServer() {
   app.use(cookieParser());
   const authenticateUser = async (req, res, next) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
+    const sessionToken = extractSessionToken(req);
+    const hasBearer = Boolean(authHeader?.startsWith("Bearer "));
+    if (!hasBearer && !sessionToken) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const token = authHeader.split("Bearer ")[1];
+    const token = hasBearer ? authHeader.split("Bearer ")[1] : sessionToken;
     try {
-      const decodedToken = await admin4.auth().verifyIdToken(token);
+      const decodedToken = hasBearer ? await admin4.auth().verifyIdToken(token) : await admin4.auth().verifySessionCookie(token, true);
       req.user = decodedToken;
       next();
     } catch (error) {
@@ -1355,6 +1428,8 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       res.status(500).json({ error: formatGeminiError(error) });
     }
   });
+  app.post("/api/auth/session", createSessionExchangeHandler(admin4.auth()));
+  app.post("/api/auth/revoke-all", authenticateUser, createRevokeAllHandler(admin4.auth()));
   app.get("/api/auth/google/url", authenticateUser, (req, res) => {
     const url = oauth2Client.generateAuthUrl({
       access_type: "offline",

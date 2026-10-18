@@ -8,3 +8,14 @@
  */
 export const TEST_USER_EMAIL = 'e2e-smoke@demo-creatoros.test';
 export const TEST_USER_PASSWORD = 'EmulatorOnly-Not-A-Secret';
+
+/**
+ * Phase A — email/password registration flows. Fresh addresses per run (the
+ * emulator keeps accounts for the whole run, and register must exercise the
+ * SIGN-UP path, not email-already-in-use). The password must satisfy the
+ * shipped password policy: >= 8 chars, not in the bundled common-password list.
+ */
+export const PHASE_A_TEST_PASSWORD = 'EmulatorOnly-Not-A-Secret';
+export function freshPhaseAEmail(): string {
+  return `e2e-auth-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@demo-creatoros.test`;
+}

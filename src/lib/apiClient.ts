@@ -90,7 +90,9 @@ async function requireIdToken(): Promise<string> {
 }
 
 function buildApiHeaders(input: RequestInfo | URL, init: RequestInit, token: string): Headers {
-  const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+  const headers = new Headers(
+    init?.headers || (input instanceof Request ? input.headers : undefined),
+  );
   if (!headers.has('Content-Type')) {
     // Legacy authorizedFetch defaulted to JSON request bodies; preserve that.
     headers.set('Content-Type', 'application/json');
@@ -116,7 +118,7 @@ async function throwForResponse(response: Response): Promise<never> {
   if (response.status === 429) {
     throw new RateLimitError(
       parseRetryAfterSeconds(body, response.headers),
-      typeof body?.error === 'string' && body.error ? body.error : undefined
+      typeof body?.error === 'string' && body.error ? body.error : undefined,
     );
   }
   throw new Error(body?.error || `Request failed with status ${response.status}`);
@@ -127,7 +129,10 @@ async function throwForResponse(response: Response): Promise<never> {
  * Returns the raw Response (throws on non-OK), so callers keep using
  * `response.json()` / `response.blob()` exactly as before.
  */
-export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+export async function apiFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<Response> {
   const rawUrl = extractRequestUrl(input);
 
   // Only same-origin /api/* requests are authenticated — everything else passes through untouched.
@@ -159,4 +164,23 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
     return throwForResponse(response);
   }
   return response;
+}
+
+/**
+ * Phase A — exchange the current ID token for a Firebase session cookie
+ * (POST /api/auth/session). Best-effort by design: callers fire-and-forget it
+ * after sign-in/registration; the Bearer flow keeps working if it fails.
+ * The cookie is an ABSOLUTE 14-day session (never renewed by traffic).
+ */
+export async function exchangeSessionCookie(): Promise<void> {
+  await apiFetch('/api/auth/session', { method: 'POST' });
+}
+
+/**
+ * Phase A — "Sign out of all devices": revokes every refresh token server-side
+ * (POST /api/auth/revoke-all) and clears this device's session cookie. Pair
+ * with a client `logout()` so the current tab returns to the login view.
+ */
+export async function revokeAllSessions(): Promise<void> {
+  await apiFetch('/api/auth/revoke-all', { method: 'POST' });
 }

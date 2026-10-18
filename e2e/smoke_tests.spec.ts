@@ -57,6 +57,15 @@ test.describe('CreatorOS End-to-End System Smoke Tests', () => {
     await page.route('**/api/analytics/summary', async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     });
+    // Phase A: sign-in now fire-and-forgets the session-cookie exchange; the
+    // real endpoint is unit-tested server-side, here it just must not block.
+    await page.route('**/api/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, expiresIn: 14 * 24 * 60 * 60 }),
+      });
+    });
     await page.route('**/api/onboarding/**', async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     });
