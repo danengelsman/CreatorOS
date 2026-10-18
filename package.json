@@ -13,6 +13,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit && eslint .",
     "check:artifact": "node scripts/check-artifact-freshness.mjs",
+    "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "prepare": "husky"
   },
@@ -76,6 +77,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.10",
-    "tsx": "^4.23.13"
+    "tsx": "^4.23.13",
+    "vitest": "^5.0.5",
+    "zod": "^4.6.7"
   }
 }

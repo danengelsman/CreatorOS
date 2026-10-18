@@ -1,5 +1,5 @@
 # F4.1 — Real CI. Replaces the old "CreatorOS Runner Diagnostic" heartbeat.
-# Pipeline: install -> typecheck -> lint -> build -> artifact-freshness gate.
+# Pipeline: install -> typecheck -> lint -> build -> artifact gate -> unit tests.
 # Prettier runs non-blocking (continue-on-error) until the one-time repo-wide
 # format pass lands (deliberately deferred to avoid merge conflicts with
 # in-flight branches — see F4.3).
@@ -46,9 +46,9 @@ jobs:
       - name: Artifact freshness gate (api/_server.js vs server.ts)
         run: npm run check:artifact
 
-      # TODO (Week 4, F4.4): add unit tests here once a test runner (Vitest)
-      # is configured in package.json. No test runner exists yet, so there is
-      # nothing to run — do not add a fake/passing step in the meantime.
+      # F4.4 — unit tests (Vitest, services-layer focus per D5-A).
+      - name: Unit tests
+        run: npm run test:unit
 
       # TODO (Week 4, F4.5): add the Playwright e2e smoke job here once the
       # specs run against the Firebase Emulator Suite with mocked Gemini —
