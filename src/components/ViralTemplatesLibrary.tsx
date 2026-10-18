@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkle, Copy, ArrowRight, Video, TwitterLogo, InstagramLogo, YoutubeLogo, TiktokLogo, FileText, CheckCircle, MagicWand, X, Cards } from '@phosphor-icons/react';
+import { Sparkle, ArrowRight, TwitterLogo, InstagramLogo, YoutubeLogo, TiktokLogo, FileText, CheckCircle, MagicWand, X, Cards } from '@phosphor-icons/react';
 import { apiFetch } from '../firebase';
 import { cn } from '../lib/utils';
 import { getFriendlyError } from '../lib/friendlyError';

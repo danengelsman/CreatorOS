@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { PaperPlaneRight as Send, CheckCircle as CheckCircle2, ArrowsClockwise as RefreshCw, Chat as MessageSquare, CaretRight as ChevronRight, Palette, TextT as Type, Target, Lightning as Zap, Lightbulb, WarningCircle, FileText, X } from '@phosphor-icons/react';
+import { ArrowsClockwise as RefreshCw, Chat as MessageSquare, Palette, TextT as Type, Target, Lightbulb, WarningCircle, FileText, X } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
-import { generateBrandKit, generateContentIdeas, generateBrandLogo, generateStyleGuideSummary } from '../services/gemini';
-import { cn } from '../lib/utils';
+import { generateBrandKit, generateBrandLogo, generateStyleGuideSummary } from '../services/gemini';
+
 import { db, serverTimestamp, handleFirestoreError, OperationType } from '../firebase';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import BrandIcon from './BrandIcon';

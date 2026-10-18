@@ -10,7 +10,7 @@ import { getFriendlyError } from '../lib/friendlyError';
 
 export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSelectedIdea }: { brand: any, setBrand: any, user: any, setActiveTab: any, setSelectedIdea?: any }) {
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [, setErrorMsg] = useState('');
 
   // Spontaneous voice recording states
   const [isRecording, setIsRecording] = useState(false);

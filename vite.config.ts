@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 const pkg = require('./package.json') as { version: string };
 
 export default defineConfig(({mode}) => {
-  const env = loadEnv(mode, '.', '');
+  loadEnv(mode, '.', '');
   // F3.4: real build metadata injected at compile time so SupportHub can show
   // the actual package version and git commit instead of scripted output.
   // Both are '' when unavailable (e.g. shallow CI checkout) and the UI omits

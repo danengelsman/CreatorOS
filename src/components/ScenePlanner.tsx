@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { FilmScript, Sparkle, Clock, Copy, Check, VideoCamera, Image as ImageIcon, TextAa, Warning, ArrowRight, ListChecks, Export, ArrowClockwise } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import { generateScenePlan } from '../services/gemini';
@@ -18,7 +18,7 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
   const [titleText, setTitleText] = useState(initialTitle);
   const [isGenerating, setIsGenerating] = useState(false);
   const [scenePlan, setScenePlan] = useState<any | null>(null);
-  const [copiedBeatId, setCopiedBeatId] = useState<string | null>(null);
+  const [, setCopiedBeatId] = useState<string | null>(null);
   const [copiedJson, setCopiedJson] = useState(false);
   const [error, setError] = useState('');
 

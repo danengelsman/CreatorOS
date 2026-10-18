@@ -515,7 +515,6 @@ var TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
 var TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
 var TIKTOK_REDIRECT_URI = `${process.env.APP_URL}/api/auth/tiktok/callback`;
 var __filename = fileURLToPath(import.meta.url);
-var __dirname = path.dirname(__filename);
 function formatGeminiError(error) {
   let errorMessage = error.message || "Unknown API Error";
   try {
@@ -750,7 +749,8 @@ async function startServer() {
   });
   app.post("/api/gemini/generate", protectAIRoute, async (req, res) => {
     try {
-      let { model, contents, config } = req.body;
+      const { contents, config } = req.body;
+      let { model } = req.body;
       if (!model || model === "gemini-2.5-flash") {
         model = "gemini-3.8-flash";
       }
@@ -1419,7 +1419,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
   app.post("/api/publish", authenticateUser, async (req, res) => {
-    const { title, body, platforms } = req.body;
+    const { platforms } = req.body;
     if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
       return res.status(400).json({ error: "No target platforms specified" });
     }
@@ -1454,7 +1454,6 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
             url: `https://studio.youtube.com/channel/${channelId}/community`
           };
         } else if (lowerPlatform === "tiktok") {
-          const openId = profile.open_id || "tiktok-creator";
           results[platform] = {
             status: "success",
             message: `Successfully pushed content draft container to TikTok! Ready for mobile review.`,
@@ -1575,7 +1574,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           }
         }
       }
-      let tiktokStats = { followers: 0, views: 0, likes: 0 };
+      const tiktokStats = { followers: 0, views: 0, likes: 0 };
       let publishedCount = 0;
       let scheduledCount = 0;
       let draftCount = 0;

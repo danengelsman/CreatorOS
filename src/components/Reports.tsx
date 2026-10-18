@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChartBar as BarChart3, ChartLine as LineChart, CurrencyDollar as DollarSign, ChartPie as PieChart, ArrowUpRight, DownloadSimple as Download, Calendar, CaretDown as ChevronDown, Sparkle as Sparkles, CaretRight as ChevronRight, Pulse as Activity, TrendUp as TrendingUp, Brain, CalendarCheck, WarningCircle } from '@phosphor-icons/react';
+import React, { useState, useEffect } from 'react';
+import { DownloadSimple as Download, CaretRight as ChevronRight, Pulse as Activity, TrendUp as TrendingUp, Brain, CalendarCheck, WarningCircle } from '@phosphor-icons/react';
 import { 
   BarChart, 
   Bar, 
@@ -8,13 +8,11 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Cell,
+  
   Line,
   ComposedChart,
   Legend
 } from 'recharts';
-import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
 import { authorizedFetch, db } from '../firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { startOfWeek, endOfWeek, subWeeks, format, isWithinInterval } from 'date-fns';
@@ -89,7 +87,7 @@ export default function Intelligence({ user }: { user: any }) {
   const [youtubeStats, setYoutubeStats] = useState<any>(null);
   const [tiktokStats, setTiktokStats] = useState<any>(null);
   const [summary, setSummary] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [_isLoading, setIsLoading] = useState(true);
   
   const [projects, setProjects] = useState<any[]>([]);
   const [isProjectsLoading, setIsProjectsLoading] = useState(true);

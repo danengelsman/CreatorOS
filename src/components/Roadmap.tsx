@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapTrifold as Map, Flag, Lightning as Zap, Trophy, Star, LockKey as Lock, CheckCircle as CheckCircle2, CaretRight as ChevronRight, Target, Medal as Award } from '@phosphor-icons/react';
+import { Flag, Lightning as Zap, Trophy, LockKey as Lock, CheckCircle as CheckCircle2, CaretRight as ChevronRight, Target, Medal as Award } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 
@@ -46,7 +46,7 @@ const STAGES = [
   }
 ];
 
-export default function Roadmap({ brand, user, projects = [] }: { brand: any, user: any, projects?: any[] }) {
+export default function Roadmap({ brand: _brand, user, projects = [] }: { brand: any, user: any, projects?: any[] }) {
   // F6.4 (honesty sweep): this used to hardcode currentDay = 1 and
   // completedDays = [1] — fabricated progress for every user. Real progress
   // is derived from actual content created in the workspace: each finished

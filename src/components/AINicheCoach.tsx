@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Sparkle, CheckCircle, Target, Lightning, Lightbulb, Play } from '@phosphor-icons/react';
+import { Sparkle, Target, Lightning, Lightbulb } from '@phosphor-icons/react';
 import { apiFetch } from '../firebase';
-import { cn } from '../lib/utils';
+
 import { getFriendlyError } from '../lib/friendlyError';
 
 export default function AINicheCoach({ summary, brand }: { summary: any, brand: any }) {

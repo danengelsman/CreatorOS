@@ -43,7 +43,7 @@ function record(name: string, pass: boolean, detail = '') {
   results.push({ name, pass, detail });
   console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
 }
-async function expectReject(name: string, p: Promise<unknown>, reasonHint: string) {
+async function expectReject(name: string, p: Promise<unknown>, _reasonHint: string) {
   try {
     await p;
     record(name, false, 'state was ACCEPTED but should have been rejected');

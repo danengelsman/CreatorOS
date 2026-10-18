@@ -1,9 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, User as FirebaseUser } from 'firebase/auth';
-import {
-  getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot,
-  addDoc, updateDoc, deleteDoc, serverTimestamp, getDocFromServer
-} from 'firebase/firestore';
+import { getFirestore, doc, serverTimestamp, getDocFromServer } from 'firebase/firestore';
 // Storage not available
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -149,7 +146,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-async function testConnection() {
+export async function testConnection() {
   try {
     // Only perform diagnostic check if auth state confirms user is present
     if (auth.currentUser) {

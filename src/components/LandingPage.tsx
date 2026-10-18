@@ -3,23 +3,23 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowRight, 
   Check, 
-  Star, 
+   
   Globe, 
   GithubLogo,
-  Lightning as Zap, 
-  ShieldCheck, 
+   
+   
   List as Menu, 
   X, 
   CaretRight as ChevronRight, 
   TrendUp as TrendingUp, 
-  Target, 
+   
   Palette, 
-  BookOpen, 
+   
   Sparkle,
   ChatCircleText,
   Clock,
-  ArrowCircleUp,
-  User,
+  
+  
   Plus,
   Envelope,
   Code,
@@ -31,7 +31,6 @@ import {
 } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import BrandIcon from './BrandIcon';
-import { loginWithGoogle } from '../firebase';
 
 // Sandbox presets for the interactive Brand Kit planner
 const SANDBOX_PRESETS: Record<string, Record<string, any>> = {

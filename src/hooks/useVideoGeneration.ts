@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateVideo, getOperationStatus } from '../services/gemini';
-import { db, serverTimestamp, OperationType } from '../firebase';
+import { db, serverTimestamp } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import localforage from 'localforage';
 import { getFriendlyError } from '../lib/friendlyError';
@@ -188,7 +188,7 @@ export function useVideoGeneration({
       }
       
       let done = false;
-      let finalOp = operation;
+      const finalOp = operation;
       let status = operation;
       let pollFailures = 0;
       /** Max consecutive failed status polls before declaring stuck. */

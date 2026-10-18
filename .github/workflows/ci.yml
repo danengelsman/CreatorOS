@@ -1,26 +1,78 @@
-name: CreatorOS Runner Diagnostic
+# F4.1 — Real CI. Replaces the old "CreatorOS Runner Diagnostic" heartbeat.
+# Pipeline: install -> typecheck -> lint -> build -> artifact-freshness gate.
+# Prettier runs non-blocking (continue-on-error) until the one-time repo-wide
+# format pass lands (deliberately deferred to avoid merge conflicts with
+# in-flight branches — see F4.3).
+name: CI
 
 on:
+  pull_request:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  runner-test:
-    name: GitHub Actions runner test
+  quality:
+    name: Typecheck, lint, build, artifact gate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Report runner
-        run: |
-          echo "CreatorOS GitHub Actions runner is alive"
-          echo "Runner OS: $RUNNER_OS"
-          echo "Runner name: $RUNNER_NAME"
-      - name: Check Node and npm
-        run: |
-          node --version
-          npm --version
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Build
+        run: npm run build
+
+      - name: Artifact freshness gate (api/_server.js vs server.ts)
+        run: npm run check:artifact
+
+      # TODO (Week 4, F4.4): add unit tests here once a test runner (Vitest)
+      # is configured in package.json. No test runner exists yet, so there is
+      # nothing to run — do not add a fake/passing step in the meantime.
+
+      # TODO (Week 4, F4.5): add the Playwright e2e smoke job here once the
+      # specs run against the Firebase Emulator Suite with mocked Gemini —
+      # they currently hit live Firebase auth and embed credentials, so
+      # wiring them now would make every CI run red. When that job lands,
+      # upload playwright-report/ and test-results/ on failure with
+      # actions/upload-artifact@v4 (if: failure()).
+
+  format:
+    name: Prettier check (non-blocking until repo-wide format pass)
+    runs-on: ubuntu-latest
+    continue-on-error: true # TODO: flip to enforcing after the one-time repo-wide `prettier --write` commit (deferred — see F4.3)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prettier check
+        run: npx prettier --check .

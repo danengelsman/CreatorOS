@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# F4.3 — pre-commit: format + lint-fix staged files via lint-staged.
+# Deliberately no tsc here: full-program typecheck on a staged subset is not
+# reliable (cross-file types); tsc runs in CI instead. Keep the hook fast.
+npx lint-staged

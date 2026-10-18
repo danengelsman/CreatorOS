@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
-import { motion } from 'motion/react';
+
 import { 
   CurrencyDollar, 
   TrendUp, 
@@ -25,7 +25,7 @@ export default function FirstDollarDashboard({ user, brand }: { user: any, brand
   const [sharingMilestone, setSharingMilestone] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [summary, setSummary] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -154,7 +154,7 @@ export default function FirstDollarDashboard({ user, brand }: { user: any, brand
         <div className="space-y-4">
           <h2 className="text-xl font-bold">Gamified Roadmap</h2>
           <div className="space-y-4">
-            {milestones.map((ms, i) => (
+            {milestones.map((ms) => (
               <div key={ms.id} className={cn("ios-card p-5 flex flex-col gap-4 border-l-4", ms.progress > 0 ? "border-[var(--accent)]" : "border-[var(--separator)]")}>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-3">

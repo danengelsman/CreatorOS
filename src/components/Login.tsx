@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { loginWithGoogle, loginWithEmail, registerWithEmail } from '../firebase';
 import { getFriendlyError } from '../lib/friendlyError';
-import { ShieldCheck, Globe, Lightning as Zap, CircleNotch as Loader2, ArrowRight, Sparkle as Sparkles } from '@phosphor-icons/react';
+import { ShieldCheck, Globe, CircleNotch as Loader2, ArrowRight, Sparkle as Sparkles } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 import BrandIcon from './BrandIcon';
 
