@@ -1,5 +1,10 @@
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import {
+  createErrorLogGate,
+  DEFAULT_ERROR_LOG_SAMPLE_RATE,
+  DEFAULT_MAX_ERROR_LOGS_PER_SESSION,
+} from './errorLogGate';
 
 export interface AppLogData {
   userId?: string | null;
@@ -11,16 +16,37 @@ export interface AppLogData {
   metadata?: any;
 }
 
-// Deduplication cache to prevent logging the exact same error repeatedly in a session
-const loggedErrorsSet = new Set<string>();
+// F4.7 — Budget knobs (D6-A). Env-overridable so a bad release can be debugged
+// with a higher cap, or muted entirely with a 0 sample rate, without a redeploy
+// of code — just a different env var on the hosting platform.
+const envMaxLogs = Number(import.meta.env.VITE_MAX_ERROR_LOGS_PER_SESSION);
+const MAX_ERROR_LOGS_PER_SESSION =
+  Number.isFinite(envMaxLogs) && envMaxLogs >= 1
+    ? Math.floor(envMaxLogs)
+    : DEFAULT_MAX_ERROR_LOGS_PER_SESSION;
+
+const envSampleRate = Number(import.meta.env.VITE_ERROR_LOG_SAMPLE_RATE);
+const ERROR_LOG_SAMPLE_RATE = Number.isFinite(envSampleRate)
+  ? Math.min(1, Math.max(0, envSampleRate))
+  : DEFAULT_ERROR_LOG_SAMPLE_RATE;
+
+// One gate per session: dedupe + cap + sampling (see errorLogGate.ts). Because
+// fingerprints are only admitted through the gate, its internal state stays
+// bounded by the cap — no separate trim needed.
+const logGate = createErrorLogGate({
+  maxPerSession: MAX_ERROR_LOGS_PER_SESSION,
+  sampleRate: ERROR_LOG_SAMPLE_RATE,
+});
 
 /**
  * Logs a client-side runtime error to the Firestore 'app_logs' collection.
- * Includes automatic deduplication and payload size safety limits.
+ * Includes automatic deduplication, per-session sampling and write cap
+ * (F4.7, D6-A), and payload size safety limits. Fire-and-forget: callers never
+ * await this, and any failure falls back to console instead of reaching the UI.
  */
 export async function logErrorToFirestore(
   error: Error | string | unknown,
-  metadata?: any
+  metadata?: any,
 ): Promise<void> {
   try {
     const message = error instanceof Error ? error.message : String(error);
@@ -29,17 +55,12 @@ export async function logErrorToFirestore(
     const userAgent = navigator.userAgent;
     const userId = auth.currentUser?.uid || null;
 
-    // Create a fingerprint for deduplication
+    // F4.7 — Sampling + cap + dedupe all live in the gate; this function stays
+    // fire-and-forget and must never throw into the UI (the try/catch below is
+    // the last-resort guard).
     const fingerprint = `${message}-${stack || ''}-${url}`;
-    if (loggedErrorsSet.has(fingerprint)) {
+    if (!logGate.shouldLog(fingerprint)) {
       return;
-    }
-    loggedErrorsSet.add(fingerprint);
-
-    // Limit cache size to avoid memory leaks
-    if (loggedErrorsSet.size > 100) {
-      const firstKey = loggedErrorsSet.values().next().value;
-      if (firstKey) loggedErrorsSet.delete(firstKey);
     }
 
     const payload: AppLogData = {
@@ -49,7 +70,7 @@ export async function logErrorToFirestore(
       url,
       userAgent,
       timestamp: serverTimestamp(),
-      metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null
+      metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null,
     };
 
     const logsCollection = collection(db, 'app_logs');
@@ -75,19 +96,19 @@ export function initErrorMonitoring(): void {
     if (event.message === 'Script error.' && !event.filename) {
       return;
     }
-    
+
     logErrorToFirestore(event.error || event.message, {
       filename: event.filename,
       lineno: event.lineno,
       colno: event.colno,
-      source: 'window.onerror'
+      source: 'window.onerror',
     });
   });
 
   // Catch unhandled Promise rejections
   window.addEventListener('unhandledrejection', (event) => {
     logErrorToFirestore(event.reason, {
-      source: 'window.onunhandledrejection'
+      source: 'window.onunhandledrejection',
     });
   });
 

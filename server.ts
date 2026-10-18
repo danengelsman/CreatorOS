@@ -1,17 +1,18 @@
-import express from "express";
+import express from 'express';
+import { randomUUID } from 'node:crypto';
 // vite is imported lazily — only in local dev. A static import here would
 // pull rollup native binaries into the serverless bundle and crash on boot.
 let createViteServer: any = null;
 import multer from 'multer';
-import path from "path";
-import fs from "fs";
+import path from 'path';
+import fs from 'fs';
 import { google } from 'googleapis';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import axios from 'axios';
-import { createOAuthState, verifyAndConsumeOAuthState } from "./src/server/oauth-state.ts";
-import { encryptToken, decryptToken } from "./src/server/crypto.ts";
+import { createOAuthState, verifyAndConsumeOAuthState } from './src/server/oauth-state.ts';
+import { encryptToken, decryptToken } from './src/server/crypto.ts';
 import {
   serverFirestore,
   projectsFirestore,
@@ -20,14 +21,19 @@ import {
   getIntegration,
   listIntegrations,
   firestorePing,
-} from "./src/server/firestore.ts";
-import { QuotaLedger, quotaGuardMiddleware, extractTokensUsed, ROUTE_COST_ESTIMATES } from './src/server/quotaLedger';
+} from './src/server/firestore.ts';
+import {
+  QuotaLedger,
+  quotaGuardMiddleware,
+  extractTokensUsed,
+  ROUTE_COST_ESTIMATES,
+} from './src/server/quotaLedger';
 
 dotenv.config();
 
 // Load Firebase applet config if exists
 let firestoreDbId: string | undefined = undefined;
-let projectId = "gen-lang-client-0282443702";
+let projectId = 'gen-lang-client-0282443702';
 try {
   const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
   if (fs.existsSync(firebaseConfigPath)) {
@@ -87,7 +93,9 @@ if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
 
   console.log('── CreatorOS boot: credential check ──');
   console.log(`GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'present' : 'MISSING'}`);
-  console.log(`FIREBASE_SERVICE_ACCOUNT: ${process.env.FIREBASE_SERVICE_ACCOUNT ? 'present' : 'MISSING'}`);
+  console.log(
+    `FIREBASE_SERVICE_ACCOUNT: ${process.env.FIREBASE_SERVICE_ACCOUNT ? 'present' : 'MISSING'}`,
+  );
   console.log(`APP_URL: ${process.env.APP_URL || 'MISSING'}`);
   console.log(`TOKEN_ENCRYPTION_KEY: ${process.env.TOKEN_ENCRYPTION_KEY ? 'present' : 'MISSING'}`);
   console.log(`OAUTH_STATE_SECRET: ${process.env.OAUTH_STATE_SECRET ? 'present' : 'MISSING'}`);
@@ -107,7 +115,9 @@ if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
 // behavior locally. Token verification requires real credentials in production.
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    const svc = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString('utf8'));
+    const svc = JSON.parse(
+      Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString('utf8'),
+    );
     admin.initializeApp({ credential: admin.credential.cert(svc), projectId });
   } else {
     admin.initializeApp({ projectId });
@@ -119,7 +129,7 @@ try {
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  `${process.env.APP_URL}/api/auth/google/callback`
+  `${process.env.APP_URL}/api/auth/google/callback`,
 );
 
 // TikTok Configuration
@@ -140,7 +150,11 @@ function formatGeminiError(error) {
     }
   } catch (e) {}
 
-  if (errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('prepayment credits are depleted') || error.status === 429) {
+  if (
+    errorMessage.includes('RESOURCE_EXHAUSTED') ||
+    errorMessage.includes('prepayment credits are depleted') ||
+    error.status === 429
+  ) {
     return 'Your API credits are depleted. Please go to AI Studio to manage your billing settings.';
   }
   return errorMessage;
@@ -154,11 +168,31 @@ async function startServer() {
   // F1.6d — Restrictive CORS. The API is same-origin only (plus CreatorOS
   // Vercel preview deployments). Requests without an Origin (curl, mobile)
   // pass through — they still hit route-level auth below.
-  const ALLOWED_ORIGINS = [
-    process.env.APP_URL,
-    'https://creator-os-delta-lilac.vercel.app',
-  ].filter(Boolean) as string[];
+  const ALLOWED_ORIGINS = [process.env.APP_URL, 'https://creator-os-delta-lilac.vercel.app'].filter(
+    Boolean,
+  ) as string[];
   const vercelPreviewOrigin = /^https:\/\/creator-os-[a-z0-9-]+\.vercel\.app$/;
+
+  // F4.7 — Request IDs + lightweight /api request logging (D6-A: console only,
+  // no per-request Firestore writes, no vendor). Every /api request gets a
+  // fresh id, attached to req and echoed to the client via X-Request-Id, so an
+  // error surfaced in the UI can be matched to exactly one server log line.
+  // Generated server-side on purpose: honoring a client-supplied id would let
+  // callers forge or pad log lines.
+  app.use('/api', (req: any, res: any, next: any) => {
+    const requestId = randomUUID();
+    req.requestId = requestId;
+    res.setHeader('X-Request-Id', requestId);
+    const startedAt = Date.now();
+    res.on('finish', () => {
+      // Collapse control characters so a crafted URL can't split log lines.
+      const cleanPath = String(req.originalUrl || req.url).replace(/[\r\n\t]+/g, ' ');
+      console.log(
+        `[api] ${requestId} ${req.method} ${cleanPath} -> ${res.statusCode} (${Date.now() - startedAt}ms)`,
+      );
+    });
+    next();
+  });
 
   // CORS applies to API surface only; page routes (OAuth callback HTML with
   // inline scripts) are same-origin documents and don't need it.
@@ -263,9 +297,11 @@ async function startServer() {
       const url = new URL(value);
       if (url.protocol !== 'https:') return false;
       const hostname = url.hostname.toLowerCase();
-      return hostname === 'generativelanguage.googleapis.com'
-        || hostname.endsWith('.googleapis.com')
-        || hostname.endsWith('.googleusercontent.com');
+      return (
+        hostname === 'generativelanguage.googleapis.com' ||
+        hostname.endsWith('.googleapis.com') ||
+        hostname.endsWith('.googleusercontent.com')
+      );
     } catch {
       return false;
     }
@@ -300,7 +336,11 @@ async function startServer() {
         });
       }
 
-      if (route === '/api/gemini/generate' && req.body?.model && !ALLOWED_GEMINI_MODELS.has(req.body.model)) {
+      if (
+        route === '/api/gemini/generate' &&
+        req.body?.model &&
+        !ALLOWED_GEMINI_MODELS.has(req.body.model)
+      ) {
         return res.status(400).json({ error: 'Unsupported Gemini model.' });
       }
 
@@ -350,9 +390,8 @@ async function startServer() {
         throw new Error('GEMINI_API_KEY is not set in environment variables');
       }
       const { GoogleGenAI } = await import('@google/genai');
-      _ai = new GoogleGenAI({ 
+      _ai = new GoogleGenAI({
         apiKey: process.env.GEMINI_API_KEY,
-         
       });
     }
     return _ai;
@@ -365,14 +404,19 @@ async function startServer() {
   async function executeWithModelCascade(
     ai: any,
     payload: any,
-    models: string[] = ["gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview", "gemini-flash-latest"]
+    models: string[] = [
+      'gemini-3.8-flash',
+      'gemini-3.1-flash-lite',
+      'gemini-3.1-pro-preview',
+      'gemini-flash-latest',
+    ],
   ): Promise<string | null> {
     for (const model of models) {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const res = await ai.models.generateContent({
             model,
-            ...payload
+            ...payload,
           });
           if (res?.text) {
             return res.text;
@@ -380,15 +424,20 @@ async function startServer() {
         } catch (err: any) {
           const status = err?.status || err?.code;
           const msg = String(err?.message || '');
-          const isTransient = status === 503 || msg.includes('503') || msg.includes('high demand') || msg.includes('UNAVAILABLE') || status === 429;
-          
+          const isTransient =
+            status === 503 ||
+            msg.includes('503') ||
+            msg.includes('high demand') ||
+            msg.includes('UNAVAILABLE') ||
+            status === 429;
+
           if (attempt === 0 && isTransient) {
             // Short jittered micro-retry (250-400ms) for sub-second transient packet drops
             const jitter = 250 + Math.floor(Math.random() * 150);
             await new Promise((resolve) => setTimeout(resolve, jitter));
             continue;
           }
-          
+
           // Move to next model pool in cascade cleanly
           break;
         }
@@ -402,46 +451,50 @@ async function startServer() {
     limits: { fileSize: MAX_VIDEO_UPLOAD_BYTES },
   });
 
-  app.post("/api/gemini/analyze-video", protectAIRoute, upload.single('video'), async (req: any, res) => {
-    try {
-      const file = req.file;
-      if (!file) {
-        return res.status(400).json({ error: 'No video file provided' });
-      }
-      
-      const aiInstance = await getAI();
-      const uploadResult = await aiInstance.files.upload({
-        file: file.path,
-        mimeType: file.mimetype,
-      });
-      
-      const { prompt } = req.body;
-      const response = await aiInstance.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: [
-          uploadResult,
-          { text: prompt || "Analyze this video." }
-        ]
-      });
-      recordQuota(req, '/api/gemini/analyze-video', response);
-      
-      try { fs.unlinkSync(file.path); } catch (e) {}
-      
-      res.json({ text: response.text });
-    } catch (error: any) {
-      console.error('Video Analysis Error:', error);
-      res.status(500).json({ error: formatGeminiError(error) });
-    }
-  });
+  app.post(
+    '/api/gemini/analyze-video',
+    protectAIRoute,
+    upload.single('video'),
+    async (req: any, res) => {
+      try {
+        const file = req.file;
+        if (!file) {
+          return res.status(400).json({ error: 'No video file provided' });
+        }
 
-  app.post("/api/gemini/generate", protectAIRoute, async (req: any, res) => {
+        const aiInstance = await getAI();
+        const uploadResult = await aiInstance.files.upload({
+          file: file.path,
+          mimeType: file.mimetype,
+        });
+
+        const { prompt } = req.body;
+        const response = await aiInstance.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: [uploadResult, { text: prompt || 'Analyze this video.' }],
+        });
+        recordQuota(req, '/api/gemini/analyze-video', response);
+
+        try {
+          fs.unlinkSync(file.path);
+        } catch (e) {}
+
+        res.json({ text: response.text });
+      } catch (error: any) {
+        console.error('Video Analysis Error:', error);
+        res.status(500).json({ error: formatGeminiError(error) });
+      }
+    },
+  );
+
+  app.post('/api/gemini/generate', protectAIRoute, async (req: any, res) => {
     try {
       const { contents, config } = req.body;
-    let { model } = req.body;
-      
+      let { model } = req.body;
+
       // Transparently rewrite deprecated models to modern standard
-      if (!model || model === "gemini-2.5-flash") {
-        model = "gemini-3.8-flash";
+      if (!model || model === 'gemini-2.5-flash') {
+        model = 'gemini-3.8-flash';
       }
 
       const ai = await getAI();
@@ -450,23 +503,25 @@ async function startServer() {
         response = await ai.models.generateContent({
           model,
           contents,
-          config
+          config,
         });
         recordQuota(req, '/api/gemini/generate', response);
       } catch (firstAttemptError: any) {
         // If 503 high demand or 404 retired model, retry with fallback flash-lite pool
-        const isTransientOrRetired = 
-          firstAttemptError?.status === 503 || 
-          firstAttemptError?.status === 404 || 
+        const isTransientOrRetired =
+          firstAttemptError?.status === 503 ||
+          firstAttemptError?.status === 404 ||
           firstAttemptError?.message?.includes('high demand') ||
           firstAttemptError?.message?.includes('no longer available');
 
-        if (isTransientOrRetired && model !== "gemini-3.1-flash-lite") {
-          console.warn(`Model ${model} unavailable (${firstAttemptError.message}), cascading to gemini-3.1-flash-lite...`);
+        if (isTransientOrRetired && model !== 'gemini-3.1-flash-lite') {
+          console.warn(
+            `Model ${model} unavailable (${firstAttemptError.message}), cascading to gemini-3.1-flash-lite...`,
+          );
           response = await ai.models.generateContent({
-            model: "gemini-3.1-flash-lite",
+            model: 'gemini-3.1-flash-lite',
             contents,
-            config
+            config,
           });
           recordQuota(req, '/api/gemini/generate', response);
         } else {
@@ -481,19 +536,21 @@ async function startServer() {
     }
   });
 
-  app.post("/api/gemini/generate-image", protectAIRoute, async (req: any, res) => {
+  app.post('/api/gemini/generate-image', protectAIRoute, async (req: any, res) => {
     try {
       const { prompt, aspectRatio } = req.body;
-      const response = await (await getAI()).models.generateContent({
+      const response = await (
+        await getAI()
+      ).models.generateContent({
         model: 'gemini-3.1-flash-lite-image',
         contents: {
-          parts: [{ text: prompt }]
+          parts: [{ text: prompt }],
         },
         config: {
           imageConfig: {
-            aspectRatio: aspectRatio || "1:1",
-          }
-        }
+            aspectRatio: aspectRatio || '1:1',
+          },
+        },
       });
       recordQuota(req, '/api/gemini/generate-image', response);
       let base64EncodeString = '';
@@ -515,9 +572,9 @@ async function startServer() {
   });
 
   // --- Onboarding Interview and Channel Style API ---
-  app.post("/api/onboarding/chat", authenticateUser, async (req: any, res) => {
+  app.post('/api/onboarding/chat', authenticateUser, async (req: any, res) => {
     const { messages } = req.body;
-    
+
     // Deterministic interview fallback logic in case of upstream AI model outages or 503 spikes
     const buildDeterministicFallback = () => {
       const userMsgs = (messages || []).filter((m: any) => m.role === 'user');
@@ -526,23 +583,27 @@ async function startServer() {
 
       if (count <= 1) {
         return {
-          message: "Fantastic direction! That's a high-potential space. Next, who is your dream viewer or target audience for these videos?",
-          isComplete: false
+          message:
+            "Fantastic direction! That's a high-potential space. Next, who is your dream viewer or target audience for these videos?",
+          isComplete: false,
         };
       } else if (count === 2) {
         return {
-          message: "Got it! That gives us a really clear target. Lastly, what should the style and mood of your content feel like? (e.g., friendly and easy to follow, calm and aesthetic, or energetic and bold?)",
-          isComplete: false
+          message:
+            'Got it! That gives us a really clear target. Lastly, what should the style and mood of your content feel like? (e.g., friendly and easy to follow, calm and aesthetic, or energetic and bold?)',
+          isComplete: false,
         };
       } else {
-        const niche = userMsgs[0]?.content?.replace(/^I'd love to make videos about:\s*/i, '') || "Content Creation";
-        const audience = userMsgs[1]?.content || "Curious Learners & Creators";
-        const vibe = latestUserText || "Friendly, Authentic & Engaging";
+        const niche =
+          userMsgs[0]?.content?.replace(/^I'd love to make videos about:\s*/i, '') ||
+          'Content Creation';
+        const audience = userMsgs[1]?.content || 'Curious Learners & Creators';
+        const vibe = latestUserText || 'Friendly, Authentic & Engaging';
 
         return {
           message: `Fantastic! We have everything needed to architect your custom Creator Profile for ${niche}. Click 'Build My Brand Kit' below to unlock your custom colors, voice, templates, and video ideas!`,
           isComplete: true,
-          summary: { niche, audience, vibe }
+          summary: { niche, audience, vibe },
         };
       }
     };
@@ -572,44 +633,48 @@ async function startServer() {
 
       const contents = (messages || []).map((m: any) => ({
         role: m.role === 'assistant' ? 'model' : m.role,
-        parts: [{ text: m.content }]
+        parts: [{ text: m.content }],
       }));
 
       const ai = await getAI();
       const config = {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: {
-          type: "OBJECT" as any,
+          type: 'OBJECT' as any,
           properties: {
-            message: { type: "STRING" as any, description: "Your next chat response or final encouraging summary" },
-            isComplete: { type: "BOOLEAN" as any, description: "True if all 3 questions (niche, audience, vibe) have been answered and summarized" },
+            message: {
+              type: 'STRING' as any,
+              description: 'Your next chat response or final encouraging summary',
+            },
+            isComplete: {
+              type: 'BOOLEAN' as any,
+              description:
+                'True if all 3 questions (niche, audience, vibe) have been answered and summarized',
+            },
             summary: {
-              type: "OBJECT" as any,
+              type: 'OBJECT' as any,
               properties: {
-                niche: { type: "STRING" as any },
-                audience: { type: "STRING" as any },
-                vibe: { type: "STRING" as any }
-              }
-            }
+                niche: { type: 'STRING' as any },
+                audience: { type: 'STRING' as any },
+                vibe: { type: 'STRING' as any },
+              },
+            },
           },
-          required: ["message", "isComplete"]
-        }
+          required: ['message', 'isComplete'],
+        },
       };
 
       const requestPayload = {
-        contents: [
-          { role: "user", parts: [{ text: systemInstruction }] },
-          ...contents
-        ],
-        config
+        contents: [{ role: 'user', parts: [{ text: systemInstruction }] }, ...contents],
+        config,
       };
 
       // Multi-tier cascade across diverse model compute pools with jittered retry
       const responseText = await executeWithModelCascade(ai, requestPayload, [
-        "gemini-3.8-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-3.1-pro-preview",
-        "gemini-flash-latest"
+        'gemini-3.8-flash',
+        'gemini-3.1-flash-lite',
+        'gemini-3.1-pro-preview',
+        'gemini-flash-latest',
       ]);
 
       if (responseText) {
@@ -627,48 +692,52 @@ async function startServer() {
     }
   });
 
-  app.post("/api/onboarding/generate-brand", authenticateUser, async (req: any, res) => {
+  app.post('/api/onboarding/generate-brand', authenticateUser, async (req: any, res) => {
     const { niche, audience, vibe } = req.body;
 
     // High quality deterministic brand profile fallback in case of upstream 503 spikes
     const buildFallbackBrandKit = () => {
-      const cleanNiche = niche || "Content Creation";
-      const words = cleanNiche.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+      const cleanNiche = niche || 'Content Creation';
+      const words = cleanNiche
+        .split(' ')
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
       const brandName = `${words.slice(0, 2).join('')} Studio`;
-      
+
       return {
         name: brandName,
         tagline: `Making ${cleanNiche.toLowerCase()} simple, engaging, and impactful.`,
-        archetype: "The Empowering Guide",
-        personality: "Warm, Resourceful, Clear, Motivating",
+        archetype: 'The Empowering Guide',
+        personality: 'Warm, Resourceful, Clear, Motivating',
         colors: {
-          primary: "#18181B",
-          secondary: "#7C3AED",
-          accent: "#F59E0B",
-          background: "#FAFAFA"
+          primary: '#18181B',
+          secondary: '#7C3AED',
+          accent: '#F59E0B',
+          background: '#FAFAFA',
         },
         typography: {
-          heading: "Plus Jakarta Sans",
-          body: "Inter"
+          heading: 'Plus Jakarta Sans',
+          body: 'Inter',
         },
-        visual_style: "Clean high-contrast layouts, minimal screen clutter, and crisp typography highlights.",
-        thumbnail_style: "Punchy vibrant accents, high-contrast expressive faces, and 3-word bold topic hooks.",
+        visual_style:
+          'Clean high-contrast layouts, minimal screen clutter, and crisp typography highlights.',
+        thumbnail_style:
+          'Punchy vibrant accents, high-contrast expressive faces, and 3-word bold topic hooks.',
         content_hooks: [
           `If you've been struggling to master ${cleanNiche.toLowerCase()}, here is the 60-second fix.`,
           `The single biggest mistake beginner creators make in ${cleanNiche.toLowerCase()} (and how to avoid it).`,
-          `3 simple tools that completely changed the way I create ${cleanNiche.toLowerCase()} content.`
+          `3 simple tools that completely changed the way I create ${cleanNiche.toLowerCase()} content.`,
         ],
         catchphrases: [
-          "Create with intention, grow with momentum.",
-          "Keep building, one video at a time.",
-          "See you in the next one!"
-        ]
+          'Create with intention, grow with momentum.',
+          'Keep building, one video at a time.',
+          'See you in the next one!',
+        ],
       };
     };
 
     try {
       const userInput = `Niche/Topic: ${niche}. Dream Viewers/Audience: ${audience}. Channel Vibe/Style: ${vibe}.`;
-      
+
       const prompt = `Generate a complete, beautiful Channel Style profile for a content creator based on this description: ${userInput}. 
 Select a specific creator archetype (e.g., 'The Educator', 'The Entertainer', 'The Analyst', 'The Storyteller', 'The Guide', 'The Visionary').
 Provide granular options for visual styles, cohesive color palettes (with hex codes), and specific Google Fonts for typography (e.g., Space Grotesk, Outfit, Inter, Playfair Display, Fira Code, JetBrains Mono). 
@@ -676,60 +745,96 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
 
       const ai = await getAI();
       const config = {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: {
-          type: "OBJECT" as any,
+          type: 'OBJECT' as any,
           properties: {
-            name: { type: "STRING" as any, description: "A catchy, humble, and clear name for the channel (do not use complex brand jargon)" },
-            tagline: { type: "STRING" as any, description: "A simple and motivating tagline for the channel" },
-            archetype: { type: "STRING" as any, description: "A friendly label for their creator archetype (e.g. The Enthusiastic Guide, The Aesthetic Chef, The Simple Teacher)" },
-            personality: { type: "STRING" as any, description: "3-4 simple personality descriptors (e.g. friendly, calm, informative)" },
+            name: {
+              type: 'STRING' as any,
+              description:
+                'A catchy, humble, and clear name for the channel (do not use complex brand jargon)',
+            },
+            tagline: {
+              type: 'STRING' as any,
+              description: 'A simple and motivating tagline for the channel',
+            },
+            archetype: {
+              type: 'STRING' as any,
+              description:
+                'A friendly label for their creator archetype (e.g. The Enthusiastic Guide, The Aesthetic Chef, The Simple Teacher)',
+            },
+            personality: {
+              type: 'STRING' as any,
+              description: '3-4 simple personality descriptors (e.g. friendly, calm, informative)',
+            },
             colors: {
-              type: "OBJECT" as any,
+              type: 'OBJECT' as any,
               properties: {
-                primary: { type: "STRING" as any, description: "HEX color code" },
-                secondary: { type: "STRING" as any, description: "HEX color code" },
-                accent: { type: "STRING" as any, description: "HEX color code" },
-                background: { type: "STRING" as any, description: "HEX color code" }
+                primary: { type: 'STRING' as any, description: 'HEX color code' },
+                secondary: { type: 'STRING' as any, description: 'HEX color code' },
+                accent: { type: 'STRING' as any, description: 'HEX color code' },
+                background: { type: 'STRING' as any, description: 'HEX color code' },
               },
-              required: ["primary", "secondary", "accent", "background"]
+              required: ['primary', 'secondary', 'accent', 'background'],
             },
             typography: {
-              type: "OBJECT" as any,
+              type: 'OBJECT' as any,
               properties: {
-                heading: { type: "STRING" as any, description: "Clean Google Font name for titles" },
-                body: { type: "STRING" as any, description: "Clean Google Font name for text" }
+                heading: {
+                  type: 'STRING' as any,
+                  description: 'Clean Google Font name for titles',
+                },
+                body: { type: 'STRING' as any, description: 'Clean Google Font name for text' },
               },
-              required: ["heading", "body"]
+              required: ['heading', 'body'],
             },
-            visual_style: { type: "STRING" as any, description: "Simple description of the channel's video style (e.g., clean, high-contrast text, minimal background clutter)" },
-            thumbnail_style: { type: "STRING" as any, description: "Simple and clear thumbnail style description (e.g., bright natural lighting, bold easy-to-read text, close-up face)" },
+            visual_style: {
+              type: 'STRING' as any,
+              description:
+                "Simple description of the channel's video style (e.g., clean, high-contrast text, minimal background clutter)",
+            },
+            thumbnail_style: {
+              type: 'STRING' as any,
+              description:
+                'Simple and clear thumbnail style description (e.g., bright natural lighting, bold easy-to-read text, close-up face)',
+            },
             content_hooks: {
-              type: "ARRAY" as any,
-              items: { type: "STRING" as any },
-              description: "3 simple, engaging script opening templates tailored for their niche"
+              type: 'ARRAY' as any,
+              items: { type: 'STRING' as any },
+              description: '3 simple, engaging script opening templates tailored for their niche',
             },
             catchphrases: {
-              type: "ARRAY" as any,
-              items: { type: "STRING" as any },
-              description: "2-3 short, catchy sayings or sign-offs to build community connection"
-            }
+              type: 'ARRAY' as any,
+              items: { type: 'STRING' as any },
+              description: '2-3 short, catchy sayings or sign-offs to build community connection',
+            },
           },
-          required: ["name", "tagline", "archetype", "personality", "colors", "typography", "visual_style", "thumbnail_style", "content_hooks", "catchphrases"]
-        }
+          required: [
+            'name',
+            'tagline',
+            'archetype',
+            'personality',
+            'colors',
+            'typography',
+            'visual_style',
+            'thumbnail_style',
+            'content_hooks',
+            'catchphrases',
+          ],
+        },
       };
 
       const responseText = await executeWithModelCascade(
         ai,
-        { contents: [{ role: "user", parts: [{ text: prompt }] }], config },
+        { contents: [{ role: 'user', parts: [{ text: prompt }] }], config },
         [
-          "gemini-3.8-flash",
-          "gemini-3.1-flash-lite",
-          "gemini-3.1-pro-preview",
-          "gemini-flash-latest"
-        ]
+          'gemini-3.8-flash',
+          'gemini-3.1-flash-lite',
+          'gemini-3.1-pro-preview',
+          'gemini-flash-latest',
+        ],
       );
-      
+
       if (responseText) {
         try {
           const parsed = JSON.parse(responseText);
@@ -746,36 +851,40 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
   });
 
   // --- Dynamic Niche Sparks for Hesitant Day-Zero Creators ---
-  app.get("/api/onboarding/niche-sparks", protectAIRoute, async (req: any, res) => {
+  app.get('/api/onboarding/niche-sparks', protectAIRoute, async (req: any, res) => {
     // Curated high-converting fallbacks in case of network latency or rate limit
     const fallbackSparks = {
-      museMessage: "Take a breath—day zero is the hardest step because the canvas is blank. You don't have to guess: here are high-momentum niches thriving right now.",
+      museMessage:
+        "Take a breath—day zero is the hardest step because the canvas is blank. You don't have to guess: here are high-momentum niches thriving right now.",
       sparks: [
         {
-          type: "trending",
-          badge: "Trending Today",
-          title: "AI Workflows for Solo Creators",
-          pitch: "Creators are booming by breaking down simple prompts, free AI tools, and everyday productivity shortcuts.",
-          dreamViewer: "Freelancers, students & creators saving time",
-          vibe: "Clear, actionable, and exciting"
+          type: 'trending',
+          badge: 'Trending Today',
+          title: 'AI Workflows for Solo Creators',
+          pitch:
+            'Creators are booming by breaking down simple prompts, free AI tools, and everyday productivity shortcuts.',
+          dreamViewer: 'Freelancers, students & creators saving time',
+          vibe: 'Clear, actionable, and exciting',
         },
         {
-          type: "underserved",
-          badge: "Underserved Goldmine",
-          title: "Micro-Budget Studio Gear Reviews",
-          pitch: "Massive search volume with low competition: testing budget $30 microphones and smartphone lighting setups.",
-          dreamViewer: "Beginner creators who want quality without spending thousands",
-          vibe: "Honest, resourceful, and grounded"
+          type: 'underserved',
+          badge: 'Underserved Goldmine',
+          title: 'Micro-Budget Studio Gear Reviews',
+          pitch:
+            'Massive search volume with low competition: testing budget $30 microphones and smartphone lighting setups.',
+          dreamViewer: 'Beginner creators who want quality without spending thousands',
+          vibe: 'Honest, resourceful, and grounded',
         },
         {
-          type: "trending",
-          badge: "High Growth",
-          title: "Cozy Tech & Mindful Productivity",
-          pitch: "Audiences fatigued by hustle culture are loving desk setups, calm focus sessions, and intentional tech.",
-          dreamViewer: "Remote workers and students craving peace",
-          vibe: "Calm, aesthetic, and supportive"
-        }
-      ]
+          type: 'trending',
+          badge: 'High Growth',
+          title: 'Cozy Tech & Mindful Productivity',
+          pitch:
+            'Audiences fatigued by hustle culture are loving desk setups, calm focus sessions, and intentional tech.',
+          dreamViewer: 'Remote workers and students craving peace',
+          vibe: 'Calm, aesthetic, and supportive',
+        },
+      ],
     };
 
     try {
@@ -789,42 +898,49 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
       const ai = await getAI();
       const config = {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: {
-          type: "OBJECT" as any,
+          type: 'OBJECT' as any,
           properties: {
-            museMessage: { type: "STRING" as any },
+            museMessage: { type: 'STRING' as any },
             sparks: {
-              type: "ARRAY" as any,
+              type: 'ARRAY' as any,
               items: {
-                type: "OBJECT" as any,
+                type: 'OBJECT' as any,
                 properties: {
-                  type: { type: "STRING" as any, description: "'trending' or 'underserved'" },
-                  badge: { type: "STRING" as any, description: "Short badge like 'Trending Today' or 'Hidden Gem'" },
-                  title: { type: "STRING" as any, description: "Concise niche title" },
-                  pitch: { type: "STRING" as any, description: "1 punchy sentence why it works" },
-                  dreamViewer: { type: "STRING" as any, description: "Who watches this" },
-                  vibe: { type: "STRING" as any, description: "Suggested mood" }
+                  type: { type: 'STRING' as any, description: "'trending' or 'underserved'" },
+                  badge: {
+                    type: 'STRING' as any,
+                    description: "Short badge like 'Trending Today' or 'Hidden Gem'",
+                  },
+                  title: { type: 'STRING' as any, description: 'Concise niche title' },
+                  pitch: { type: 'STRING' as any, description: '1 punchy sentence why it works' },
+                  dreamViewer: { type: 'STRING' as any, description: 'Who watches this' },
+                  vibe: { type: 'STRING' as any, description: 'Suggested mood' },
                 },
-                required: ["type", "badge", "title", "pitch", "dreamViewer", "vibe"]
-              }
-            }
+                required: ['type', 'badge', 'title', 'pitch', 'dreamViewer', 'vibe'],
+              },
+            },
           },
-          required: ["museMessage", "sparks"]
-        }
+          required: ['museMessage', 'sparks'],
+        },
       };
 
       const responseText = await executeWithModelCascade(
         ai,
-        { contents: [{ role: "user", parts: [{ text: prompt }] }], config },
+        { contents: [{ role: 'user', parts: [{ text: prompt }] }], config },
         [
-          "gemini-3.8-flash",
-          "gemini-3.1-flash-lite",
-          "gemini-3.1-pro-preview",
-          "gemini-flash-latest"
-        ]
+          'gemini-3.8-flash',
+          'gemini-3.1-flash-lite',
+          'gemini-3.1-pro-preview',
+          'gemini-flash-latest',
+        ],
       );
-      recordQuota(req, '/api/onboarding/niche-sparks', responseText ? { usageMetadata: null } : null);
+      recordQuota(
+        req,
+        '/api/onboarding/niche-sparks',
+        responseText ? { usageMetadata: null } : null,
+      );
 
       if (responseText) {
         try {
@@ -842,14 +958,15 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
 
-  
-
   // --- Replicate (video provider with free credits; gemini-omni needs paid tier) ---
   const REPLICATE_API = 'https://api.replicate.com/v1';
   const getReplicateToken = () => process.env.REPLICATE_API_TOKEN || '';
-  const replicateHeaders = () => ({ 'Authorization': `Bearer ${getReplicateToken()}`, 'Content-Type': 'application/json' });
+  const replicateHeaders = () => ({
+    Authorization: `Bearer ${getReplicateToken()}`,
+    'Content-Type': 'application/json',
+  });
 
-  app.post("/api/gemini/generate-video", protectAIRoute, async (req: any, res) => {
+  app.post('/api/gemini/generate-video', protectAIRoute, async (req: any, res) => {
     try {
       const { prompt, aspectRatio, durationSeconds } = req.body;
 
@@ -897,26 +1014,33 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       // background:true makes create() return as soon as the render job is
       // registered instead of blocking for the whole multi-minute render.
       // The client polls /api/gemini/video-status with the returned id.
-      const interaction = await (await getAI()).interactions.create({
-        model: 'gemini-omni-flash-preview',
-        input: prompt,
-        background: true,
-        store: true, // required by the API for background interactions
-        stream: false,
-        response_format: {
-          type: 'video',
-          aspect_ratio: aspectRatio || '16:9',
-          duration: durationSeconds ? `${durationSeconds}s` : '5s',
-        }
-      }, { timeout: 60000 });
+      const interaction = await (
+        await getAI()
+      ).interactions.create(
+        {
+          model: 'gemini-omni-flash-preview',
+          input: prompt,
+          background: true,
+          store: true, // required by the API for background interactions
+          stream: false,
+          response_format: {
+            type: 'video',
+            aspect_ratio: aspectRatio || '16:9',
+            duration: durationSeconds ? `${durationSeconds}s` : '5s',
+          },
+        },
+        { timeout: 60000 },
+      );
       recordQuota(req, '/api/gemini/generate-video', interaction);
-      
+
       // Some backends may still complete synchronously — support both shapes.
       const videoPart = interaction.output_video;
-      if (interaction.status === "completed" && videoPart && (videoPart.data || videoPart.uri)) {
-        return res.json({ 
-          done: true, 
-          data: videoPart.data ? `data:${videoPart.mime_type || 'video/mp4'};base64,${videoPart.data}` : videoPart.uri 
+      if (interaction.status === 'completed' && videoPart && (videoPart.data || videoPart.uri)) {
+        return res.json({
+          done: true,
+          data: videoPart.data
+            ? `data:${videoPart.mime_type || 'video/mp4'};base64,${videoPart.data}`
+            : videoPart.uri,
         });
       }
       res.json({
@@ -931,14 +1055,16 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
 
-  app.post("/api/gemini/video-status", protectAIRoute, async (req: any, res) => {
+  app.post('/api/gemini/video-status', protectAIRoute, async (req: any, res) => {
     try {
       const { operationName } = req.body;
 
       // Replicate predictions: poll by id, parse real % from render logs.
       if (typeof operationName === 'string' && operationName.startsWith('replicate:')) {
         const predId = operationName.slice('replicate:'.length);
-        const r = await fetch(`${REPLICATE_API}/predictions/${predId}`, { headers: replicateHeaders() });
+        const r = await fetch(`${REPLICATE_API}/predictions/${predId}`, {
+          headers: replicateHeaders(),
+        });
         const text = await r.text();
         if (!r.ok) throw new Error(`Render provider error (${r.status}): ${text.slice(0, 300)}`);
         const pred = JSON.parse(text);
@@ -956,7 +1082,8 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           // Replicate exposes no numeric progress field, but its logs contain
           // tqdm-style "42%" updates from the render loop.
           const matches = [...String(pred.logs || '').matchAll(/(\d{1,3})%/g)];
-          if (matches.length) progressPercentage = Math.min(99, parseInt(matches[matches.length - 1][1], 10));
+          if (matches.length)
+            progressPercentage = Math.min(99, parseInt(matches[matches.length - 1][1], 10));
         } else if (pred.status === 'starting') {
           progressPercentage = 1;
         } else if (['failed', 'canceled'].includes(pred.status)) {
@@ -975,7 +1102,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
       const interaction = await (await getAI()).interactions.get(operationName);
       recordQuota(req, '/api/gemini/video-status', interaction);
-      
+
       let done = false;
       let data = null;
       // Honest signals for the client's progress model. progressPercentage is
@@ -985,28 +1112,28 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const startedAt = interaction.created || null;
       const updatedAt = interaction.updated || null;
       let progressPercentage: number | null = null;
-      
-      if (renderStatus === "completed") {
+
+      if (renderStatus === 'completed') {
         done = true;
         progressPercentage = 100;
         const videoPart = interaction.output_video;
         if (videoPart && videoPart.data) {
-           data = `data:${videoPart.mime_type || 'video/mp4'};base64,${videoPart.data}`;
+          data = `data:${videoPart.mime_type || 'video/mp4'};base64,${videoPart.data}`;
         } else if (videoPart && videoPart.uri) {
-           // fallback just in case it returns URI
-           data = videoPart.uri;
+          // fallback just in case it returns URI
+          data = videoPart.uri;
         }
-      } else if (["failed", "cancelled"].includes(renderStatus)) {
+      } else if (['failed', 'cancelled'].includes(renderStatus)) {
         throw new Error(`Video generation ${renderStatus}`);
       }
-      
-      res.json({ 
-        done, 
+
+      res.json({
+        done,
         progressPercentage,
         renderStatus,
         startedAt,
         updatedAt,
-        data
+        data,
       });
     } catch (error: any) {
       console.error('Video Status Error:', error);
@@ -1014,7 +1141,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
 
-  app.post("/api/gemini/video-download", protectAIRoute, async (req: any, res) => {
+  app.post('/api/gemini/video-download', protectAIRoute, async (req: any, res) => {
     try {
       const { uri } = req.body;
       if (!uri) return res.status(400).send('No URI');
@@ -1028,9 +1155,13 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       res.setHeader('Content-Type', 'video/mp4');
       videoRes.body!.pipeTo(
         new WritableStream({
-          write(chunk) { res.write(chunk); },
-          close() { res.end(); },
-        })
+          write(chunk) {
+            res.write(chunk);
+          },
+          close() {
+            res.end();
+          },
+        }),
       );
     } catch (error: any) {
       console.error('Video Download Error:', error);
@@ -1040,21 +1171,21 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
   // --- OAuth & Social Integration ---
 
-  app.get("/api/auth/google/url", authenticateUser, (req: any, res) => {
+  app.get('/api/auth/google/url', authenticateUser, (req: any, res) => {
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: [
         'https://www.googleapis.com/auth/youtube.readonly',
         'https://www.googleapis.com/auth/yt-analytics.readonly',
-        'https://www.googleapis.com/auth/userinfo.profile'
+        'https://www.googleapis.com/auth/userinfo.profile',
       ],
       state: createOAuthState(req.user.uid, 'youtube'), // F1.3 signed, single-use state
-      prompt: 'consent'
+      prompt: 'consent',
     });
     res.json({ url });
   });
 
-  app.get("/api/auth/google/callback", async (req, res) => {
+  app.get('/api/auth/google/callback', async (req, res) => {
     const { code, state } = req.query;
 
     // F1.3 — verify signature, TTL and single-use jti before trusting state.
@@ -1116,7 +1247,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   });
 
   // TikTok OAuth
-  app.get("/api/auth/tiktok/url", authenticateUser, (req: any, res) => {
+  app.get('/api/auth/tiktok/url', authenticateUser, (req: any, res) => {
     const scope = 'user.info.basic,video.list';
 
     // F1.3 signed, single-use state (replaces raw uid / random csrfState)
@@ -1125,11 +1256,11 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     // Construct TikTok auth URL
     // Documentation: https://developers.tiktok.com/doc/login-kit-web
     const url = `https://www.tiktok.com/v2/auth/authorize/?client_key=${TIKTOK_CLIENT_KEY}&scope=${scope}&response_type=code&redirect_uri=${encodeURIComponent(TIKTOK_REDIRECT_URI)}&state=${encodeURIComponent(csrfState)}`;
-    
+
     res.json({ url });
   });
 
-  app.get("/api/auth/tiktok/callback", async (req, res) => {
+  app.get('/api/auth/tiktok/callback', async (req, res) => {
     const { code, state } = req.query;
 
     // F1.3 — verify signature, TTL and single-use jti before trusting state.
@@ -1149,7 +1280,8 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
     try {
       // Exchange code for token
-      const response = await axios.post('https://open.tiktokapis.com/v2/oauth/token/',
+      const response = await axios.post(
+        'https://open.tiktokapis.com/v2/oauth/token/',
         new URLSearchParams({
           client_key: TIKTOK_CLIENT_KEY!,
           client_secret: TIKTOK_CLIENT_SECRET!,
@@ -1157,7 +1289,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           grant_type: 'authorization_code',
           redirect_uri: TIKTOK_REDIRECT_URI,
         }).toString(),
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
       );
 
       const { access_token, refresh_token, expires_in, open_id } = response.data;
@@ -1198,29 +1330,33 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
 
-  app.get("/api/accounts", authenticateUser, async (req: any, res) => {
+  app.get('/api/accounts', authenticateUser, async (req: any, res) => {
     try {
       // F2 — connected accounts live in Firestore `integrations` now
       const accounts = await listIntegrations(req.user.uid);
-      res.json(accounts.map(a => ({
-        platform: a.platform,
-        profile: JSON.parse(a.profile_data || '{}')
-      })));
+      res.json(
+        accounts.map((a) => ({
+          platform: a.platform,
+          profile: JSON.parse(a.profile_data || '{}'),
+        })),
+      );
     } catch (err: any) {
       console.error('Accounts API Error:', err);
       res.status(500).json({ error: err.message || 'Failed to list connected accounts' });
     }
   });
 
-  app.post("/api/publish", authenticateUser, async (req: any, res) => {
+  app.post('/api/publish', authenticateUser, async (req: any, res) => {
     const { platforms } = req.body;
     if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
-      return res.status(400).json({ error: "No target platforms specified" });
+      return res.status(400).json({ error: 'No target platforms specified' });
     }
 
     try {
-      const results: { [key: string]: { status: 'success' | 'error', message: string, url?: string } } = {};
-      
+      const results: {
+        [key: string]: { status: 'success' | 'error'; message: string; url?: string };
+      } = {};
+
       // Get all connected accounts for the user (F2 — Firestore `integrations`)
       const accounts = (await listIntegrations(req.user.uid)).map((a) => ({
         platform: a.platform,
@@ -1228,21 +1364,23 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         // F1.4 — decrypt at rest tokens (legacy plaintext passes through + upgrades)
         access_token: decryptToken(a.access_token, {
           update: (enc) => {
-            void updateIntegrationFields(req.user.uid, a.platform, { access_token: enc }).catch((err: unknown) => console.error("[f1.4] lazy token upgrade failed:", err));
+            void updateIntegrationFields(req.user.uid, a.platform, { access_token: enc }).catch(
+              (err: unknown) => console.error('[f1.4] lazy token upgrade failed:', err),
+            );
           },
         }),
       }));
 
       for (const platform of platforms) {
         const lowerPlatform = platform.toLowerCase();
-        
+
         // Check if the platform is connected via OAuth
-        const account = accounts.find(a => a.platform === lowerPlatform);
-        
+        const account = accounts.find((a) => a.platform === lowerPlatform);
+
         if (!account) {
           results[platform] = {
             status: 'error',
-            message: `Platform ${platform} is not connected via OAuth. Please connect it in the Integrations tab first.`
+            message: `Platform ${platform} is not connected via OAuth. Please connect it in the Integrations tab first.`,
           };
           continue;
         }
@@ -1251,36 +1389,37 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
         if (lowerPlatform === 'youtube') {
           // Authentic YouTube community post / draft simulator using OAuth profile context
-          const channelId = profile.id || 'UC' + Math.random().toString(36).substring(2, 12).toUpperCase();
+          const channelId =
+            profile.id || 'UC' + Math.random().toString(36).substring(2, 12).toUpperCase();
           results[platform] = {
             status: 'success',
             message: `Successfully synchronized and pushed to channel "${profile.name || 'YouTube'}"!`,
-            url: `https://studio.youtube.com/channel/${channelId}/community`
+            url: `https://studio.youtube.com/channel/${channelId}/community`,
           };
         } else if (lowerPlatform === 'tiktok') {
           // Authentic TikTok API draft push simulator using OAuth profile context
           results[platform] = {
             status: 'success',
             message: `Successfully pushed content draft container to TikTok! Ready for mobile review.`,
-            url: `https://www.tiktok.com/creator-academy`
+            url: `https://www.tiktok.com/creator-academy`,
           };
         } else if (lowerPlatform === 'instagram') {
           results[platform] = {
             status: 'success',
             message: `Successfully synchronized post caption and media guidelines to Meta Creator Studio!`,
-            url: `https://business.facebook.com/creatorstudio`
+            url: `https://business.facebook.com/creatorstudio`,
           };
         } else if (lowerPlatform === 'twitter' || lowerPlatform === 'x') {
           results[platform] = {
             status: 'success',
             message: `Successfully pushed content draft and scheduled post container to X!`,
-            url: `https://x.com/home`
+            url: `https://x.com/home`,
           };
         } else {
           results[platform] = {
             status: 'success',
             message: `Successfully synced content to ${platform}!`,
-            url: '#'
+            url: '#',
           };
         }
       }
@@ -1292,40 +1431,44 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
 
-  app.get("/api/analytics/youtube", authenticateUser, async (req: any, res) => {
+  app.get('/api/analytics/youtube', authenticateUser, async (req: any, res) => {
     const account = await getIntegration(req.user.uid, 'youtube');
     if (!account) return res.json({ views: 0, subscribers: 0, videos: 0 });
 
     try {
       const auth = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
+        process.env.GOOGLE_CLIENT_SECRET,
       );
       auth.setCredentials({
         access_token: decryptToken(account.access_token, {
           update: (enc) => {
-            void updateIntegrationFields(req.user.uid, 'youtube', { access_token: enc }).catch((err: unknown) => console.error("[f1.4] lazy token upgrade failed:", err));
+            void updateIntegrationFields(req.user.uid, 'youtube', { access_token: enc }).catch(
+              (err: unknown) => console.error('[f1.4] lazy token upgrade failed:', err),
+            );
           },
         }),
         refresh_token: decryptToken(account.refresh_token, {
           update: (enc) => {
-            void updateIntegrationFields(req.user.uid, 'youtube', { refresh_token: enc }).catch((err: unknown) => console.error("[f1.4] lazy token upgrade failed:", err));
+            void updateIntegrationFields(req.user.uid, 'youtube', { refresh_token: enc }).catch(
+              (err: unknown) => console.error('[f1.4] lazy token upgrade failed:', err),
+            );
           },
         }),
-        expiry_date: account.expiry_date ?? undefined
+        expiry_date: account.expiry_date ?? undefined,
       });
 
       const youtube = google.youtube({ version: 'v3', auth });
       const response = await youtube.channels.list({
         part: ['statistics'],
-        mine: true
+        mine: true,
       });
 
       const stats = response.data.items?.[0]?.statistics;
       res.json({
         views: parseInt(stats?.viewCount || '0'),
         subscribers: parseInt(stats?.subscriberCount || '0'),
-        videos: parseInt(stats?.videoCount || '0')
+        videos: parseInt(stats?.videoCount || '0'),
       });
     } catch (error) {
       console.error('YouTube Analytics Error:', error);
@@ -1333,7 +1476,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
 
-  app.get("/api/analytics/tiktok", authenticateUser, async (req: any, res) => {
+  app.get('/api/analytics/tiktok', authenticateUser, async (req: any, res) => {
     // F3.2 (D4-A): fabricated TikTok metrics (followers/views/likes) were
     // removed — no fake numbers ship. TikTok's display API
     // requires audit approval (see F6.3), so until that is granted the
@@ -1344,51 +1487,55 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     res.json({
       available: false,
       reason: 'audit_pending',
-      message: 'TikTok analytics unavailable — TikTok requires audit approval for data access.'
+      message: 'TikTok analytics unavailable — TikTok requires audit approval for data access.',
     });
   });
 
-  app.get("/api/analytics/summary", authenticateUser, async (req: any, res) => {
+  app.get('/api/analytics/summary', authenticateUser, async (req: any, res) => {
     try {
       const userId = req.user.uid;
 
       // 1. Fetch connected accounts (F2 — Firestore `integrations`)
       const accounts = await listIntegrations(userId);
-      const isYoutubeConnected = accounts.some(a => a.platform === 'youtube');
+      const isYoutubeConnected = accounts.some((a) => a.platform === 'youtube');
 
       // 2. Fetch YouTube Stats if connected
       let youtubeStats = { views: 0, subscribers: 0, videos: 0 };
       if (isYoutubeConnected) {
-        const ytAccount = accounts.find(a => a.platform === 'youtube');
+        const ytAccount = accounts.find((a) => a.platform === 'youtube');
         if (ytAccount) {
           try {
             const auth = new google.auth.OAuth2(
               process.env.GOOGLE_CLIENT_ID,
-              process.env.GOOGLE_CLIENT_SECRET
+              process.env.GOOGLE_CLIENT_SECRET,
             );
             auth.setCredentials({
               access_token: decryptToken(ytAccount.access_token, {
                 update: (enc) => {
-                  void updateIntegrationFields(userId, 'youtube', { access_token: enc }).catch((err: unknown) => console.error("[f1.4] lazy token upgrade failed:", err));
+                  void updateIntegrationFields(userId, 'youtube', { access_token: enc }).catch(
+                    (err: unknown) => console.error('[f1.4] lazy token upgrade failed:', err),
+                  );
                 },
               }),
               refresh_token: decryptToken(ytAccount.refresh_token, {
                 update: (enc) => {
-                  void updateIntegrationFields(userId, 'youtube', { refresh_token: enc }).catch((err: unknown) => console.error("[f1.4] lazy token upgrade failed:", err));
+                  void updateIntegrationFields(userId, 'youtube', { refresh_token: enc }).catch(
+                    (err: unknown) => console.error('[f1.4] lazy token upgrade failed:', err),
+                  );
                 },
               }),
-              expiry_date: ytAccount.expiry_date ?? undefined
+              expiry_date: ytAccount.expiry_date ?? undefined,
             });
             const youtube = google.youtube({ version: 'v3', auth });
             const response = await youtube.channels.list({
               part: ['statistics'],
-              mine: true
+              mine: true,
             });
             const stats = response.data.items?.[0]?.statistics;
             youtubeStats = {
               views: parseInt(stats?.viewCount || '0'),
               subscribers: parseInt(stats?.subscriberCount || '0'),
-              videos: parseInt(stats?.videoCount || '0')
+              videos: parseInt(stats?.videoCount || '0'),
             };
           } catch (err) {
             console.error('YouTube stats fetch error in summary:', err);
@@ -1415,10 +1562,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
 
       try {
         const projectsDb = projectsFirestore(firestoreDbId || '(default)');
-        const snap = await projectsDb
-          .collection('projects')
-          .where('userId', '==', userId)
-          .get();
+        const snap = await projectsDb.collection('projects').where('userId', '==', userId).get();
         snap.forEach((doc: any) => {
           if (doc.id.startsWith('brand_')) return; // brand kit doc, not content
           const data = doc.data() || {};
@@ -1434,7 +1578,10 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         });
         grandTotal = publishedCount + scheduledCount + draftCount;
       } catch (err: any) {
-        console.error('Firestore projects aggregation failed in summary:', err?.response?.data || err?.message || err);
+        console.error(
+          'Firestore projects aggregation failed in summary:',
+          err?.response?.data || err?.message || err,
+        );
         // Resilient (F2): the sqlite content table no longer exists. On
         // failure the counts stay zero so the rest of the summary (YouTube /
         // TikTok stats, revenue, roadmap) still renders instead of 500-ing.
@@ -1452,7 +1599,8 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const totalFollowers = youtubeStats.subscribers + tiktokStats.followers;
       const totalViews = youtubeStats.views + tiktokStats.views;
       const totalLikes = tiktokStats.likes;
-      const engagementRate = totalViews > 0 ? parseFloat(((totalLikes / totalViews) * 100).toFixed(2)) : 0;
+      const engagementRate =
+        totalViews > 0 ? parseFloat(((totalLikes / totalViews) * 100).toFixed(2)) : 0;
 
       // Calculate milestone completions
       const milestoneBrandKit = false; // no honest server-side brand-kit signal (brands table removed)
@@ -1467,12 +1615,16 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       const goalsCompletionPercentage = Math.round((completedMilestones / 3) * 100);
 
       // Revenue Calculation based on monetization milestone progress
-      const adsRevenue = isYoutubeConnected && youtubeStats.subscribers >= 1000 ? Math.round(youtubeStats.views * 0.002) : 0;
+      const adsRevenue =
+        isYoutubeConnected && youtubeStats.subscribers >= 1000
+          ? Math.round(youtubeStats.views * 0.002)
+          : 0;
       const affiliatesRevenue = totalFollowers > 10 ? 5 : 0;
       const digitalProductsRevenue = publishedCount >= 2 ? 20 : 0;
       const sponsorshipsRevenue = totalFollowers >= 5000 ? 150 : 0;
 
-      const totalRevenue = adsRevenue + affiliatesRevenue + digitalProductsRevenue + sponsorshipsRevenue;
+      const totalRevenue =
+        adsRevenue + affiliatesRevenue + digitalProductsRevenue + sponsorshipsRevenue;
 
       res.json({
         success: true,
@@ -1483,7 +1635,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
             total: grandTotal,
             published: publishedCount,
             scheduled: scheduledCount,
-            draft: draftCount
+            draft: draftCount,
           },
           engagementRate,
           totalFollowers,
@@ -1493,20 +1645,55 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           milestones: {
             brandKit: milestoneBrandKit,
             postsPublished: milestonePostsPublished,
-            followersReached: milestoneFollowersReached
+            followersReached: milestoneFollowersReached,
           },
           revenueStreams: [
-            { name: 'Ads', projected: `$${adsRevenue}`, status: adsRevenue > 0 ? 'Active' : 'Locked', progress: adsRevenue > 0 ? 100 : 10 },
-            { name: 'Affiliates', projected: `$${affiliatesRevenue}`, status: affiliatesRevenue > 0 ? 'Active' : 'Planning', progress: affiliatesRevenue > 0 ? 100 : 20 },
-            { name: 'Sponsorships', projected: `$${sponsorshipsRevenue}`, status: sponsorshipsRevenue > 0 ? 'Active' : 'Locked', progress: sponsorshipsRevenue > 0 ? 100 : 5 },
-            { name: 'Digital Products', projected: `$${digitalProductsRevenue}`, status: digitalProductsRevenue > 0 ? 'Active' : 'Planning', progress: digitalProductsRevenue > 0 ? 100 : 40 }
+            {
+              name: 'Ads',
+              projected: `$${adsRevenue}`,
+              status: adsRevenue > 0 ? 'Active' : 'Locked',
+              progress: adsRevenue > 0 ? 100 : 10,
+            },
+            {
+              name: 'Affiliates',
+              projected: `$${affiliatesRevenue}`,
+              status: affiliatesRevenue > 0 ? 'Active' : 'Planning',
+              progress: affiliatesRevenue > 0 ? 100 : 20,
+            },
+            {
+              name: 'Sponsorships',
+              projected: `$${sponsorshipsRevenue}`,
+              status: sponsorshipsRevenue > 0 ? 'Active' : 'Locked',
+              progress: sponsorshipsRevenue > 0 ? 100 : 5,
+            },
+            {
+              name: 'Digital Products',
+              projected: `$${digitalProductsRevenue}`,
+              status: digitalProductsRevenue > 0 ? 'Active' : 'Planning',
+              progress: digitalProductsRevenue > 0 ? 100 : 40,
+            },
           ],
           gamifiedRoadmap: [
-            { id: 1, title: 'First 100 Followers', status: milestoneFollowersReached ? 'completed' : 'in-progress', progress: Math.min(100, Math.round((totalFollowers / 100) * 100)) },
-            { id: 2, title: 'First 5 Published Posts', status: milestonePostsPublished ? 'completed' : 'in-progress', progress: Math.min(100, Math.round((publishedCount / 5) * 100)) },
-            { id: 3, title: 'First Monetization Effort', status: totalRevenue > 0 ? 'completed' : 'locked', progress: totalRevenue > 0 ? 100 : 0 }
-          ]
-        }
+            {
+              id: 1,
+              title: 'First 100 Followers',
+              status: milestoneFollowersReached ? 'completed' : 'in-progress',
+              progress: Math.min(100, Math.round((totalFollowers / 100) * 100)),
+            },
+            {
+              id: 2,
+              title: 'First 5 Published Posts',
+              status: milestonePostsPublished ? 'completed' : 'in-progress',
+              progress: Math.min(100, Math.round((publishedCount / 5) * 100)),
+            },
+            {
+              id: 3,
+              title: 'First Monetization Effort',
+              status: totalRevenue > 0 ? 'completed' : 'locked',
+              progress: totalRevenue > 0 ? 100 : 0,
+            },
+          ],
+        },
       });
     } catch (err: any) {
       console.error('Summary API Error:', err);
@@ -1514,7 +1701,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
 
-  app.get("/api/diagnostics/check", authenticateUser, async (req: any, res) => {
+  app.get('/api/diagnostics/check', authenticateUser, async (req: any, res) => {
     const checks: any = {
       database: { status: 'unknown', latency: 0 },
       firebase: { status: 'unknown' },
@@ -1526,7 +1713,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         TIKTOK_CLIENT_KEY: !!process.env.TIKTOK_CLIENT_KEY,
         TIKTOK_CLIENT_SECRET: !!process.env.TIKTOK_CLIENT_SECRET,
         APP_URL: process.env.APP_URL || 'http://localhost:3000',
-      }
+      },
     };
 
     // 1. Database Check (F2 — Firestore replaces sqlite)
@@ -1558,7 +1745,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         const start = Date.now();
         const aiInstance = await getAI();
         const testGen = await aiInstance.models.generateContent({
-          model: "gemini-3.7-flash",
+          model: 'gemini-3.7-flash',
           contents: "respond with 'healthy'",
         });
         checks.gemini.status = testGen.text ? 'healthy' : 'degraded';
@@ -1575,13 +1762,13 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     res.json(checks);
   });
 
-  app.get("/robots.txt", (req, res) => {
+  app.get('/robots.txt', (req, res) => {
     res.type('text/plain');
-    res.send("User-agent: *\nAllow: /");
+    res.send('User-agent: *\nAllow: /');
   });
 
   // Legal Pages
-  app.get("/privacy", (req, res) => {
+  app.get('/privacy', (req, res) => {
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
@@ -1598,7 +1785,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     `);
   });
 
-  app.get("/terms", (req, res) => {
+  app.get('/terms', (req, res) => {
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
@@ -1619,13 +1806,13 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   // On Vercel serverless, static files are served by Vercel's own CDN layer;
   // this function only handles /api/* routes.
   if (!process.env.VERCEL) {
-    if (process.env.NODE_ENV !== "production") {
+    if (process.env.NODE_ENV !== 'production') {
       if (!createViteServer) {
         ({ createServer: createViteServer } = await import('vite'));
       }
       const vite = await createViteServer({
         server: { middlewareMode: true },
-        appType: "spa",
+        appType: 'spa',
       });
       app.use(vite.middlewares);
     } else {
@@ -1636,7 +1823,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       });
     }
 
-    app.listen(PORT, "0.0.0.0", () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
   }
