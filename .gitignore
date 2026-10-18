@@ -22,3 +22,6 @@ uploads/
 playwright-report/
 test-results/
 
+
+# TS incremental builds
+*.tsbuildinfo
