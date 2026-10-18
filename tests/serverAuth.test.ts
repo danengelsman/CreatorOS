@@ -139,6 +139,17 @@ describe('authenticateUser middleware (via GET /api/accounts)', () => {
     expect(adminState.verifyIdToken).not.toHaveBeenCalled();
   });
 
+  // F4.7 — every /api response carries a server-generated X-Request-Id so a
+  // client-reported error can be matched to exactly one server log line.
+  it('stamps a unique X-Request-Id on each /api response', async () => {
+    const [a, b] = [await get('/api/accounts'), await get('/api/accounts')];
+    const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    expect(a.headers.get('x-request-id')).toMatch(uuidShape);
+    expect(b.headers.get('x-request-id')).toMatch(uuidShape);
+    expect(a.headers.get('x-request-id')).not.toBe(b.headers.get('x-request-id'));
+  });
+
   it('401s with "Invalid token" when token verification fails', async () => {
     const res = await get('/api/accounts', 'bogus-token');
 

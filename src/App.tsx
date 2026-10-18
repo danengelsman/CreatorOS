@@ -1,9 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { UsersThree, List as Menu, X, CurrencyDollar as DollarSign, SignOut as LogOut, CircleNotch as Loader2, UserCircle, House, PenNib, Hexagon, Path, ChatsCircle, ChartLineUp, BookOpen, Sparkle, ShieldCheck, Recycle, Lightbulb, Lightning, VideoCamera } from '@phosphor-icons/react';
+import {
+  UsersThree,
+  List as Menu,
+  X,
+  CurrencyDollar as DollarSign,
+  SignOut as LogOut,
+  CircleNotch as Loader2,
+  UserCircle,
+  House,
+  PenNib,
+  Hexagon,
+  Path,
+  ChatsCircle,
+  ChartLineUp,
+  BookOpen,
+  Sparkle,
+  ShieldCheck,
+  Recycle,
+  Lightbulb,
+  Lightning,
+  VideoCamera,
+} from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
-import { auth, onAuthStateChanged, completeGoogleRedirect, db, logout, FirebaseUser, handleFirestoreError, OperationType } from './firebase';
-import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, collection, query, where } from 'firebase/firestore';
+import {
+  auth,
+  onAuthStateChanged,
+  completeGoogleRedirect,
+  db,
+  logout,
+  FirebaseUser,
+  handleFirestoreError,
+  OperationType,
+} from './firebase';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  onSnapshot,
+  collection,
+  query,
+  where,
+} from 'firebase/firestore';
 
 // Components
 import Dashboard from './components/Dashboard';
@@ -32,6 +71,7 @@ const FirstDollarDashboard = React.lazy(() => import('./components/FirstDollarDa
 const RetentionHookLab = React.lazy(() => import('./components/RetentionHookLab'));
 const VideoAnalyzer = React.lazy(() => import('./components/VideoAnalyzer'));
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { RouteErrorBoundary } from './components/RouteErrorBoundary';
 
 // F3.3 (D4-A): the Community view is a facade (hardcoded sample leaderboard,
 // sample "Active" counter, no-op composer). It ships
@@ -50,7 +90,13 @@ const NAV_ITEMS = [
   { id: 'ideas', label: 'Ideas', icon: Lightbulb, component: VideoIdeas },
   { id: 'roadmap', label: 'Roadmap', icon: Path, component: Roadmap },
   { id: 'hub', label: 'Creator Hub', icon: UsersThree, component: CreatorHub, locked: true },
-  { id: 'community', label: FEATURE_COMMUNITY ? 'Community' : 'Community (soon)', icon: ChatsCircle, component: Community, locked: !FEATURE_COMMUNITY },
+  {
+    id: 'community',
+    label: FEATURE_COMMUNITY ? 'Community' : 'Community (soon)',
+    icon: ChatsCircle,
+    component: Community,
+    locked: !FEATURE_COMMUNITY,
+  },
   { id: 'reports', label: 'Reports', icon: ChartLineUp, component: Reports },
   { id: 'help', label: 'Help', icon: BookOpen, component: HelpCenter },
   { id: 'prompts', label: 'Co-Pilot', icon: Sparkle, component: PerfectPromptCopilot },
@@ -60,20 +106,20 @@ const NAV_ITEMS = [
 const NAV_GROUPS = [
   {
     title: 'Main',
-    items: ['home']
+    items: ['home'],
   },
   {
     title: 'Studio',
-    items: ['create', 'retention', 'analyzer', 'repurpose', 'brand', 'ideas', 'prompts']
+    items: ['create', 'retention', 'analyzer', 'repurpose', 'brand', 'ideas', 'prompts'],
   },
   {
     title: 'Growth',
-    items: ['first_dollar', 'hub', 'reports', 'roadmap', 'community']
+    items: ['first_dollar', 'hub', 'reports', 'roadmap', 'community'],
   },
   {
     title: 'Settings',
-    items: ['profile', 'help', 'support']
-  }
+    items: ['profile', 'help', 'support'],
+  },
 ];
 
 const DEVELOPER_EMAILS = ['danengelsman@gmail.com'];
@@ -123,7 +169,7 @@ export default function App() {
     }, 3500);
 
     // Concurrently handle any pending Google redirect flow in background
-    void completeGoogleRedirect().catch(err => {
+    void completeGoogleRedirect().catch((err) => {
       console.warn('Google redirect check completed:', err);
     });
 
@@ -145,19 +191,23 @@ export default function App() {
               createdAt: serverTimestamp(),
               lastLogin: serverTimestamp(),
               subscriptionTier: 'free',
-              accountStatus: 'active'
+              accountStatus: 'active',
             });
           } else {
-            await setDoc(userRef, {
-              lastLogin: serverTimestamp()
-            }, { merge: true });
+            await setDoc(
+              userRef,
+              {
+                lastLogin: serverTimestamp(),
+              },
+              { merge: true },
+            );
           }
           if (isActive) setUser(firebaseUser);
         } else {
           if (isActive) setUser(null);
         }
       } catch (error) {
-        console.error("Error during auth state change:", error);
+        console.error('Error during auth state change:', error);
         if (isActive) setUser(firebaseUser);
       } finally {
         if (isActive) {
@@ -198,57 +248,72 @@ export default function App() {
       setProjectsLoadError(false);
       // Real-time user data update
       const userRef = doc(db, 'users', user.uid);
-      const unsubscribeUser = onSnapshot(userRef, (snap) => {
-        if (snap.exists()) {
-          setUserData(snap.data());
-        }
-      }, (error) => {
-        handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
-      });
+      const unsubscribeUser = onSnapshot(
+        userRef,
+        (snap) => {
+          if (snap.exists()) {
+            setUserData(snap.data());
+          }
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+        },
+      );
 
       // Real-time brand update
       const brandRef = doc(db, 'projects', `brand_${user.uid}`);
-      const unsubscribeBrand = onSnapshot(brandRef, (snap) => {
-        if (snap.exists()) {
-          const projectData = snap.data();
-          // Only complete brand and dismiss onboarding if not a draft
-          if (projectData.status === 'draft') {
-            setBrand(null);
-            setShowOnboarding(true);
-          } else if (projectData.data) {
-            setBrand(projectData.data);
-            setShowOnboarding(false);
+      const unsubscribeBrand = onSnapshot(
+        brandRef,
+        (snap) => {
+          if (snap.exists()) {
+            const projectData = snap.data();
+            // Only complete brand and dismiss onboarding if not a draft
+            if (projectData.status === 'draft') {
+              setBrand(null);
+              setShowOnboarding(true);
+            } else if (projectData.data) {
+              setBrand(projectData.data);
+              setShowOnboarding(false);
+            } else {
+              setBrand(null);
+              setShowOnboarding(true);
+            }
           } else {
             setBrand(null);
             setShowOnboarding(true);
           }
-        } else {
-          setBrand(null);
-          setShowOnboarding(true);
-        }
-      }, (error) => {
-        handleFirestoreError(error, OperationType.GET, `projects/brand_${user.uid}`);
-      });
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, `projects/brand_${user.uid}`);
+        },
+      );
 
       // Real-time projects update (content created in studio)
       const projectsRef = collection(db, 'projects');
       const q = query(projectsRef, where('userId', '==', user.uid));
-      const unsubscribeProjects = onSnapshot(q, (snap) => {
-        const projectsData = snap.docs
-          .filter(doc => !doc.id.startsWith('brand_')) // Filter out brand doc
-          .map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }))
-          .sort((a: any, b: any) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-        setProjects(projectsData);
-        setProjectsLoadError(false);
-        setIsProjectsLoading(false);
-      }, (error) => {
-        setProjectsLoadError(true);
-        setIsProjectsLoading(false);
-        handleFirestoreError(error, OperationType.GET, 'projects');
-      });
+      const unsubscribeProjects = onSnapshot(
+        q,
+        (snap) => {
+          const projectsData = snap.docs
+            .filter((doc) => !doc.id.startsWith('brand_')) // Filter out brand doc
+            .map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            }))
+            .sort(
+              (a: any, b: any) =>
+                (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0),
+            );
+          setProjects(projectsData);
+          setProjectsLoadError(false);
+          setIsProjectsLoading(false);
+        },
+        (error) => {
+          setProjectsLoadError(true);
+          setIsProjectsLoading(false);
+          handleFirestoreError(error, OperationType.GET, 'projects');
+        },
+      );
 
       return () => {
         unsubscribeUser();
@@ -262,9 +327,10 @@ export default function App() {
   }, [user]);
 
   const isDeveloper = user?.email && DEVELOPER_EMAILS.includes(user.email);
-  const visibleNavItems = NAV_ITEMS.filter(item => !item.devOnly || isDeveloper);
+  const visibleNavItems = NAV_ITEMS.filter((item) => !item.devOnly || isDeveloper);
 
-  const ActiveComponent = visibleNavItems.find(item => item.id === activeTab)?.component || Dashboard;
+  const ActiveComponent =
+    visibleNavItems.find((item) => item.id === activeTab)?.component || Dashboard;
 
   if (isAuthLoading) {
     return <LoadingScreen />;
@@ -295,7 +361,10 @@ export default function App() {
               <BrandIcon size={20} className="text-[var(--accent)]" />
               <span className="font-bold text-[19px] tracking-tight">CreatorOS</span>
             </div>
-            <button onClick={() => navigate('/')} className="ios-button ios-button-tinted h-9 px-4 text-[14px]">
+            <button
+              onClick={() => navigate('/')}
+              className="ios-button ios-button-tinted h-9 px-4 text-[14px]"
+            >
               Back to Home
             </button>
           </div>
@@ -316,7 +385,10 @@ export default function App() {
               <BrandIcon size={20} className="text-[var(--accent)]" />
               <span className="font-bold text-[19px] tracking-tight">CreatorOS</span>
             </div>
-            <button onClick={() => navigate('/')} className="ios-button ios-button-tinted h-9 px-4 text-[14px]">
+            <button
+              onClick={() => navigate('/')}
+              className="ios-button ios-button-tinted h-9 px-4 text-[14px]"
+            >
               Back to Home
             </button>
           </div>
@@ -338,7 +410,10 @@ export default function App() {
               <BrandIcon size={20} className="text-[var(--accent)]" />
               <span className="font-bold text-[19px] tracking-tight">CreatorOS</span>
             </div>
-            <button onClick={() => navigate('/help')} className="ios-button ios-button-tinted h-9 px-4 text-[14px]">
+            <button
+              onClick={() => navigate('/help')}
+              className="ios-button ios-button-tinted h-9 px-4 text-[14px]"
+            >
               Back to Help
             </button>
           </div>
@@ -354,7 +429,11 @@ export default function App() {
     document.body.classList.remove('is-app');
     return (
       <React.Suspense fallback={<LoadingScreen />}>
-        {currentPath === '/login' ? <Login navigate={navigate} /> : <LandingPage navigate={navigate} />}
+        {currentPath === '/login' ? (
+          <Login navigate={navigate} />
+        ) : (
+          <LandingPage navigate={navigate} />
+        )}
       </React.Suspense>
     );
   }
@@ -383,42 +462,44 @@ export default function App() {
     <ErrorBoundary>
       <div className="flex h-screen bg-[var(--bg-primary)] text-[var(--label-primary)] font-sans overflow-hidden relative">
         <AnimatePresence>
-          {showOnboarding && (
-            <Onboarding onComplete={handleOnboardingComplete} user={user} />
-          )}
+          {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} user={user} />}
         </AnimatePresence>
-        
+
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 relative">
-          
           {/* iOS Navigation Bar (Header) */}
           <header className="fixed top-0 left-0 right-0 lg:absolute z-[70] material-thin border-b border-[var(--separator)] flex items-center justify-between px-4 pb-2 pt-[env(safe-area-inset-top,16px)] h-[calc(env(safe-area-inset-top,0px)+52px)]">
             <div className="flex-1 flex items-center h-full">
-               <button 
-                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-                 className="p-2 -ml-2 flex items-center gap-2 text-[var(--accent)] hover:opacity-80 transition-opacity"
-               >
-                 {isMobileMenuOpen ? <X size={24} strokeWidth={1.5} /> : <Menu size={24} strokeWidth={1.5} />}
-                 <span className="font-bold text-lg hidden sm:block tracking-tight text-[var(--label-primary)]">CreatorOS</span>
-               </button>
-               
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-2 -ml-2 flex items-center gap-2 text-[var(--accent)] hover:opacity-80 transition-opacity"
+              >
+                {isMobileMenuOpen ? (
+                  <X size={24} strokeWidth={1.5} />
+                ) : (
+                  <Menu size={24} strokeWidth={1.5} />
+                )}
+                <span className="font-bold text-lg hidden sm:block tracking-tight text-[var(--label-primary)]">
+                  CreatorOS
+                </span>
+              </button>
             </div>
-            
+
             <div className="flex flex-col items-center flex-1 justify-center h-full">
               <span className="font-semibold text-[17px] tracking-[-0.014em]">
-                {visibleNavItems.find(item => item.id === activeTab)?.label}
+                {visibleNavItems.find((item) => item.id === activeTab)?.label}
               </span>
             </div>
-            
+
             <div className="flex-1 flex justify-end h-full items-center gap-3">
-              <div 
+              <div
                 onClick={() => setActiveTab('profile')}
                 className="cursor-pointer active:scale-95 transition-transform flex items-center justify-center w-8 h-8 rounded-full border border-[var(--separator)] overflow-hidden bg-[var(--bg-secondary)] shadow-sm"
               >
                 {userPhoto ? (
-                  <img 
-                    src={userPhoto || undefined} 
-                    alt="" 
+                  <img
+                    src={userPhoto || undefined}
+                    alt=""
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                   />
@@ -443,7 +524,7 @@ export default function App() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                   className="fixed top-[env(safe-area-inset-top,0px)] left-0 bottom-0 w-[280px] lg:top-[calc(env(safe-area-inset-top,0px)+60px)] lg:left-4 lg:bottom-auto lg:w-80 bg-[var(--bg-secondary)] ios-card shadow-2xl z-[65] max-h-[100dvh] lg:max-h-[80vh] overflow-y-auto custom-scrollbar border-r lg:border border-[var(--separator)]"
                 >
                   <div className="p-4 lg:p-2 space-y-6 lg:space-y-4">
@@ -451,17 +532,24 @@ export default function App() {
                     <div className="flex lg:hidden items-center justify-between pb-2 border-b border-[var(--separator)]">
                       <div className="flex items-center gap-2 text-[var(--accent)]">
                         <Menu size={24} strokeWidth={1.5} />
-                        <span className="font-bold text-lg tracking-tight text-[var(--label-primary)]">CreatorOS</span>
+                        <span className="font-bold text-lg tracking-tight text-[var(--label-primary)]">
+                          CreatorOS
+                        </span>
                       </div>
-                      <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-[var(--label-secondary)] hover:text-[var(--label-primary)]">
+                      <button
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="p-2 text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
+                      >
                         <X size={24} />
                       </button>
                     </div>
 
                     {NAV_GROUPS.map((group, groupIdx) => {
-                      const groupItems = group.items.map(id => visibleNavItems.find(item => item.id === id)).filter(Boolean);
+                      const groupItems = group.items
+                        .map((id) => visibleNavItems.find((item) => item.id === id))
+                        .filter(Boolean);
                       if (groupItems.length === 0) return null;
-                      
+
                       return (
                         <div key={groupIdx} className="space-y-1">
                           {group.title !== 'Main' && (
@@ -476,22 +564,31 @@ export default function App() {
                                 // F3.3: the gated Community entry is never
                                 // navigable. 'hub' keeps its original unlock
                                 // behavior (developers, or users with content).
-                                const communityLocked = item.id === 'community' && !FEATURE_COMMUNITY;
-                                const hubUnlocked = item.id === 'hub' && (isDeveloper || projects.length > 0);
+                                const communityLocked =
+                                  item.id === 'community' && !FEATURE_COMMUNITY;
+                                const hubUnlocked =
+                                  item.id === 'hub' && (isDeveloper || projects.length > 0);
                                 if (communityLocked || (item.locked && !hubUnlocked)) return;
                                 switchTab(item.id);
                                 setIsMobileMenuOpen(false);
                               }}
                               className={cn(
-                                "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group",
-                                activeTab === item.id 
-                                  ? "bg-[var(--accent)] text-white shadow-md shadow-[#007AFF1A]" 
-                                  : "text-[var(--label-secondary)] hover:bg-[var(--separator)]",
-                                item.locked && !isDeveloper && projects.length === 0 && "opacity-40 cursor-not-allowed grayscale"
+                                'w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group',
+                                activeTab === item.id
+                                  ? 'bg-[var(--accent)] text-white shadow-md shadow-[#007AFF1A]'
+                                  : 'text-[var(--label-secondary)] hover:bg-[var(--separator)]',
+                                item.locked &&
+                                  !isDeveloper &&
+                                  projects.length === 0 &&
+                                  'opacity-40 cursor-not-allowed grayscale',
                               )}
                             >
                               <div className="flex items-center gap-3">
-                                <item.icon size={20} className="flex-shrink-0" weight={activeTab === item.id ? "duotone" : "regular"} />
+                                <item.icon
+                                  size={20}
+                                  className="flex-shrink-0"
+                                  weight={activeTab === item.id ? 'duotone' : 'regular'}
+                                />
                                 <span className="font-semibold text-[15px]">{item.label}</span>
                               </div>
                             </button>
@@ -499,10 +596,10 @@ export default function App() {
                         </div>
                       );
                     })}
-                    
+
                     <div className="my-4 border-t border-[var(--separator)]" />
-                    
-                    <button 
+
+                    <button
                       onClick={() => {
                         logout();
                         setIsMobileMenuOpen(false);
@@ -526,28 +623,63 @@ export default function App() {
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                 >
-                  <React.Suspense fallback={
-                    <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
-                      <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
-                      <span className="text-sm font-medium text-[var(--label-secondary)]">Loading workspace...</span>
-                    </div>
-                  }>
-                    {(() => {
-                      const Component = ActiveComponent as any;
-                      
-                      if (currentPath.startsWith('/help/')) {
-                        const topicId = currentPath.replace('/help/', '');
-                        return <HelpArticle topic={topicId} onBack={() => {
-                          navigate('/'); // Reset path
-                          setActiveTab('help');
-                        }} />;
+                  {/* F4.7 — Per-route boundary: a crash in one tab renders a scoped
+                      recovery card here; the shell (nav, tab bar) stays usable.
+                      motion.div's key={activeTab} remounts a fresh boundary per tab. */}
+                  <RouteErrorBoundary
+                    onGoHome={() => {
+                      navigate('/');
+                      switchTab('home');
+                    }}
+                  >
+                    <React.Suspense
+                      fallback={
+                        <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+                          <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
+                          <span className="text-sm font-medium text-[var(--label-secondary)]">
+                            Loading workspace...
+                          </span>
+                        </div>
                       }
-                      
-                      return <Component brand={brand} setBrand={setBrand} setActiveTab={switchTab} navigate={navigate} user={user} userData={userData} projects={projects} isProjectsLoading={isProjectsLoading} projectsLoadError={projectsLoadError} selectedIdea={selectedIdea} setSelectedIdea={setSelectedIdea} selectedProject={selectedProject} onOpenProject={openProject} />;
-                    })()}
-                  </React.Suspense>
+                    >
+                      {(() => {
+                        const Component = ActiveComponent as any;
+
+                        if (currentPath.startsWith('/help/')) {
+                          const topicId = currentPath.replace('/help/', '');
+                          return (
+                            <HelpArticle
+                              topic={topicId}
+                              onBack={() => {
+                                navigate('/'); // Reset path
+                                setActiveTab('help');
+                              }}
+                            />
+                          );
+                        }
+
+                        return (
+                          <Component
+                            brand={brand}
+                            setBrand={setBrand}
+                            setActiveTab={switchTab}
+                            navigate={navigate}
+                            user={user}
+                            userData={userData}
+                            projects={projects}
+                            isProjectsLoading={isProjectsLoading}
+                            projectsLoadError={projectsLoadError}
+                            selectedIdea={selectedIdea}
+                            setSelectedIdea={setSelectedIdea}
+                            selectedProject={selectedProject}
+                            onOpenProject={openProject}
+                          />
+                        );
+                      })()}
+                    </React.Suspense>
+                  </RouteErrorBoundary>
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -556,21 +688,25 @@ export default function App() {
           {/* iOS Tab Bar (Mobile Only) */}
           <nav className="fixed bottom-0 left-0 right-0 z-[60] lg:hidden material-thick border-t border-[var(--separator)] px-2 pb-[env(safe-area-inset-bottom,4px)] pt-1 h-[calc(env(safe-area-inset-bottom,0px)+49px)]">
             <div className="flex items-center justify-around h-full">
-              {visibleNavItems.filter(item => ['home', 'create', 'repurpose', 'brand', 'profile'].includes(item.id)).map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => switchTab(item.id)}
-                  className={cn(
-                    "flex flex-col items-center justify-center flex-1 gap-1 py-1 transition-colors",
-                    activeTab === item.id ? "text-[var(--accent)]" : "text-[var(--label-secondary)]"
-                  )}
-                >
-                  <item.icon size={23} weight={activeTab === item.id ? "duotone" : "regular"} />
-                  <span className="text-[10px] font-medium tracking-[0.01em]">
-                    {item.label}
-                  </span>
-                </button>
-              ))}
+              {visibleNavItems
+                .filter((item) =>
+                  ['home', 'create', 'repurpose', 'brand', 'profile'].includes(item.id),
+                )
+                .map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => switchTab(item.id)}
+                    className={cn(
+                      'flex flex-col items-center justify-center flex-1 gap-1 py-1 transition-colors',
+                      activeTab === item.id
+                        ? 'text-[var(--accent)]'
+                        : 'text-[var(--label-secondary)]',
+                    )}
+                  >
+                    <item.icon size={23} weight={activeTab === item.id ? 'duotone' : 'regular'} />
+                    <span className="text-[10px] font-medium tracking-[0.01em]">{item.label}</span>
+                  </button>
+                ))}
             </div>
           </nav>
         </div>
