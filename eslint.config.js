@@ -1,7 +1,7 @@
-import js from "@eslint/js";
-import tseslint from "typescript-eslint";
-import globals from "globals";
-import firebaseRulesPlugin from "@firebase/eslint-plugin-security-rules";
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import globals from 'globals';
+import firebaseRulesPlugin from '@firebase/eslint-plugin-security-rules';
 
 /**
  * F4.2 — repaired ESLint flat config.
@@ -22,21 +22,21 @@ import firebaseRulesPlugin from "@firebase/eslint-plugin-security-rules";
 export default tseslint.config(
   {
     ignores: [
-      "api/",
-      "dist/",
-      "scripts/archive/",
-      "coverage/",
-      "playwright-report/",
-      "test-results/",
+      'api/',
+      'dist/',
+      'scripts/archive/',
+      'coverage/',
+      'playwright-report/',
+      'test-results/',
     ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  ...(Array.isArray(firebaseRulesPlugin.configs["flat/recommended"])
-    ? firebaseRulesPlugin.configs["flat/recommended"]
-    : [firebaseRulesPlugin.configs["flat/recommended"]]),
+  ...(Array.isArray(firebaseRulesPlugin.configs['flat/recommended'])
+    ? firebaseRulesPlugin.configs['flat/recommended']
+    : [firebaseRulesPlugin.configs['flat/recommended']]),
   {
-    files: ["src/**/*.{ts,tsx}"],
+    files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -45,12 +45,14 @@ export default tseslint.config(
   },
   {
     files: [
-      "server.ts",
-      "security-entry.ts",
-      "vite.config.ts",
-      "playwright.config.ts",
-      "scripts/**/*.{ts,tsx,js,mjs}",
-      "e2e/**/*.{ts,tsx}",
+      'server.ts',
+      'security-entry.ts',
+      'vite.config.ts',
+      'vitest.config.ts',
+      'playwright.config.ts',
+      'scripts/**/*.{ts,tsx,js,mjs}',
+      'e2e/**/*.{ts,tsx}',
+      'tests/**/*.{ts,tsx}', // F4.4 unit tests run in Node
     ],
     languageOptions: {
       globals: {
@@ -62,7 +64,7 @@ export default tseslint.config(
       // Server-side and tooling code logs to stdout/stderr on purpose
       // (fail-fast boot checks, request logging, probes). Client logging is
       // Firestore-backed (see F4.7) — console is deliberately avoided there.
-      "no-console": "off",
+      'no-console': 'off',
     },
   },
   {
@@ -70,17 +72,24 @@ export default tseslint.config(
       // Net-noise until F4.6 (zod contracts) + F5.3 (strict TS) land: 150+
       // pre-existing `any`s, each flagged here would drown real signals.
       // Re-enable when strict mode is turned on.
-      "@typescript-eslint/no-explicit-any": "off",
+      '@typescript-eslint/no-explicit-any': 'off',
       // Unused catch bindings are noise: bare `catch {}` is idiomatic since
       // ES2019 and error details are already logged inside most handlers.
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        { caughtErrors: "none", argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          caughtErrors: 'none',
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          // Allow the omit-pattern (`const { gone, ...rest } = obj`) used by
+          // contract tests to build invalid payloads from valid fixtures.
+          ignoreRestSiblings: true,
+        },
       ],
       // Best-effort cleanup / optional-parse catches are intentionally empty
       // (temp-file unlink, JSON.parse fallbacks). A comment in every one of
       // them is noise; re-enable if an empty catch ever swallows a real error.
-      "no-empty": ["error", { allowEmptyCatch: true }],
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
 );
