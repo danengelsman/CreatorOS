@@ -75,9 +75,17 @@ D0-A rebuild bot branch · D1-A archive dead scripts · **D2-A intrinsic route-l
 - **Deployed:** `a824a2a..2777d1d` pushed; CI green on main (2m, strict npm ci); Vercel redeployed; production probes: unauth 401 + X-Request-Id present, forged 401.
 - **Not done (flagged):** branch-protection rule on main (requires PR + status checks) — Dan-level repo setting, security-adjacent; 60% services coverage not measured (needs @vitest/coverage-v8, deferred); `git stash` in CreatorOS_wt_honesty holds ~92 files of pre-existing residue (recoverable, assessed redundant).
 
+## Auth expansion Phase A MERGED + DEPLOYED (2026-10-18)
+
+- PR #5 (`test-auth-e2e-harness`, squash `3cf2993`): onboarding handoff e2e coverage (the F4.5 gap) + email/password emulator harness helpers; 6 passed / 2 fixme-skipped; tripwires green.
+- PR #6 (`feat-auth-phase-a`, squash `cb6ca28`): email/password sign-up/in/reset (enumeration-safe generic copy), password policy (8+ chars + bundled top-1000 common list, `src/lib/passwordPolicy.ts`), email verification banner (soft), remember-email, session cookies (POST /api/auth/session → admin createSessionCookie, 14d ABSOLUTE, httpOnly/secure/sameSite=lax; authenticateUser accepts cookie OR Bearer), POST /api/auth/revoke-all + "Sign out of all devices" UI, emulator projectId mirror fix (emulator-only), e2e auth-flows spec (4 new). Vitest 111/111, e2e 8/8. Merge conflict in e2e/test-user.ts resolved as union of both harnesses (parent-resolved; brace fix `37c3633`; session mock added to onboarding spec `ba09112`).
+- Deployed `cb6ca28` to production; probes: GET / 200, forged session → 401, gemini unauth → 401. CI green on main push.
+- **Phase B deferred until Dan enables Firebase Identity Platform** (his billing decision): TOTP MFA, breach-password screening, stricter enumeration settings. Free-tier Phase A uses a static common-password list instead.
+- LoginScreen now offers Google + email/password. Emulator note: server admin mirrors the client's `demo-creatoros` projectId when emulator env is set (e2e-only path; prod untouched).
+
 ## Next action
 
 1. Say _"Execute Week 5"_ → Phase 5 frontend architecture: D7-A TanStack Router (URLs/deep links), D8-A Zustand slices, F5.4 CalendarView/LandingPage splits, F5.5 font/CSS hygiene — now safely PR-able with CI as the merge gate.
 2. Before more AI changes: **Gemini model audit** vs official Google docs (model IDs on main came from an unverified table).
 3. Port `phase1-today-journey` from CreatorOS-git onto main (Today/First-Dollar slice, verified Oct 6).
-4. Dan tasks: run `npx tsx scripts/set-admin-claim.ts <uid>` (needs his Vercel service-account value + Firebase uid); decide on branch protection (recommended: require PR + the CI checks); auth expansion workstream (email/password, 2FA, passkeys, session timeout) is specced in the fork conversation.
+4. DONE 2026-10-18: branch protection ON (PRs + CI checks, admins enforced). Auth Phase A (email/password, reset, session cookies 14d, sign-out-everywhere) MERGED + DEPLOYED (cb6ca28). STILL OPEN: admin claim (`npx tsx scripts/set-admin-claim.ts <uid>` — needs Dan service-account value + Firebase uid); Phase B (TOTP, passkeys, Apple) deferred until Identity Platform billing decision.
