@@ -104,6 +104,17 @@ test.describe('CreatorOS Onboarding → Dashboard handoff', () => {
       return route.abort();
     });
 
+    // Session-cookie exchange (Phase A): sign-in fires this after login. The
+    // exchange is unit-tested against the server; e2e only needs it to not
+    // block sign-in. Same cheap fulfill as auth-flows.spec.ts.
+    await page.route('**/api/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, expiresIn: 14 * 24 * 60 * 60 }),
+      });
+    });
+
     // Home (Dashboard) fetches the analytics summary; degrade gracefully.
     await page.route('**/api/analytics/summary', async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
