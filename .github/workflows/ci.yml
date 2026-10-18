@@ -68,11 +68,14 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Set up JDK 21 (Firebase emulators require >= 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: Install dependencies
         run: npm ci
-
-      # Java (required by the Firebase emulators) is preinstalled on
-      # ubuntu-latest runners; firebase-tools comes from devDependencies.
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium
 
