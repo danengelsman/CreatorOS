@@ -104,8 +104,11 @@ test.describe.serial('Phase A email/password auth flows', () => {
     await page.locator('input[placeholder="Password"]').fill(PHASE_A_TEST_PASSWORD);
     await page.locator('button[type="submit"]').click();
 
-    // Same workspace gate as Google users (onboarding without a brand doc).
-    await expect(page.locator('text=Build Your Channel Style').first()).toBeVisible();
+    // Phase 1: onboarding is a one-time event at profile creation. The
+    // register test above created users/{uid}, so re-sign-in lands directly
+    // in the workspace (Today on Home) — the modal never remounts.
+    await expect(page.locator('header button').first()).toBeVisible();
+    await expect(page.locator('text=Build Your Channel Style')).toHaveCount(0);
 
     // Firestore parity: users/{uid} exists with accountProvider 'password',
     // written through the SAME rules path as Google sign-ins.
@@ -138,10 +141,10 @@ test.describe.serial('Phase A email/password auth flows', () => {
     await page.locator('input[placeholder="Email Address"]').fill(email);
     await page.locator('input[placeholder="Password"]').fill(PHASE_A_TEST_PASSWORD);
     await page.locator('button[type="submit"]').click();
-    await expect(page.locator('text=Build Your Channel Style').first()).toBeVisible();
-
-    // Dismiss onboarding to reach the app shell.
-    await page.locator('button:has-text("Set up manually later")').click();
+    // Profile doc exists from the register test → workspace mounts directly,
+    // no onboarding modal to dismiss (Phase 1: onboarding is one-time).
+    await expect(page.locator('header button').first()).toBeVisible();
+    await expect(page.locator('text=Build Your Channel Style')).toHaveCount(0);
 
     // Profile (Settings) → Sign out of all devices. This call goes to the REAL
     // dev server (not mocked): verifyIdToken + revokeRefreshTokens against the

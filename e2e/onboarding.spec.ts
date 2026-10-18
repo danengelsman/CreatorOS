@@ -4,17 +4,19 @@ import { TEST_USER_PASSWORD, createEmulatorUser, uniqueEmulatorEmail } from './t
 /**
  * F4.5b — Onboarding → Dashboard handoff regression net.
  *
- * The F4.5 smoke spec suppresses onboarding deterministically (a seeded brand
- * doc), which left src/components/Onboarding.tsx with ZERO e2e coverage. This
- * spec is the counterpart: it creates a fresh Auth-emulator account with NO
- * brand document, so `projects/brand_<uid>` does not exist when App's snapshot
- * listener fires and the onboarding modal mounts (src/App.tsx). It then walks
- * the real interview (niche → audience → vibe, /api/onboarding/chat mocked),
- * builds the brand kit (/api/onboarding/generate-brand mocked), and asserts:
- *   1. the handoff to the logged-in Home view,
+ * This spec creates a fresh Auth-emulator account with NO Firestore docs, so
+ * when App's auth handler sees users/<uid> does not exist it shows the
+ * onboarding modal (Phase 1: onboarding is keyed to profile creation, not to
+ * branding — a brand kit is optional). It then walks the real interview
+ * (niche → audience → vibe, /api/onboarding/chat mocked), builds the brand kit
+ * via "Build my channel style first" (/api/onboarding/generate-brand mocked),
+ * and asserts:
+ *   1. the handoff to the logged-in Home view (Today primary; the Home studio
+ *      content — including the first-creation mission — lives in a collapsed
+ *      <details> the spec opens before asserting),
  *   2. users/{uid}.onboardingAnswers landed in the EMULATOR Firestore
  *      (REST read with the user's ID token, same pattern as global-setup.ts),
- *   3. a reload does NOT remount onboarding (brand doc now `completed`).
+ *   3. a reload does NOT remount onboarding (users/<uid> now exists).
  *
  * No live-service contact: Firebase stays on local emulators, every /api/*
  * route is mocked (catch-all aborts anything unmocked), and the request
@@ -175,7 +177,7 @@ test.describe('CreatorOS Onboarding → Dashboard handoff', () => {
     await page.locator('input[placeholder="Password"]').fill(TEST_USER_PASSWORD);
     await page.locator('button[type="submit"]').click();
 
-    // --- Onboarding must mount (no brand doc → App shows the modal). ---
+    // --- Onboarding must mount (fresh account → no users/<uid> profile doc). ---
     const onboardingHeading = page.getByRole('heading', { name: "Let's Build Your Channel Style" });
     await expect(onboardingHeading).toBeVisible();
 
@@ -197,18 +199,24 @@ test.describe('CreatorOS Onboarding → Dashboard handoff', () => {
     expect(chatCallCount).toBe(3);
 
     // Interview complete → summary card (2200ms reveal) → build the kit.
+    // Phase 1: the brand-kit build is the secondary action; the primary is
+    // "Continue to Today" (no kit required).
     await expect(page.getByRole('heading', { name: 'Your Profile is Ready!' })).toBeVisible();
     await expect(page.getByText(MOCK_ANSWERS.niche)).toBeVisible();
     await expect(page.getByText(MOCK_ANSWERS.audience)).toBeVisible();
     await expect(page.getByText(MOCK_ANSWERS.vibe)).toBeVisible();
-    await page.locator('button:has-text("Build My Channel Style")').click();
+    await page.locator('button:has-text("Build my channel style first")').click();
 
     // --- Handoff: onboarding closes, the logged-in Home view mounts. ---
     await expect(onboardingHeading).toHaveCount(0);
     const menuButton = page.locator('header button').first();
     await expect(menuButton).toBeVisible();
-    // Fresh brand + no content projects → Home renders the first-creation
-    // mission seeded from the mocked kit's content_ideas.
+    // Home leads with Today; the studio content (first-creation mission seeded
+    // from the mocked kit's content_ideas) sits in a collapsed panel.
+    const studioPanel = page.locator(
+      'details:has(summary:has-text("Explore your existing studio"))',
+    );
+    await studioPanel.locator('summary').click();
     const missionSection = page.locator('section[aria-label="Your first creator mission"]');
     await expect(missionSection).toBeVisible();
     await expect(
@@ -237,9 +245,13 @@ test.describe('CreatorOS Onboarding → Dashboard handoff', () => {
       summary: MOCK_BRAND_KIT.tagline, // Onboarding copies kit.tagline → summary
     });
 
-    // --- Reload: the completed brand doc must suppress onboarding. ---
+    // --- Reload: the existing users/<uid> profile must suppress onboarding. ---
     await page.reload();
     await expect(onboardingHeading).toHaveCount(0);
+    await page
+      .locator('details:has(summary:has-text("Explore your existing studio"))')
+      .locator('summary')
+      .click();
     await expect(page.locator('section[aria-label="Your first creator mission"]')).toBeVisible();
     await expect(menuButton).toBeVisible();
 

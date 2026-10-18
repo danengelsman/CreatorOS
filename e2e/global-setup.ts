@@ -86,6 +86,7 @@ async function seedEmulatorUser() {
           `[e2e] Auth emulator ready — seed user ${TEST_USER_EMAIL} ${last.code === 'EMAIL_EXISTS' ? 'already exists' : 'created'}`,
         );
         await seedBrandDocument(last.localId, last.idToken);
+        await seedUserProfile(last.localId, last.idToken);
         return;
       }
     } catch {
@@ -154,6 +155,48 @@ async function seedBrandDocument(localId?: string, idToken?: string) {
     );
   }
   console.log(`[e2e] Firestore emulator ready — seeded projects/brand_${localId}`);
+}
+
+/**
+ * Seed the user profile doc (`users/<uid>`). Phase 1: App keys the onboarding
+ * modal to the EXISTENCE of users/{uid} (it is created at first sign-in), no
+ * longer to the brand document — branding is optional and must never re-open
+ * onboarding. The shared seed user simulates an existing member, so their
+ * profile is seeded here with their own ID token (same rules path as a real
+ * client create); a missing profile would mount onboarding over the workspace.
+ */
+async function seedUserProfile(localId?: string, idToken?: string) {
+  if (!localId || !idToken) {
+    console.warn('[e2e] no localId/idToken from seed signUp — skipping user profile seed');
+    return;
+  }
+  const url = `http://${FIRESTORE_EMULATOR_HOST}/v1/projects/${EMULATOR_PROJECT_ID}/databases/(default)/documents/users/${localId}`;
+  // Idempotent: the update rules only allow lastLogin-style merges, so an
+  // existing profile (warm emulator reuse) is left untouched rather than
+  // rewritten with create-only fields.
+  const existing = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } });
+  if (existing.ok) {
+    console.log(`[e2e] Firestore emulator ready — users/${localId} already seeded`);
+    return;
+  }
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fields: {
+        email: { stringValue: TEST_USER_EMAIL },
+        accountProvider: { stringValue: 'password' },
+        createdAt: { timestampValue: '2026-01-01T00:00:00.000Z' },
+        lastLogin: { timestampValue: '2026-01-01T00:00:00.000Z' },
+      },
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `[e2e] failed to seed user profile: ${response.status} ${await response.text()}`,
+    );
+  }
+  console.log(`[e2e] Firestore emulator ready — seeded users/${localId}`);
 }
 
 /**

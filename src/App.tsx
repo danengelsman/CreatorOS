@@ -73,6 +73,7 @@ const RetentionHookLab = React.lazy(() => import('./components/RetentionHookLab'
 const VideoAnalyzer = React.lazy(() => import('./components/VideoAnalyzer'));
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { RouteErrorBoundary } from './components/RouteErrorBoundary';
+import { ensureFirstDollarJourney } from './services/firstDollarJourney';
 
 // F3.3 (D4-A): the Community view is a facade (hardcoded sample leaderboard,
 // sample "Active" counter, no-op composer). It ships
@@ -189,6 +190,10 @@ export default function App() {
           const userSnap = await getDoc(userRef);
 
           if (!userSnap.exists()) {
+            // Phase 1: onboarding is a one-time event at profile creation —
+            // driven by the users/{uid} doc, not by branding (a brand kit is
+            // optional and must never re-force the modal on existing users).
+            setShowOnboarding(true);
             await setDoc(userRef, {
               email: firebaseUser.email,
               displayName: firebaseUser.displayName,
@@ -210,7 +215,12 @@ export default function App() {
           }
           if (isActive) setUser(firebaseUser);
         } else {
-          if (isActive) setUser(null);
+          if (isActive) {
+            setUser(null);
+            setUserData(null);
+            setShowOnboarding(false);
+            setActiveTab('home');
+          }
         }
       } catch (error) {
         console.error('Error during auth state change:', error);
@@ -266,27 +276,18 @@ export default function App() {
         },
       );
 
-      // Real-time brand update
+      // Real-time brand update. Branding stays optional: the snapshot only
+      // mirrors brand data and never opens/closes the onboarding modal, so it
+      // cannot block or restart the First Dollar journey.
       const brandRef = doc(db, 'projects', `brand_${user.uid}`);
       const unsubscribeBrand = onSnapshot(
         brandRef,
         (snap) => {
           if (snap.exists()) {
             const projectData = snap.data();
-            // Only complete brand and dismiss onboarding if not a draft
-            if (projectData.status === 'draft') {
-              setBrand(null);
-              setShowOnboarding(true);
-            } else if (projectData.data) {
-              setBrand(projectData.data);
-              setShowOnboarding(false);
-            } else {
-              setBrand(null);
-              setShowOnboarding(true);
-            }
+            setBrand(projectData.status === 'draft' ? null : projectData.data || null);
           } else {
             setBrand(null);
-            setShowOnboarding(true);
           }
         },
         (error) => {
@@ -467,9 +468,14 @@ export default function App() {
 
   document.body.classList.add('is-app');
 
-  const handleOnboardingComplete = (targetTab?: string) => {
+  // Phase 1: completing onboarding opens Today on Home. The saved journey is
+  // ensured (created on first entry, resumed afterwards) BEFORE the modal
+  // closes, so Home never shows a "could not load your journey" flash.
+  const handleOnboardingComplete = async () => {
+    if (!user) throw new Error('Sign in to start your journey.');
+    await ensureFirstDollarJourney(user.uid);
+    setActiveTab('home');
     setShowOnboarding(false);
-    setActiveTab(targetTab || 'home');
   };
 
   const openProject = (project: any) => {

@@ -1,15 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { PaperPlaneRight as Send, CaretRight as ChevronRight, Sparkle as Sparkles, CheckCircle as CheckCircle2, CircleNotch as Loader2, Robot } from '@phosphor-icons/react';
+import {
+  PaperPlaneRight as Send,
+  CaretRight as ChevronRight,
+  Sparkle as Sparkles,
+  CheckCircle as CheckCircle2,
+  CircleNotch as Loader2,
+  Robot,
+} from '@phosphor-icons/react';
 import BrandIcon from './BrandIcon';
 import { cn } from '../lib/utils';
-import { db, serverTimestamp, handleFirestoreError, OperationType, authorizedFetch } from '../firebase';
+import {
+  db,
+  serverTimestamp,
+  handleFirestoreError,
+  OperationType,
+  authorizedFetch,
+} from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import Confetti from './Confetti';
 import MysticalNicheSparks, { NicheSpark, NicheSparksData } from './MysticalNicheSparks';
 
 interface OnboardingProps {
-  onComplete: (targetTab?: string) => void;
+  // Phase 1: async so the app can ensure the saved First Dollar journey
+  // exists (first_dollar_journeys/{uid}) before the modal closes into Today.
+  onComplete: () => Promise<void>;
   user: any;
 }
 
@@ -33,23 +48,27 @@ export const cacheNicheToBrandProfile = async (user: any, spark: NicheSpark) => 
   if (!user?.uid) return;
   try {
     const brandRef = doc(db, 'projects', `brand_${user.uid}`);
-    await setDoc(brandRef, {
-      userId: user.uid,
-      name: spark.title?.slice(0, 95) || 'Draft Brand Profile',
-      type: 'brand_kit',
-      status: 'draft',
-      draft: {
-        niche: spark.title,
-        pitch: spark.pitch || '',
-        dreamViewer: spark.dreamViewer || '',
-        vibe: spark.vibe || '',
-        badge: spark.badge || '',
-        type: spark.type || 'trending',
-        cachedAt: new Date().toISOString()
+    await setDoc(
+      brandRef,
+      {
+        userId: user.uid,
+        name: spark.title?.slice(0, 95) || 'Draft Brand Profile',
+        type: 'brand_kit',
+        status: 'draft',
+        draft: {
+          niche: spark.title,
+          pitch: spark.pitch || '',
+          dreamViewer: spark.dreamViewer || '',
+          vibe: spark.vibe || '',
+          badge: spark.badge || '',
+          type: spark.type || 'trending',
+          cachedAt: new Date().toISOString(),
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+      { merge: true },
+    );
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`);
   }
@@ -58,14 +77,35 @@ export const cacheNicheToBrandProfile = async (user: any, spark: NicheSpark) => 
 export default function Onboarding({ onComplete, user }: OnboardingProps) {
   const [phase, setPhase] = useState<'welcome' | 'interview' | 'success' | 'generating'>('welcome');
   const [messages, setMessages] = useState<Message[]>([
-    { 
-      role: 'assistant', 
-      content: "Welcome! Let's build your perfect Creator Profile together. To start, what topic or niche excites you the most for your channel?" 
-    }
+    {
+      role: 'assistant',
+      content:
+        "Welcome! Let's build your perfect Creator Profile together. To start, what topic or niche excites you the most for your channel?",
+    },
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [transitionBusy, setTransitionBusy] = useState(false);
+  const [transitionError, setTransitionError] = useState('');
+
+  // Phase 1: every "go to Today" path funnels through onComplete, which
+  // ensures the journey doc before resolving. A failure here keeps the
+  // onboarding open with a retry-able error instead of stranding the user.
+  const continueToToday = async () => {
+    if (transitionBusy) return;
+    setTransitionBusy(true);
+    setTransitionError('');
+    try {
+      await onComplete();
+    } catch (error) {
+      setTransitionError(
+        `Your journey could not be saved. Please try again. ${error instanceof Error ? error.message : ''}`,
+      );
+    } finally {
+      setTransitionBusy(false);
+    }
+  };
 
   // In-Stream Conversational Muse state for blank-page paralysis
   const [sparksData, setSparksData] = useState<NicheSparksData | null>(null);
@@ -75,7 +115,7 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
   const [selectedSparkTitle, setSelectedSparkTitle] = useState<string | null>(null);
   const [restoredFromDraft, setRestoredFromDraft] = useState<string | null>(null);
   const [idleSeconds, setIdleSeconds] = useState(0);
-  
+
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const sparksTopRef = useRef<HTMLDivElement>(null);
@@ -96,18 +136,19 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
             setRestoredFromDraft(draft.niche);
             setPhase('interview');
             setMessages([
-              { 
-                role: 'assistant', 
-                content: "Welcome! Let's build your perfect Creator Profile together. To start, what topic or niche excites you the most for your channel?" 
+              {
+                role: 'assistant',
+                content:
+                  "Welcome! Let's build your perfect Creator Profile together. To start, what topic or niche excites you the most for your channel?",
               },
-              { 
-                role: 'user', 
-                content: `I'd love to make videos about: ${draft.niche}` 
+              {
+                role: 'user',
+                content: `I'd love to make videos about: ${draft.niche}`,
               },
-              { 
-                role: 'assistant', 
-                content: `Welcome back! We've restored your chosen direction: "${draft.niche}". Next, who is your dream audience or target viewer?` 
-              }
+              {
+                role: 'assistant',
+                content: `Welcome back! We've restored your chosen direction: "${draft.niche}". Next, who is your dream audience or target viewer?`,
+              },
             ]);
           }
         }
@@ -134,7 +175,7 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
           const relativeTop = elementRect.top - containerRect.top + container.scrollTop;
           container.scrollTo({
             top: Math.max(0, relativeTop - 12),
-            behavior: 'smooth'
+            behavior: 'smooth',
           });
         }
       }, 100);
@@ -180,33 +221,37 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
     } catch (err) {
       console.warn('Sparks fetch error:', err);
       setSparksData({
-        museMessage: "Take a breath—day zero is the hardest step because the canvas is blank. You don't have to guess: here are high-momentum niches thriving right now.",
+        museMessage:
+          "Take a breath—day zero is the hardest step because the canvas is blank. You don't have to guess: here are high-momentum niches thriving right now.",
         sparks: [
           {
-            type: "trending",
-            badge: "Trending Today",
-            title: "AI Workflows for Solo Creators",
-            pitch: "Creators are booming by breaking down simple prompts, free AI tools, and everyday productivity shortcuts.",
-            dreamViewer: "Freelancers, students & creators saving time",
-            vibe: "Clear, actionable, and exciting"
+            type: 'trending',
+            badge: 'Trending Today',
+            title: 'AI Workflows for Solo Creators',
+            pitch:
+              'Creators are booming by breaking down simple prompts, free AI tools, and everyday productivity shortcuts.',
+            dreamViewer: 'Freelancers, students & creators saving time',
+            vibe: 'Clear, actionable, and exciting',
           },
           {
-            type: "underserved",
-            badge: "Underserved Goldmine",
-            title: "Micro-Budget Studio Gear Reviews",
-            pitch: "Massive search volume with low competition: testing budget $30 microphones and smartphone lighting setups.",
-            dreamViewer: "Beginner creators who want quality without spending thousands",
-            vibe: "Honest, resourceful, and grounded"
+            type: 'underserved',
+            badge: 'Underserved Goldmine',
+            title: 'Micro-Budget Studio Gear Reviews',
+            pitch:
+              'Massive search volume with low competition: testing budget $30 microphones and smartphone lighting setups.',
+            dreamViewer: 'Beginner creators who want quality without spending thousands',
+            vibe: 'Honest, resourceful, and grounded',
           },
           {
-            type: "trending",
-            badge: "High Growth",
-            title: "Cozy Tech & Mindful Productivity",
-            pitch: "Audiences fatigued by hustle culture are loving desk setups, calm focus sessions, and intentional tech.",
-            dreamViewer: "Remote workers and students craving peace",
-            vibe: "Calm, aesthetic, and supportive"
-          }
-        ]
+            type: 'trending',
+            badge: 'High Growth',
+            title: 'Cozy Tech & Mindful Productivity',
+            pitch:
+              'Audiences fatigued by hustle culture are loving desk setups, calm focus sessions, and intentional tech.',
+            dreamViewer: 'Remote workers and students craving peace',
+            vibe: 'Calm, aesthetic, and supportive',
+          },
+        ],
       });
     } finally {
       setIsLoadingSparks(false);
@@ -216,7 +261,7 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
   const handleSelectSpark = async (spark: NicheSpark) => {
     if (isAiTyping) return;
     setSelectedSparkTitle(spark.title);
-    
+
     // Automatically cache the selected niche into the user's branding project profile in Firestore
     cacheNicheToBrandProfile(user, spark);
 
@@ -224,7 +269,7 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
     setTimeout(() => {
       setShowSparks(false);
     }, 1000);
-    
+
     // Send selected niche spark as user's response
     const userText = `I'd love to make videos about: ${spark.title}`;
     const updatedMessages: Message[] = [...messages, { role: 'user', content: userText }];
@@ -234,32 +279,37 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
     try {
       const data = await authorizedFetch('/api/onboarding/chat', {
         method: 'POST',
-        body: JSON.stringify({ messages: updatedMessages })
+        body: JSON.stringify({ messages: updatedMessages }),
       });
 
       if (data?.message) {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+        setMessages((prev) => [...prev, { role: 'assistant', content: data.message }]);
       }
-      
+
       if (data?.isComplete) {
-        setSummary(data.summary || {
-          niche: spark.title,
-          audience: spark.dreamViewer || "Content Creators",
-          vibe: spark.vibe || "Friendly & Encouraging"
-        });
+        setSummary(
+          data.summary || {
+            niche: spark.title,
+            audience: spark.dreamViewer || 'Content Creators',
+            vibe: spark.vibe || 'Friendly & Encouraging',
+          },
+        );
         setTimeout(() => {
           setPhase('success');
         }, 2200);
       }
     } catch (error) {
-      console.warn('Network issue during onboarding chat after selecting spark, using local fallback:', error);
+      console.warn(
+        'Network issue during onboarding chat after selecting spark, using local fallback:',
+        error,
+      );
       // Fallback message to prevent conversational freezing
-      setMessages(prev => [
-        ...prev, 
-        { 
-          role: 'assistant', 
-          content: `Fantastic choice! Focusing on "${spark.title}" is a winning angle. Who is your dream viewer or target audience for these videos?` 
-        }
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `Fantastic choice! Focusing on "${spark.title}" is a winning angle. Who is your dream viewer or target audience for these videos?`,
+        },
       ]);
     } finally {
       setIsAiTyping(false);
@@ -271,7 +321,7 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
 
     const userText = inputValue.trim();
     setInputValue('');
-    
+
     // Add user message
     const updatedMessages: Message[] = [...messages, { role: 'user', content: userText }];
     setMessages(updatedMessages);
@@ -280,20 +330,22 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
     try {
       const data = await authorizedFetch('/api/onboarding/chat', {
         method: 'POST',
-        body: JSON.stringify({ messages: updatedMessages })
+        body: JSON.stringify({ messages: updatedMessages }),
       });
 
       // Add AI reply
       if (data?.message) {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+        setMessages((prev) => [...prev, { role: 'assistant', content: data.message }]);
       }
-      
+
       if (data?.isComplete) {
-        setSummary(data.summary || {
-          niche: userText,
-          audience: "Content Creators",
-          vibe: "Friendly & Encouraging"
-        });
+        setSummary(
+          data.summary || {
+            niche: userText,
+            audience: 'Content Creators',
+            vibe: 'Friendly & Encouraging',
+          },
+        );
         // Transition after a brief delay so they see the final message
         setTimeout(() => {
           setPhase('success');
@@ -301,27 +353,31 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
       }
     } catch (error) {
       console.warn('Network issue during onboarding chat, using local fallback:', error);
-      const userCount = updatedMessages.filter(m => m.role === 'user').length;
+      const userCount = updatedMessages.filter((m) => m.role === 'user').length;
       if (userCount === 2) {
-        setMessages(prev => [
-          ...prev, 
-          { 
-            role: 'assistant', 
-            content: "Got it! That gives us a really clear target. Lastly, what should the style and mood of your content feel like? (e.g., friendly and easy to follow, calm and aesthetic, or energetic and bold?)" 
-          }
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content:
+              'Got it! That gives us a really clear target. Lastly, what should the style and mood of your content feel like? (e.g., friendly and easy to follow, calm and aesthetic, or energetic and bold?)',
+          },
         ]);
       } else {
-        setMessages(prev => [
-          ...prev, 
-          { 
-            role: 'assistant', 
-            content: "Fantastic! I have all the details needed to architect your custom Creator Profile. Click 'Build My Brand Kit' below!" 
-          }
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content:
+              "Fantastic! I have all the details needed to architect your custom Creator Profile. Click 'Build My Brand Kit' below!",
+          },
         ]);
         setSummary({
-          niche: updatedMessages[1]?.content?.replace(/^I'd love to make videos about:\s*/i, '') || userText,
-          audience: updatedMessages[2]?.content || "Audience & Viewers",
-          vibe: userText || "Authentic & Engaging"
+          niche:
+            updatedMessages[1]?.content?.replace(/^I'd love to make videos about:\s*/i, '') ||
+            userText,
+          audience: updatedMessages[2]?.content || 'Audience & Viewers',
+          vibe: userText || 'Authentic & Engaging',
         });
         setTimeout(() => {
           setPhase('success');
@@ -341,73 +397,85 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
         body: JSON.stringify({
           niche: summary?.niche || '',
           audience: summary?.audience || '',
-          vibe: summary?.vibe || ''
-        })
+          vibe: summary?.vibe || '',
+        }),
       });
 
       // 2. Save the brand kit to Firestore
       const brandRef = doc(db, 'projects', `brand_${user.uid}`);
-      await setDoc(brandRef, {
-        userId: user.uid,
-        name: kit.name || 'Untitled Brand',
-        type: 'brand_kit',
-        status: 'completed',
-        data: kit,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      }, { merge: true }).catch(err => handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`));
+      await setDoc(
+        brandRef,
+        {
+          userId: user.uid,
+          name: kit.name || 'Untitled Brand',
+          type: 'brand_kit',
+          status: 'completed',
+          data: kit,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      ).catch((err) =>
+        handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`),
+      );
 
       // 3. Save onboardingAnswers to User document in Firestore
       const userRef = doc(db, 'users', user.uid);
-      await setDoc(userRef, {
-        onboardingAnswers: {
-          niche: summary?.niche || '',
-          audience: summary?.audience || '',
-          vibe: summary?.vibe || '',
-          summary: kit.tagline || ''
+      await setDoc(
+        userRef,
+        {
+          onboardingAnswers: {
+            niche: summary?.niche || '',
+            audience: summary?.audience || '',
+            vibe: summary?.vibe || '',
+            summary: kit.tagline || '',
+          },
+          updatedAt: serverTimestamp(),
         },
-        updatedAt: serverTimestamp()
-      }, { merge: true }).catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`));
+        { merge: true },
+      ).catch((err) => handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`));
 
-      // 4. Complete Onboarding
-      onComplete('home');
+      // 4. Start or resume the First Dollar path and open Today.
+      await onComplete();
     } catch (error) {
-      console.error("Error generating brand kit during onboarding:", error);
+      console.error('Error generating brand kit during onboarding:', error);
+      setTransitionError(
+        `Could not finish the brand kit. You can still go to Today. ${error instanceof Error ? error.message : ''}`,
+      );
       setPhase('success');
     }
   };
 
   // Progress calculations based on user replies
-  const userMessagesCount = messages.filter(m => m.role === 'user').length;
+  const userMessagesCount = messages.filter((m) => m.role === 'user').length;
   const progressPercent = Math.min(100, Math.round((userMessagesCount / 3) * 100));
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 overflow-hidden">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="absolute inset-0 bg-black/60 backdrop-blur-3xl"
       />
-      
-      <motion.div 
+
+      <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 30 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 30 }}
-        transition={{ type: "spring", damping: 26, stiffness: 190 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 190 }}
         className="relative w-full max-w-4xl bg-[var(--bg-secondary)] rounded-[40px] shadow-2xl overflow-hidden flex flex-col md:flex-row h-full max-h-[92vh] md:max-h-[720px] lg:max-h-[760px] border border-white/10"
       >
-        
         {/* Left Side: Visual Guide / Status Panel */}
         <div className="hidden md:flex md:w-[280px] lg:w-[320px] shrink-0 relative bg-black/40 flex-col justify-between p-6 lg:p-8 border-r border-white/5 overflow-y-auto">
           {/* Subtle decorative glow */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-[var(--accent)] rounded-full filter blur-[100px] opacity-20 pointer-events-none" />
-          
+
           <div className="z-10 space-y-4 lg:space-y-6">
             <div className="p-2.5 lg:p-3 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 w-fit">
               <BrandIcon size={26} className="text-white animate-pulse" />
             </div>
-            
+
             <div className="space-y-2">
               <span className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.2em] text-white/40 block">
                 Creator Profile
@@ -416,7 +484,8 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                 Architect Your Identity
               </h3>
               <p className="text-xs lg:text-[13px] text-white/60 leading-relaxed font-normal">
-                We're tailoring a unique channel voice, customized color palette, templates, and script generators just for you.
+                We're tailoring a unique channel voice, customized color palette, templates, and
+                script generators just for you.
               </p>
             </div>
           </div>
@@ -427,27 +496,40 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
               <span className="text-xs font-bold text-white/80">{progressPercent}% Done</span>
             </div>
             <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-              <motion.div 
+              <motion.div
                 className="h-full bg-[var(--accent)]"
                 initial={{ width: '0%' }}
                 animate={{ width: `${progressPercent}%` }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
               />
             </div>
-            
+
             <div className="flex gap-2">
-              <div className={cn("w-2 h-2 rounded-full transition-colors duration-500", phase === 'welcome' ? "bg-white" : "bg-white/20")} />
-              <div className={cn("w-2 h-2 rounded-full transition-colors duration-500", phase === 'interview' ? "bg-white" : "bg-white/20")} />
-              <div className={cn("w-2 h-2 rounded-full transition-colors duration-500", phase === 'success' || phase === 'generating' ? "bg-white" : "bg-white/20")} />
+              <div
+                className={cn(
+                  'w-2 h-2 rounded-full transition-colors duration-500',
+                  phase === 'welcome' ? 'bg-white' : 'bg-white/20',
+                )}
+              />
+              <div
+                className={cn(
+                  'w-2 h-2 rounded-full transition-colors duration-500',
+                  phase === 'interview' ? 'bg-white' : 'bg-white/20',
+                )}
+              />
+              <div
+                className={cn(
+                  'w-2 h-2 rounded-full transition-colors duration-500',
+                  phase === 'success' || phase === 'generating' ? 'bg-white' : 'bg-white/20',
+                )}
+              />
             </div>
           </div>
         </div>
 
         {/* Right Side: Interactive Panel */}
         <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-secondary)] relative h-full overflow-y-auto">
-          
           <AnimatePresence mode="wait">
-            
             {/* WELCOME PHASE */}
             {phase === 'welcome' && (
               <motion.div
@@ -463,25 +545,32 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                     Let's Build Your Channel Style
                   </h1>
                   <p className="text-[18px] sm:text-[20px] text-[var(--label-secondary)] leading-relaxed font-medium">
-                    Skip the blank-page paralysis. Speak with our AI Brand Architect to discover your ideal niche, audience, and creative style in seconds.
+                    Skip the blank-page paralysis. Speak with our AI Brand Architect to discover
+                    your ideal niche, audience, and creative style in seconds.
                   </p>
                 </div>
 
                 <div className="pt-4">
-                  <button 
+                  <button
                     onClick={() => setPhase('interview')}
                     className="ios-button ios-button-filled w-full h-14 text-[17px] font-semibold"
                   >
                     Let's Begin!
                     <ChevronRight size={22} strokeWidth={2} />
                   </button>
-                  
-                  <button 
-                    onClick={() => onComplete()}
+
+                  <button
+                    onClick={continueToToday}
+                    disabled={transitionBusy}
                     className="ios-button ios-button-tinted w-full h-14 mt-3 text-[15px] font-medium text-[var(--label-secondary)] border-0 bg-transparent"
                   >
-                    Set up manually later
+                    {transitionBusy ? 'Opening Today…' : 'Go to Today without a brand kit'}
                   </button>
+                  {transitionError && (
+                    <p role="alert" className="mt-3 text-sm text-red-300">
+                      {transitionError}
+                    </p>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -504,9 +593,19 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                     </div>
                     <div>
                       <h4 className="text-[15px] font-semibold">AI Brand Architect</h4>
-                      <span className="text-[11px] font-medium text-[var(--label-secondary)] block">Online • Creator Interview</span>
+                      <span className="text-[11px] font-medium text-[var(--label-secondary)] block">
+                        Online • Creator Interview
+                      </span>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    disabled={transitionBusy}
+                    onClick={continueToToday}
+                    className="text-xs font-semibold text-[var(--accent)] hover:underline"
+                  >
+                    {transitionBusy ? 'Opening…' : 'Go to Today'}
+                  </button>
                   {restoredFromDraft && (
                     <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-medium">
                       <Sparkles size={13} weight="fill" className="text-amber-300 animate-pulse" />
@@ -516,7 +615,10 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                 </div>
 
                 {/* Chat Area */}
-                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                <div
+                  ref={chatContainerRef}
+                  className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar"
+                >
                   {messages.map((msg, idx) => (
                     <motion.div
                       key={idx}
@@ -524,16 +626,18 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3 }}
                       className={cn(
-                        "flex w-full",
-                        msg.role === 'user' ? "justify-end" : "justify-start"
+                        'flex w-full',
+                        msg.role === 'user' ? 'justify-end' : 'justify-start',
                       )}
                     >
-                      <div className={cn(
-                        "max-w-[85%] rounded-[22px] px-5 py-3.5 text-[15px] leading-relaxed font-medium shadow-sm",
-                        msg.role === 'user'
-                          ? "bg-[var(--accent)] text-white rounded-br-[4px]"
-                          : "bg-[var(--bg-tertiary)] text-[var(--label-primary)] rounded-bl-[4px]"
-                      )}>
+                      <div
+                        className={cn(
+                          'max-w-[85%] rounded-[22px] px-5 py-3.5 text-[15px] leading-relaxed font-medium shadow-sm',
+                          msg.role === 'user'
+                            ? 'bg-[var(--accent)] text-white rounded-br-[4px]'
+                            : 'bg-[var(--bg-tertiary)] text-[var(--label-primary)] rounded-bl-[4px]',
+                        )}
+                      >
                         {msg.content}
                       </div>
                     </motion.div>
@@ -564,13 +668,22 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                       className="flex justify-start"
                     >
                       <div className="bg-[var(--bg-tertiary)] text-[var(--label-secondary)] rounded-[22px] rounded-bl-[4px] px-5 py-3.5 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-[var(--label-secondary)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1.5 h-1.5 bg-[var(--label-secondary)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1.5 h-1.5 bg-[var(--label-secondary)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <span
+                          className="w-1.5 h-1.5 bg-[var(--label-secondary)] rounded-full animate-bounce"
+                          style={{ animationDelay: '0ms' }}
+                        />
+                        <span
+                          className="w-1.5 h-1.5 bg-[var(--label-secondary)] rounded-full animate-bounce"
+                          style={{ animationDelay: '150ms' }}
+                        />
+                        <span
+                          className="w-1.5 h-1.5 bg-[var(--label-secondary)] rounded-full animate-bounce"
+                          style={{ animationDelay: '300ms' }}
+                        />
                       </div>
                     </motion.div>
                   )}
-                  
+
                   <div ref={chatEndRef} />
                 </div>
 
@@ -581,10 +694,16 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                       onClick={triggerSparks}
                       className="group inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-400/20 text-[11px] font-medium transition-all active:scale-95"
                     >
-                      <Sparkles size={12} weight="fill" className="text-amber-300 group-hover:rotate-12 transition-transform" />
+                      <Sparkles
+                        size={12}
+                        weight="fill"
+                        className="text-amber-300 group-hover:rotate-12 transition-transform"
+                      />
                       <span>Blank page? Tap for trending niche sparks</span>
                       {idleSeconds > 0 && idleSeconds < 60 && (
-                        <span className="text-[10px] text-purple-300/60 font-mono">({60 - idleSeconds}s)</span>
+                        <span className="text-[10px] text-purple-300/60 font-mono">
+                          ({60 - idleSeconds}s)
+                        </span>
                       )}
                     </button>
                     <span className="text-[10px] text-[var(--label-secondary)]/60 hidden sm:inline">
@@ -593,6 +712,11 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                   </div>
                 )}
 
+                {transitionError && (
+                  <p role="alert" className="px-6 py-2 text-sm text-red-300">
+                    {transitionError}
+                  </p>
+                )}
                 {/* Input Bar */}
                 <div className="p-4 border-t border-[var(--separator)] bg-[var(--bg-tertiary)]/30 backdrop-blur-md flex gap-2 items-center">
                   <input
@@ -636,7 +760,8 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                     Your Profile is Ready!
                   </h2>
                   <p className="text-[16px] text-[var(--label-secondary)] leading-relaxed font-medium">
-                    We've gathered all details to construct your personalized Channel Style profile. Here's a summary of what we've discovered:
+                    We've gathered all details to construct your personalized Channel Style profile.
+                    Here's a summary of what we've discovered:
                   </p>
                 </div>
 
@@ -668,13 +793,27 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                 </div>
 
                 <div className="pt-2">
-                  <button 
-                    onClick={handleBuildBrandKit}
+                  <button
+                    onClick={continueToToday}
+                    disabled={transitionBusy}
                     className="ios-button ios-button-filled w-full h-14 text-[17px] font-semibold"
                   >
-                    Build My Channel Style
-                    <Sparkles size={20} weight="fill" className="ml-2" />
+                    {transitionBusy ? 'Opening Today…' : 'Continue to Today'}
+                    <ChevronRight size={22} strokeWidth={2} className="ml-2" />
                   </button>
+                  <button
+                    onClick={handleBuildBrandKit}
+                    disabled={transitionBusy}
+                    className="ios-button ios-button-tinted w-full h-12 mt-3 text-sm font-semibold"
+                  >
+                    Build my channel style first
+                    <Sparkles size={17} weight="fill" className="ml-2" />
+                  </button>
+                  {transitionError && (
+                    <p role="alert" className="mt-3 text-sm text-red-300">
+                      {transitionError}
+                    </p>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -691,18 +830,18 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                   <div className="absolute inset-0 bg-[var(--accent)] rounded-full filter blur-xl opacity-25 animate-pulse" />
                   <Loader2 size={48} className="text-[var(--accent)] animate-spin relative z-10" />
                 </div>
-                
+
                 <div className="text-center space-y-2">
                   <h3 className="font-serif text-2xl font-semibold tracking-tight text-[var(--label-primary)]">
                     Architecting Your Channel Style
                   </h3>
                   <p className="text-[15px] text-[var(--label-secondary)] max-w-sm mx-auto font-medium leading-relaxed">
-                    Analyzing niche patterns, compiling target palettes, drafting custom script hooks and choosing matching typography...
+                    Analyzing niche patterns, compiling target palettes, drafting custom script
+                    hooks and choosing matching typography...
                   </p>
                 </div>
               </motion.div>
             )}
-
           </AnimatePresence>
         </div>
       </motion.div>

@@ -57,6 +57,27 @@ service cloud.firestore {
       );
     }
 
+    // Phase 1 — the saved 'Today' journey doc (src/services/firstDollarJourney.ts),
+    // one per user at first_dollar_journeys/{uid}. Strict shape: exact key set,
+    // version pinned to 1, enum-bounded step/status, answers capped at 1000
+    // chars, at most the three known steps completed. uid and version are
+    // immutable (never in the update allowlist below).
+    function isValidJourney(data, userId) {
+      return data.keys().hasAll(['uid', 'version', 'currentStep', 'status', 'answers', 'completedSteps', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'version', 'currentStep', 'status', 'answers', 'completedSteps', 'createdAt', 'updatedAt']) &&
+        data.uid == userId && data.version == 1 &&
+        data.currentStep in ['direction', 'person', 'small_offer'] &&
+        data.status in ['not_started', 'in_progress', 'completed'] &&
+        data.answers is map && data.answers.keys().hasOnly(['direction', 'person', 'small_offer']) &&
+        data.answers.size() <= 3 &&
+        (!('direction' in data.answers) || (data.answers.direction is string && data.answers.direction.size() <= 1000)) &&
+        (!('person' in data.answers) || (data.answers.person is string && data.answers.person.size() <= 1000)) &&
+        (!('small_offer' in data.answers) || (data.answers.small_offer is string && data.answers.small_offer.size() <= 1000)) &&
+        data.completedSteps is list && data.completedSteps.size() <= 3 &&
+        data.completedSteps.hasOnly(['direction', 'person', 'small_offer']) &&
+        data.createdAt is timestamp && data.updatedAt is timestamp;
+    }
+
     function isValidProject(data) {
       return data.keys().hasAll(['userId', 'name', 'type', 'createdAt']) &&
         data.userId == request.auth.uid &&
@@ -117,6 +138,27 @@ service cloud.firestore {
       );
 
       allow delete: if isAdmin();
+    }
+
+    match /first_dollar_journeys/{userId} {
+      // Owner-only, single-doc access (never a collection listing).
+      allow get: if isOwner(userId);
+      allow list: if false;
+      // Creates only via ensureFirstDollarJourney's transaction: a pristine
+      // step-one record with no answers and nothing completed.
+      allow create: if isOwner(userId) && isValidJourney(request.resource.data, userId) &&
+        request.resource.data.status == 'not_started' &&
+        request.resource.data.currentStep == 'direction' &&
+        request.resource.data.answers.size() == 0 &&
+        request.resource.data.completedSteps.size() == 0;
+      // Progress updates may only touch journey fields — uid, version, and
+      // createdAt stay untouched (affectedKeys allowlist); per-field shape is
+      // enforced by isValidJourney on the full resulting document.
+      allow update: if isOwner(userId) && isValidJourney(request.resource.data, userId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'currentStep', 'status', 'answers', 'completedSteps', 'updatedAt'
+        ]);
+      allow delete: if false;
     }
 
     match /preferences/{userId} {
