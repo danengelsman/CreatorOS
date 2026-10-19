@@ -4,7 +4,7 @@
 
 ## Repo state
 
-- Path: `C:\Users\ADMIN\Documents\CreatorOS_Repo` · branch `main` @ `2777d1d` — clean, in sync with origin (`github.com/danengelsman/CreatorOS`)
+- Path: `C:\Users\ADMIN\Documents\CreatorOS_Repo` · production branch `main` @ `b1380fa` (Phase 1 Today journey, PR #8); docs/admin-claim-state branch records this update. Verify the current HEAD before work; earlier sections retain historical SHAs.
 - Git identity fixed (repo-local + global): `Daniel Engelsman <danengelsman@gmail.com>` — OpenClaw commits now attribute correctly
 - History rewrite (2026-10-03): all 51 commits on `main` are Daniel as author+committer; content verified byte-identical (tree `b6bbdb47…`)
 - **Safety backup:** `C:\Users\ADMIN\Documents\CreatorOS_Repo_backup_pre-rewrite_20261003.bundle` (full pre-rewrite history). Delete after ~2 stable weeks in production.
@@ -14,8 +14,8 @@
 
 1. ~~**D0 / F0.1:** remote branch `vercel/install-vercel-speed-insights-k29xze`~~ **DONE 2026-10-04:** rebuilt on current main (cherry-picked bot commit, force-pushed). Old tip was `af7537a`; new tip `c4c151c` — branch history now 52 Daniel + 1 Vercel, no Mick lineage.
 2. ~~Untracked in workspace: `APP_EVALUATION.md`, `PRODUCTION_READINESS_PLAN.md`, this file~~ **DONE 2026-10-04:** committed. `UIUX_FORK_BRIEF.md` intentionally left untracked (design decision pending). `.zwork/` + `.hermes/` gitignored.
-3. **Admin claim migration pending:** run `npx tsx scripts/set-admin-claim.ts <uid>` once, then Dan signs out/in — until then admin-gated Firestore paths (user delete, support ticket admin updates, app_logs read) deny for him.
-4. `ARCHITECTURE.md` in the main worktree is untracked — commit it or delete it.
+3. **Admin claim DONE (2026-10-18):** Dan explicitly selected his primary Google sign-in account for `admin:true` in the CreatorOS Firebase project; independently read back via Firebase Admin SDK. Dan must sign out/in at the stable production URL to refresh his ID token; browser/rules access has not yet been verified. Other accounts were not elevated. The exact account and UID are in private project notes, not this public repo. Note: `set-admin-claim.ts` replaces _all_ custom claims, so future grants should merge existing claims instead.
+4. `ARCHITECTURE.md` is tracked on main (earlier untracked note was stale).
 
 ## Week 1 executed (2026-10-04, commit `785c211`)
 
@@ -87,5 +87,6 @@ D0-A rebuild bot branch · D1-A archive dead scripts · **D2-A intrinsic route-l
 
 1. Say _"Execute Week 5"_ → Phase 5 frontend architecture: D7-A TanStack Router (URLs/deep links), D8-A Zustand slices, F5.4 CalendarView/LandingPage splits, F5.5 font/CSS hygiene — now safely PR-able with CI as the merge gate.
 2. Before more AI changes: **Gemini model audit** vs official Google docs (model IDs on main came from an unverified table).
-3. Port `phase1-today-journey` from CreatorOS-git onto main (Today/First-Dollar slice, verified Oct 6).
-4. DONE 2026-10-18: branch protection ON (PRs + CI checks, admins enforced). Auth Phase A (email/password, reset, session cookies 14d, sign-out-everywhere) MERGED + DEPLOYED (cb6ca28). STILL OPEN: admin claim (`npx tsx scripts/set-admin-claim.ts <uid>` — needs Dan service-account value + Firebase uid); Phase B (TOTP, passkeys, Apple) deferred until Identity Platform billing decision.
+3. **Phase 1 Today journey merged** as PR #8 (`b1380fa`); Firestore rules deploy remains an explicit production step.
+4. DONE 2026-10-18: branch protection ON (PRs + CI checks, admins enforced). Auth Phase A (email/password, reset, 14d session cookies, sign-out-everywhere) MERGED + DEPLOYED (`cb6ca28`). Admin claim granted to Dan's explicitly selected Google account and verified by Admin SDK readback; browser token refresh still pending. Phase B (TOTP, passkeys, Apple) deferred until Identity Platform billing decision.
+5. **Firestore rules need explicit deployment** for `first_dollar_journeys`: until then production client reads/writes may be denied. Verify deployment project and obtain separate approval before deploying rules.
