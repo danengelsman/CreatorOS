@@ -73,19 +73,12 @@ if (firestoreEmulatorHost) {
  */
 export const loginWithGoogle = async () => {
   try {
-    return await signInWithPopup(auth, googleProvider);
+    // Redirect-first approach: most reliable for Vercel/Incognito/Mobile
+    // We bypass the popup entirely to avoid third-party cookie blocks.
+    await signInWithRedirect(auth, googleProvider);
+    return null; 
   } catch (error: any) {
-    if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/cancelled-popup-request') {
-      // Vercel serves this SPA from `/`; returning directly to a client-side
-      // route such as `/login` would otherwise produce a platform 404.
-      if (window.location.pathname !== '/') {
-        window.history.replaceState(window.history.state, '', '/');
-      }
-
-      await signInWithRedirect(auth, googleProvider);
-      return null;
-    }
-
+    console.error('Google Redirect failed:', error);
     throw error;
   }
 };
@@ -93,7 +86,7 @@ export const loginWithGoogle = async () => {
 export const completeGoogleRedirect = async () => {
   try {
     const redirectPromise = getRedirectResult(auth);
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
     return await Promise.race([redirectPromise, timeoutPromise]);
   } catch (error) {
     console.warn('Redirect check finished or skipped:', error);

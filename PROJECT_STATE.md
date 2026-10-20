@@ -85,7 +85,7 @@ D0-A rebuild bot branch · D1-A archive dead scripts · **D2-A intrinsic route-l
 
 ## Next action
 
-1. Say _"Execute Week 5"_ → Phase 5 frontend architecture: D7-A TanStack Router (URLs/deep links), D8-A Zustand slices, F5.4 CalendarView/LandingPage splits, F5.5 font/CSS hygiene — now safely PR-able with CI as the merge gate.
+1. EXECUTING Week 5 (Active) → Phase 5 frontend architecture: D7-A TanStack Router (URLs/deep links), D8-A Zustand slices, F5.4 CalendarView/LandingPage splits, F5.5 font/CSS hygiene — now safely PR-able with CI as the merge gate.
 2. Before more AI changes: **Gemini model audit** vs official Google docs (model IDs on main came from an unverified table).
 3. **Phase 1 Today journey merged** as PR #8 (`b1380fa`); Firestore rules deploy remains an explicit production step.
 4. DONE 2026-10-18: branch protection ON (PRs + CI checks, admins enforced). Auth Phase A (email/password, reset, 14d session cookies, sign-out-everywhere) MERGED + DEPLOYED (`cb6ca28`). Admin claim granted to Dan's explicitly selected Google account and verified by Admin SDK readback; browser token refresh still pending. Phase B (TOTP, passkeys, Apple) deferred until Identity Platform billing decision.

@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
-import react from '@vitejs/plugin-react';
+import react from "@vitejs/plugin-react";
+import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import path from 'path';
 import childProcess from 'child_process';
 import { createRequire } from 'module';
@@ -27,7 +28,7 @@ export default defineConfig(({ mode }) => {
     commitSha = '';
   }
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [TanStackRouterVite(), react(), tailwindcss()],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
       __GIT_COMMIT__: JSON.stringify(commitSha),
