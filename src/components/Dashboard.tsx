@@ -23,8 +23,6 @@ import FirstCreationMission from './FirstCreationMission';
 import Today from './Today';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { CreatorJourney, recordJourneyEvent } from '../services/creatorJourney';
-import { calculateOneLever } from '@/services/telemetry';
-import SignalCard from './SignalCard';
 
 const formatNumber = (num: number) => {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
@@ -39,7 +37,8 @@ export default function Dashboard({
   brand,
   setActiveTab,
   user,
-  projects = [],
+,
+  userData,  projects = [],
   isProjectsLoading = false,
   projectsLoadError = false,
   onOpenProject,
@@ -59,6 +58,7 @@ export default function Dashboard({
   const [loadKey, setLoadKey] = useState(0);
   const [journey, setJourney] = useState<CreatorJourney | null>(null);
   const [isJourneyLoading, setIsJourneyLoading] = useState(true);
+  const signal = useMemo(() => calculateOneLever(userData || {}, projects || []), [userData, projects]);
 
   useEffect(() => {
     if (!user?.uid) {

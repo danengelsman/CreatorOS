@@ -17,11 +17,19 @@
     "jsx": "react-jsx",
     "paths": {
       "@/*": [
-        "./*"
+        "./src/*"
       ]
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": ["dist", "node_modules", ".svelte-kit", "build", "e2e", "playwright.config.ts", "scripts"]
+  "exclude": [
+    "dist",
+    "node_modules",
+    ".svelte-kit",
+    "build",
+    "e2e",
+    "playwright.config.ts",
+    "scripts"
+  ]
 }

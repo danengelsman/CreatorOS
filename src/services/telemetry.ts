@@ -61,7 +61,7 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
     id: 'growth-signal',
     title: 'Scale Your Reach',
     description: 'Your current scripts are performing well. Let\'s repurpose them for Shorts.',
-    impact: '+50% New Viewers',
+    impact: 'Increased Reach',
     action: { type: 'navigate', path: '/dashboard/repurpose' },
     priority: 'low',
   };

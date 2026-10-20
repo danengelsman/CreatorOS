@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Zap, ArrowRight, CheckCircle } from '@phosphor-icons/react';
+import { MagnifyingGlass, Lightning, ArrowRight, CheckCircle } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 
 export default function SignalScanner() {
@@ -25,8 +25,8 @@ export default function SignalScanner() {
     
     setResult({
       signal: 'Retention Spike at 0:42',
-      insight: 'Your viewers drop off during the transition to the main topic. A faster hook could increase watch time by 15%.',
-      impact: '+15% Watch Time',
+      insight: 'Your viewers drop off during the transition to the main topic. A faster hook could increase watch time.',
+      impact: 'Improved Watch Time',
     });
     setStatus('complete');
   };
@@ -36,7 +36,7 @@ export default function SignalScanner() {
       <div className="relative z-10">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 rounded-lg bg-[var(--accent)]/20 text-[var(--accent)]">
-            <Search size={24} />
+            <MagnifyingGlass size={24} />
           </div>
           <h3 className="text-xl font-bold tracking-tight">Creator Signal Scanner</h3>
         </div>
@@ -53,7 +53,7 @@ export default function SignalScanner() {
             disabled={status === 'scanning' || !input}
             className="ios-button ios-button-tinted px-6 py-3 flex items-center gap-2 font-bold"
           >
-            {status === 'scanning' ? <CircleNotch className="animate-spin" size={18} /> : <Zap size={18} />}
+            {status === 'scanning' ? <CircleNotch className="animate-spin" size={18} /> : <Lightning size={18} />}
             {status === 'scanning' ? 'Scanning...' : 'Scan'}
           </button>
         </div>
@@ -82,7 +82,7 @@ export default function SignalScanner() {
                 <div className="absolute inset-0 border-4 border-[var(--accent)]/20 rounded-full" />
                 <div className="absolute inset-0 border-4 border-t-[var(--accent)] rounded-full animate-spin" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Zap size={32} className="text-[var(--accent)] animate-pulse" />
+                  <Lightning size={32} className="text-[var(--accent)] animate-pulse" />
                 </div>
               </div>
               <p className="text-sm font-medium text-[var(--label-secondary)] animate-pulse">

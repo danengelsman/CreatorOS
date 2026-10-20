@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { ArrowRight, Zap } from '@phosphor-icons/react';
+import { ArrowRight, Lightning } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
 import { Signal } from '@/services/telemetry';
 
@@ -14,7 +14,7 @@ export default function SignalCard({ signal }: { signal: Signal }) {
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-2 text-[var(--accent)]">
-          <Zap size={20} weight="fill" />
+          <Lightning size={20} weight="fill" />
           <span className="text-[12px] font-bold uppercase tracking-wider">One Lever</span>
         </div>
         <div className="px-2 py-1 rounded-full bg-[var(--accent)] text-white text-[10px] font-bold">
