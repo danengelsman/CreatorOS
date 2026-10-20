@@ -31,6 +31,7 @@ import {
 } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import BrandIcon from './BrandIcon';
+import SignalScanner from './SignalScanner';
 
 // Sandbox presets for the interactive Brand Kit planner
 const SANDBOX_PRESETS: Record<string, Record<string, any>> = {
@@ -533,6 +534,9 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                       </button>
                     ))}
                   </div>
+            <div className="mt-12 w-full">
+              <SignalScanner />
+            </div>
                 </div>
               </div>
 

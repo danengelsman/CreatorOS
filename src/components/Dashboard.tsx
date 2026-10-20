@@ -13,7 +13,9 @@ import {
   TrendUp,
   Users,
 } from '@phosphor-icons/react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { calculateOneLever } from '@/services/telemetry';
+import SignalCard from './SignalCard';
 import { cn } from '../lib/utils';
 import { authorizedFetch, db } from '../firebase';
 import DailyGoalTracker from './DailyGoalTracker';
@@ -21,6 +23,8 @@ import FirstCreationMission from './FirstCreationMission';
 import Today from './Today';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { CreatorJourney, recordJourneyEvent } from '../services/creatorJourney';
+import { calculateOneLever } from '@/services/telemetry';
+import SignalCard from './SignalCard';
 
 const formatNumber = (num: number) => {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
@@ -302,6 +306,7 @@ export default function Dashboard({
 
   return (
     <div className="relative isolate pb-20 pt-5 lg:pt-8">
+      {signal && <SignalCard signal={signal} />}
       {/* Ambient studio lighting */}
       <div
         aria-hidden="true"
@@ -811,8 +816,10 @@ function MetricCard({ title, value, detail, icon: Icon, accent, isLoading, index
 }
 
 function MilestoneItem({ label, completed }: { label: string; completed: boolean }) {
+  const signal = calculateOneLever(userData || {}, projects || []);
   return (
     <div
+            
       className={cn(
         'rounded-2xl border p-3.5 transition-colors',
         completed
