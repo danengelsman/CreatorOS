@@ -2,40 +2,50 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
-import { 
-  UsersThree, List as Menu, X, CurrencyDollar as DollarSign, 
-  SignOut as LogOut, CircleNotch as Loader2, UserCircle, 
-  House, PenNib, Hexagon, Path, ChatsCircle, ChartLineUp, 
-  BookOpen, Sparkle, ShieldCheck, Recycle, Lightbulb, 
-  Lightning, VideoCamera 
+import {
+  UsersThree, List as Menu, X, CurrencyDollar as DollarSign,
+  SignOut as LogOut, CircleNotch as Loader2, UserCircle,
+  House, PenNib, Hexagon, Path, ChatsCircle, ChartLineUp,
+  BookOpen, Sparkle, ShieldCheck, Recycle, Lightbulb,
+  Lightning, VideoCamera
 } from '@phosphor-icons/react';
 import { Outlet, Link } from '@tanstack/react-router';
+import { logout } from '@/firebase';
 
-const NAV_ITEMS = [
-  { id: 'home', label: 'Home', icon: House, path: '/dashboard' },
-  { id: 'first_dollar', label: 'First Dollar', icon: DollarSign, path: '/dashboard/first-dollar' },
-  { id: 'create', label: 'Create', icon: PenNib, path: '/dashboard/create' },
-  { id: 'retention', label: 'Retention Lab', icon: Lightning, path: '/dashboard/retention' },
-  { id: 'analyzer', label: 'Video Analyzer', icon: VideoCamera, path: '/dashboard/analyzer' },
-  { id: 'repurpose', label: 'Repurpose', icon: Recycle, path: '/dashboard/repurpose' },
-  { id: 'brand', label: 'Brand', icon: Hexagon, path: '/dashboard/brand' },
-  { id: 'ideas', label: 'Ideas', icon: Lightbulb, path: '/dashboard/ideas' },
-  { id: 'roadmap', label: 'Roadmap', icon: Path, path: '/dashboard/roadmap' },
-  { id: 'hub', label: 'Creator Hub', icon: UsersThree, path: '/dashboard/hub' },
-  { id: 'community', label: 'Community', icon: ChatsCircle, path: '/dashboard/community' },
-  { id: 'reports', label: 'Reports', icon: ChartLineUp, path: '/dashboard/reports' },
-  { id: 'help', label: 'Help', icon: BookOpen, path: '/dashboard/help' },
-  { id: 'prompts', label: 'Co-Pilot', icon: Sparkle, path: '/dashboard/prompts' },
-  { id: 'profile', label: 'Profile', icon: UserCircle, path: '/dashboard/profile' },
-  { id: 'support', label: 'Support Hub', icon: ShieldCheck, path: '/dashboard/support' },
+const FEATURE_COMMUNITY = import.meta.env.VITE_FEATURE_COMMUNITY === 'true';
+
+const baseNavItems = [
+  { id: 'home', label: 'Home', icon: House, path: '/_auth/dashboard' },
+  { id: 'first_dollar', label: 'First Dollar', icon: DollarSign, path: '/_auth/first-dollar' },
+  { id: 'create', label: 'Create', icon: PenNib, path: '/_auth/create' },
+  { id: 'retention', label: 'Retention Lab', icon: Lightning, path: '/_auth/retention' },
+  { id: 'analyzer', label: 'Video Analyzer', icon: VideoCamera, path: '/_auth/analyzer' },
+  { id: 'repurpose', label: 'Repurpose', icon: Recycle, path: '/_auth/repurpose' },
+  { id: 'brand', label: 'Brand', icon: Hexagon, path: '/_auth/brand' },
+  { id: 'ideas', label: 'Ideas', icon: Lightbulb, path: '/_auth/ideas' },
+  { id: 'roadmap', label: 'Roadmap', icon: Path, path: '/_auth/roadmap' },
+  { id: 'hub', label: 'Creator Hub', icon: UsersThree, path: '/_auth/hub' },
+  { id: 'community', label: 'Community', icon: ChatsCircle, path: '/_auth/community' },
+  { id: 'reports', label: 'Reports', icon: ChartLineUp, path: '/_auth/reports' },
+  { id: 'help', label: 'Help', icon: BookOpen, path: '/_auth/help' },
+  { id: 'prompts', label: 'Co-Pilot', icon: Sparkle, path: '/_auth/prompts' },
+  { id: 'profile', label: 'Profile', icon: UserCircle, path: '/_auth/profile' },
+  { id: 'support', label: 'Support Hub', icon: ShieldCheck, path: '/_auth/support' },
 ];
 
-const NAV_GROUPS = [
+const NAV_ITEMS = FEATURE_COMMUNITY ? baseNavItems : baseNavItems.filter(item => item.id !== 'community');
+
+const baseNavGroups = [
   { title: 'Main', items: ['home'] },
   { title: 'Studio', items: ['create', 'retention', 'analyzer', 'repurpose', 'brand', 'ideas', 'prompts'] },
   { title: 'Growth', items: ['first_dollar', 'hub', 'reports', 'roadmap', 'community'] },
   { title: 'Settings', items: ['profile', 'help', 'support'] },
 ];
+
+const NAV_GROUPS = baseNavGroups.map(group => ({
+  title: group.title,
+  items: FEATURE_COMMUNITY ? group.items : group.items.filter(item => item !== 'community'),
+}));
 
 export default function LayoutShell({ children, user }: { children: React.ReactNode, user: any }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -63,7 +73,7 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
           </div>
 
           <div className="flex-1 flex justify-end h-full items-center gap-3">
-            <Link to="/dashboard/profile" className="cursor-pointer active:scale-95 transition-transform flex items-center justify-center w-8 h-8 rounded-full border border-[var(--separator)] overflow-hidden bg-[var(--bg-secondary)] shadow-sm">
+            <Link to="/_auth/profile" className="cursor-pointer active:scale-95 transition-transform flex items-center justify-center w-8 h-8 rounded-full border border-[var(--separator)] overflow-hidden bg-[var(--bg-secondary)] shadow-sm">
               {userPhoto ? (
                 <img src={userPhoto} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
@@ -132,13 +142,20 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
                   })}
 
                   <div className="my-4 border-t border-[var(--separator)]" />
-                  <button 
-                    onClick={() => window.location.href = '/logout'}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-[var(--system-red)] hover:bg-[var(--separator)] transition-colors rounded-xl mb-8 lg:mb-0"
-                  >
-                    <LogOut size={20} />
-                    <span className="text-[15px] font-semibold">Logout</span>
-                  </button>
+                  <button
+                                      onClick={async () => {
+                                        try {
+                                          await logout();
+                                        } catch (err) {
+                                          console.error('Logout failed:', err);
+                                        }
+                                        window.location.href = '/login';
+                                      }}
+                                      className="w-full flex items-center gap-3 px-4 py-3 text-[var(--system-red)] hover:bg-[var(--separator)] transition-colors rounded-xl mb-8 lg:mb-0"
+                                    >
+                                      <LogOut size={20} />
+                                      <span className="text-[15px] font-semibold">Logout</span>
+                                    </button>
                 </div>
               </motion.nav>
             </>
