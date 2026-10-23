@@ -144,8 +144,10 @@ test.describe('CreatorOS End-to-End System Smoke Tests', () => {
     // 6. Navigation to the "Create" Page via the nav drawer (desktop & mobile compatible)
     await menuButton.click();
 
-    // Select the "Create" navigation item inside drawer
-    const createNavItem = page.locator('button:has-text("Create")').first();
+    // Select the "Create" navigation item inside drawer. D7-A: nav entries are
+    // router Links (anchors) now, not buttons. Exact name so "Creator Hub"
+    // doesn't match "Create" substring matching.
+    const createNavItem = page.getByRole('link', { name: 'Create', exact: true }).first();
     await expect(createNavItem).toBeVisible();
     await createNavItem.click();
 

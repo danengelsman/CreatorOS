@@ -4,6 +4,7 @@ import { router } from './router';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoadingScreen from './components/LoadingScreen';
 import Onboarding from './components/Onboarding';
+import VerificationBanner from './components/VerificationBanner';
 import { ensureFirstDollarJourney } from './services/firstDollarJourney';
 import { logout } from '@/firebase';
 
@@ -45,7 +46,10 @@ function RouterWrapper() {
     return <LoadingScreen />;
   }
 
-  // If showOnboarding is true, render the onboarding flow
+  // If showOnboarding is true, render the onboarding flow. The verification
+  // nudge rides along here because the router (and LayoutShell) is not mounted
+  // during onboarding — matches the pre-router App.tsx behavior where the
+  // banner was visible behind the onboarding modal.
   if (showOnboarding) {
     const handleOnboardingComplete = async () => {
       if (!auth.user) return;
@@ -54,7 +58,12 @@ function RouterWrapper() {
       setShowOnboarding(false);
     };
 
-    return <Onboarding onComplete={handleOnboardingComplete} user={auth.user} />;
+    return (
+      <>
+        <Onboarding onComplete={handleOnboardingComplete} user={auth.user} />
+        <VerificationBanner user={auth.user} />
+      </>
+    );
   }
 
   // Otherwise, render the router
