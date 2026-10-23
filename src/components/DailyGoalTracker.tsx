@@ -3,15 +3,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash, Fire, Sparkle, ArrowCounterClockwise, Check } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import Confetti from './Confetti';
-import { 
-  DailyGoalTask, 
-  DailyGoalsState, 
-  DEFAULT_GOAL_SUGGESTIONS, 
-  getLocalDailyGoals, 
-  fetchDailyGoalsFromCloud, 
+import {
+  DailyGoalTask,
+  DailyGoalsState,
+  DEFAULT_GOAL_SUGGESTIONS,
+  getLocalDailyGoals,
+  fetchDailyGoalsFromCloud,
   syncDailyGoalsToCloud,
   getTodayDateString,
-  getYesterdayDateString
+  getYesterdayDateString,
 } from '../services/dailyGoals';
 
 interface DailyGoalTrackerProps {
@@ -29,7 +29,7 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
   useEffect(() => {
     let isMounted = true;
     if (user?.uid) {
-      fetchDailyGoalsFromCloud(user.uid).then(cloudState => {
+      fetchDailyGoalsFromCloud(user.uid).then((cloudState) => {
         if (isMounted) {
           setGoalsState(cloudState);
           if (cloudState.lastCompletedDate === getTodayDateString()) {
@@ -45,7 +45,7 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
 
   const tasks = goalsState.tasks;
   const totalCount = tasks.length;
-  const completedCount = tasks.filter(t => t.completed).length;
+  const completedCount = tasks.filter((t) => t.completed).length;
   const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const isAllComplete = totalCount > 0 && completedCount === totalCount;
 
@@ -56,18 +56,18 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
 
   const toggleTask = (taskId: string) => {
     const today = getTodayDateString();
-    const updatedTasks = tasks.map(t => {
+    const updatedTasks = tasks.map((t) => {
       if (t.id === taskId) {
         return {
           ...t,
           completed: !t.completed,
-          completedAt: !t.completed ? new Date().toISOString() : undefined
+          completedAt: !t.completed ? new Date().toISOString() : undefined,
         };
       }
       return t;
     });
 
-    const nowCompletedCount = updatedTasks.filter(t => t.completed).length;
+    const nowCompletedCount = updatedTasks.filter((t) => t.completed).length;
     const nowAllComplete = updatedTasks.length > 0 && nowCompletedCount === updatedTasks.length;
 
     let newStreak = goalsState.streak;
@@ -96,7 +96,7 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
       date: today,
       tasks: updatedTasks,
       streak: newStreak,
-      lastCompletedDate: newLastCompletedDate
+      lastCompletedDate: newLastCompletedDate,
     };
 
     updateStateAndPersist(nextState);
@@ -107,7 +107,7 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
     if (!trimmed) return;
 
     // Prevent identical duplicates
-    if (tasks.some(t => t.text.toLowerCase() === trimmed.toLowerCase())) {
+    if (tasks.some((t) => t.text.toLowerCase() === trimmed.toLowerCase())) {
       setNewTaskInput('');
       return;
     }
@@ -116,12 +116,12 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
       id: 'task-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
       text: trimmed,
       completed: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     const nextState: DailyGoalsState = {
       ...goalsState,
-      tasks: [...tasks, newTask]
+      tasks: [...tasks, newTask],
     };
 
     updateStateAndPersist(nextState);
@@ -131,7 +131,7 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
   const deleteTask = (taskId: string) => {
     const nextState: DailyGoalsState = {
       ...goalsState,
-      tasks: tasks.filter(t => t.id !== taskId)
+      tasks: tasks.filter((t) => t.id !== taskId),
     };
     updateStateAndPersist(nextState);
   };
@@ -139,8 +139,11 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
   const resetAllToday = () => {
     const nextState: DailyGoalsState = {
       ...goalsState,
-      tasks: tasks.map(t => ({ ...t, completed: false, completedAt: undefined })),
-      lastCompletedDate: goalsState.lastCompletedDate === getTodayDateString() ? undefined : goalsState.lastCompletedDate
+      tasks: tasks.map((t) => ({ ...t, completed: false, completedAt: undefined })),
+      lastCompletedDate:
+        goalsState.lastCompletedDate === getTodayDateString()
+          ? undefined
+          : goalsState.lastCompletedDate,
     };
     updateStateAndPersist(nextState);
     setHasCelebratedToday(false);
@@ -148,22 +151,28 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
 
   // Filter default suggestions that aren't yet added
   const availableSuggestions = DEFAULT_GOAL_SUGGESTIONS.filter(
-    sugg => !tasks.some(t => t.text.toLowerCase() === sugg.toLowerCase())
+    (sugg) => !tasks.some((t) => t.text.toLowerCase() === sugg.toLowerCase()),
   );
 
   return (
-    <section 
+    <section
       aria-label="Daily creator goal tracker"
       className={cn(
-        "relative overflow-hidden rounded-[28px] border border-white/[0.09] bg-white/[0.035] p-6 shadow-[0_24px_70px_rgba(0,0,0,0.24)] backdrop-blur-xl md:p-7",
-        className
+        'relative overflow-hidden rounded-[28px] border border-white/[0.09] bg-white/[0.035] p-6 shadow-[0_24px_70px_rgba(0,0,0,0.24)] backdrop-blur-xl md:p-7',
+        className,
       )}
     >
       {showCelebration && <Confetti count={65} />}
 
       {/* Ambient background glow */}
-      <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#f4a261]/[0.08] blur-[80px]" />
-      <div aria-hidden="true" className="pointer-events-none absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-[#8b5cf6]/[0.08] blur-[80px]" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#f4a261]/[0.08] blur-[80px]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-[#8b5cf6]/[0.08] blur-[80px]"
+      />
 
       {/* Top Header */}
       <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -182,17 +191,25 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
 
         {/* Streak & Reset Badges */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className={cn(
-            "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all border",
-            goalsState.streak > 0 
-              ? "border-[#f4a261]/30 bg-[#f4a261]/15 text-[#f7c99c] shadow-[0_0_20px_rgba(244,162,97,0.2)]"
-              : "border-white/[0.08] bg-white/[0.04] text-white/60"
-          )}>
-            <Fire size={16} weight="fill" className={goalsState.streak > 0 ? "text-[#f4a261] animate-pulse" : "text-white/40"} />
-            <span>{goalsState.streak > 0 ? `${goalsState.streak}-day streak` : 'Start your streak'}</span>
+          <div
+            className={cn(
+              'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all border',
+              goalsState.streak > 0
+                ? 'border-[#f4a261]/30 bg-[#f4a261]/15 text-[#f7c99c] shadow-[0_0_20px_rgba(244,162,97,0.2)]'
+                : 'border-white/[0.08] bg-white/[0.04] text-white/60',
+            )}
+          >
+            <Fire
+              size={16}
+              weight="fill"
+              className={goalsState.streak > 0 ? 'text-[#f4a261] animate-pulse' : 'text-white/40'}
+            />
+            <span>
+              {goalsState.streak > 0 ? `${goalsState.streak}-day streak` : 'Start your streak'}
+            </span>
           </div>
 
-          {tasks.some(t => t.completed) && (
+          {tasks.some((t) => t.completed) && (
             <button
               type="button"
               onClick={resetAllToday}
@@ -209,18 +226,23 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
       <div className="relative z-10 mt-6 rounded-2xl border border-white/[0.06] bg-black/25 p-4">
         <div className="flex items-center justify-between text-xs font-semibold">
           <span className="text-white/70">
-            Today's Progress: <span className="text-white font-bold">{completedCount} of {totalCount} completed</span>
+            Today's Progress:{' '}
+            <span className="text-white font-bold">
+              {completedCount} of {totalCount} completed
+            </span>
           </span>
-          <span className={cn(
-            "font-mono font-bold transition-colors",
-            isAllComplete ? "text-emerald-400" : "text-[var(--accent)]"
-          )}>
+          <span
+            className={cn(
+              'font-mono font-bold transition-colors',
+              isAllComplete ? 'text-emerald-400' : 'text-[var(--accent)]',
+            )}
+          >
             {percentage}%
           </span>
         </div>
 
         <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
-          <motion.div 
+          <motion.div
             className="h-full rounded-full bg-gradient-to-r from-[#f4a261] via-[#c4b5fd] to-emerald-400"
             initial={{ width: 0 }}
             animate={{ width: `${percentage}%` }}
@@ -229,7 +251,7 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
         </div>
 
         {isAllComplete && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             className="mt-2.5 flex items-center gap-1.5 text-xs font-semibold text-emerald-400"
@@ -254,10 +276,10 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
                 className={cn(
-                  "group flex items-center justify-between gap-3 rounded-2xl border p-3.5 transition-all",
-                  isDone 
-                    ? "border-emerald-500/20 bg-emerald-500/[0.04]"
-                    : "border-white/[0.07] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.04]"
+                  'group flex items-center justify-between gap-3 rounded-2xl border p-3.5 transition-all',
+                  isDone
+                    ? 'border-emerald-500/20 bg-emerald-500/[0.04]'
+                    : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.04]',
                 )}
               >
                 <button
@@ -265,21 +287,29 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
                   onClick={() => toggleTask(task.id)}
                   className="flex flex-1 items-center gap-3 text-left focus:outline-none"
                 >
-                  <div className={cn(
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition-all",
-                    isDone 
-                      ? "border-emerald-400 bg-emerald-400 text-black shadow-[0_0_12px_rgba(52,211,153,0.3)]"
-                      : "border-white/20 bg-white/[0.04] text-transparent hover:border-white/40"
-                  )}>
-                    <Check size={14} weight="bold" className={isDone ? "opacity-100" : "opacity-0"} />
+                  <div
+                    className={cn(
+                      'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition-all',
+                      isDone
+                        ? 'border-emerald-400 bg-emerald-400 text-black shadow-[0_0_12px_rgba(52,211,153,0.3)]'
+                        : 'border-white/20 bg-white/[0.04] text-transparent hover:border-white/40',
+                    )}
+                  >
+                    <Check
+                      size={14}
+                      weight="bold"
+                      className={isDone ? 'opacity-100' : 'opacity-0'}
+                    />
                   </div>
 
-                  <span className={cn(
-                    "text-sm font-medium transition-all select-none",
-                    isDone 
-                      ? "text-white/40 line-through" 
-                      : "text-white/90 group-hover:text-white"
-                  )}>
+                  <span
+                    className={cn(
+                      'text-sm font-medium transition-all select-none',
+                      isDone
+                        ? 'text-white/40 line-through'
+                        : 'text-white/90 group-hover:text-white',
+                    )}
+                  >
                     {task.text}
                   </span>
                 </button>
@@ -318,7 +348,11 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
                 onClick={() => addTask(sugg)}
                 className="group flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-white/70 transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent)]"
               >
-                <Plus size={13} weight="bold" className="transition-transform group-hover:rotate-90" />
+                <Plus
+                  size={13}
+                  weight="bold"
+                  className="transition-transform group-hover:rotate-90"
+                />
                 <span>{sugg}</span>
               </button>
             ))}
@@ -327,7 +361,7 @@ export default function DailyGoalTracker({ user, className }: DailyGoalTrackerPr
       )}
 
       {/* Custom Task Input */}
-      <form 
+      <form
         onSubmit={(e) => {
           e.preventDefault();
           addTask(newTaskInput);

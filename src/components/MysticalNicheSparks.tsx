@@ -1,6 +1,15 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Sparkle, Fire, Diamond, MagicWand, CaretRight, ArrowClockwise, Users, Smiley } from '@phosphor-icons/react';
+import {
+  Sparkle,
+  Fire,
+  Diamond,
+  MagicWand,
+  CaretRight,
+  ArrowClockwise,
+  Users,
+  Smiley,
+} from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 
 export interface NicheSpark {
@@ -34,7 +43,7 @@ export default function MysticalNicheSparks({
   onRefresh,
   onDismiss,
   selectedSparkTitle,
-  disabled
+  disabled,
 }: MysticalNicheSparksProps) {
   if (isLoading) {
     return (
@@ -47,12 +56,22 @@ export default function MysticalNicheSparks({
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/10 to-transparent animate-pulse pointer-events-none" />
         <div className="flex items-center gap-3">
           <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-400/30 flex-shrink-0">
-            <MagicWand size={18} weight="duotone" className="animate-spin text-purple-300" style={{ animationDuration: '4s' }} />
+            <MagicWand
+              size={18}
+              weight="duotone"
+              className="animate-spin text-purple-300"
+              style={{ animationDuration: '4s' }}
+            />
             <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
           </div>
           <div className="space-y-0.5">
             <h4 className="text-[13px] font-semibold tracking-wide text-purple-200 flex items-center gap-1.5">
-              <Sparkle size={13} weight="fill" className="text-amber-300 animate-spin" style={{ animationDuration: '6s' }} />
+              <Sparkle
+                size={13}
+                weight="fill"
+                className="text-amber-300 animate-spin"
+                style={{ animationDuration: '6s' }}
+              />
               The Creative Muse is Awakening...
             </h4>
             <p className="text-[11.5px] text-purple-200/70 font-medium">
@@ -71,7 +90,7 @@ export default function MysticalNicheSparks({
       initial={{ opacity: 0, y: 14, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10, scale: 0.96 }}
-      transition={{ type: "spring", damping: 26, stiffness: 220 }}
+      transition={{ type: 'spring', damping: 26, stiffness: 220 }}
       className="w-full relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-950/50 via-indigo-950/40 to-black/80 backdrop-blur-2xl shadow-[0_8px_32px_rgba(147,51,234,0.18)] p-3.5 sm:p-4 space-y-2.5"
     >
       {/* Mystical decorative aurora blobs */}
@@ -143,23 +162,25 @@ export default function MysticalNicheSparks({
                 if (!disabled) onSelectSpark(spark);
               }}
               className={cn(
-                "group relative text-left rounded-xl p-2.5 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden",
+                'group relative text-left rounded-xl p-2.5 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden',
                 isSelected
-                  ? "bg-purple-600/35 border-purple-400 ring-2 ring-purple-400/50 shadow-md shadow-purple-500/20"
+                  ? 'bg-purple-600/35 border-purple-400 ring-2 ring-purple-400/50 shadow-md shadow-purple-500/20'
                   : isTrending
-                    ? "bg-gradient-to-b from-amber-500/10 via-white/[0.02] to-transparent border-amber-500/25 hover:border-amber-400/60 hover:shadow-[0_4px_16px_rgba(245,158,11,0.15)]"
-                    : "bg-gradient-to-b from-cyan-500/10 via-white/[0.02] to-transparent border-cyan-500/25 hover:border-cyan-400/60 hover:shadow-[0_4px_16px_rgba(6,182,212,0.15)]",
-                disabled && !isSelected && "opacity-40 cursor-not-allowed"
+                    ? 'bg-gradient-to-b from-amber-500/10 via-white/[0.02] to-transparent border-amber-500/25 hover:border-amber-400/60 hover:shadow-[0_4px_16px_rgba(245,158,11,0.15)]'
+                    : 'bg-gradient-to-b from-cyan-500/10 via-white/[0.02] to-transparent border-cyan-500/25 hover:border-cyan-400/60 hover:shadow-[0_4px_16px_rgba(6,182,212,0.15)]',
+                disabled && !isSelected && 'opacity-40 cursor-not-allowed',
               )}
             >
               {/* Top Badge & Sparkle */}
               <div className="flex items-center justify-between gap-1 mb-1.5">
-                <span className={cn(
-                  "inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border",
-                  isTrending
-                    ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                    : "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
-                )}>
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border',
+                    isTrending
+                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                      : 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+                  )}
+                >
                   {isTrending ? (
                     <Fire size={10} weight="fill" className="text-amber-400" />
                   ) : (
@@ -168,7 +189,11 @@ export default function MysticalNicheSparks({
                   {spark.badge}
                 </span>
 
-                <Sparkle size={12} weight="fill" className="text-purple-400/40 group-hover:text-amber-300 transition-colors" />
+                <Sparkle
+                  size={12}
+                  weight="fill"
+                  className="text-purple-400/40 group-hover:text-amber-300 transition-colors"
+                />
               </div>
 
               {/* Title & Pitch */}
@@ -194,13 +219,15 @@ export default function MysticalNicheSparks({
                   </span>
                 </div>
 
-                <div className={cn(
-                  "w-full py-1.5 px-2 rounded-lg text-[10.5px] font-semibold flex items-center justify-center gap-1 transition-all",
-                  isSelected
-                    ? "bg-purple-500 text-white shadow-sm"
-                    : "bg-white/10 text-purple-200 group-hover:bg-purple-500 group-hover:text-white"
-                )}>
-                  <span>{isSelected ? "Selected ✦" : "Choose this niche"}</span>
+                <div
+                  className={cn(
+                    'w-full py-1.5 px-2 rounded-lg text-[10.5px] font-semibold flex items-center justify-center gap-1 transition-all',
+                    isSelected
+                      ? 'bg-purple-500 text-white shadow-sm'
+                      : 'bg-white/10 text-purple-200 group-hover:bg-purple-500 group-hover:text-white',
+                  )}
+                >
+                  <span>{isSelected ? 'Selected ✦' : 'Choose this niche'}</span>
                   <CaretRight size={11} weight="bold" />
                 </div>
               </div>

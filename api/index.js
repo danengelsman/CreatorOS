@@ -14,7 +14,9 @@ function getAppPromise() {
       }
       return app;
     });
-    ready.catch(() => { ready = null; });
+    ready.catch(() => {
+      ready = null;
+    });
   }
   return ready;
 }

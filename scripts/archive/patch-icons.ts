@@ -4,12 +4,12 @@ import * as path from 'path';
 function getAllFiles(dirPath: string, arrayOfFiles: string[] = []): string[] {
   const files = fs.readdirSync(dirPath);
 
-  files.forEach(function(file) {
-    if (fs.statSync(dirPath + "/" + file).isDirectory()) {
-      arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
+  files.forEach(function (file) {
+    if (fs.statSync(dirPath + '/' + file).isDirectory()) {
+      arrayOfFiles = getAllFiles(dirPath + '/' + file, arrayOfFiles);
     } else {
       if (file.endsWith('.tsx') || file.endsWith('.ts')) {
-        arrayOfFiles.push(path.join(process.cwd(), dirPath, "/", file));
+        arrayOfFiles.push(path.join(process.cwd(), dirPath, '/', file));
       }
     }
   });
@@ -115,37 +115,43 @@ const comprehensiveMapping: Record<string, string> = {
   Instagram: 'InstagramLogo',
 };
 
-files.forEach(file => {
+files.forEach((file) => {
   let content = fs.readFileSync(file, 'utf8');
-  
+
   // Revert back and fix
   // Wait, if we already converted `lucide-react` to `@phosphor-icons/react` we need to look for `@phosphor-icons/react` and fix its contents
   const matches = content.match(/import\s+{([^}]+)}\s+from\s+'@phosphor-icons\/react'/g);
   if (matches) {
-    matches.forEach(match => {
+    matches.forEach((match) => {
       const matchInner = match.match(/import\s+{([^}]+)}\s+from\s+'@phosphor-icons\/react'/)![1];
-      const icons = matchInner.split(',').map(i => i.trim()).filter(i => i);
-      
-      const newIcons = icons.map(iconStr => {
+      const icons = matchInner
+        .split(',')
+        .map((i) => i.trim())
+        .filter((i) => i);
+
+      const newIcons = icons.map((iconStr) => {
         // e.g. "Calendar as CalendarIcon" or "PenTool"
         // But what if it's already translated "SignOut as LogOut" ?
         const parts = iconStr.split(/\s+as\s+/);
         let origName = parts[0];
         let alias = parts[parts.length - 1]; // if "Apples as Oranges" Orig=Apples, alias=Oranges
-        
+
         // Wait, for BarChart3, we didn't translate it earlier because it wasn't in the mapping!
         // So origName might be BarChart3.
         // Let's translate origName using comprehensiveMapping
         let newOrigName = comprehensiveMapping[origName] || origName;
         // If it was "BarChart3 as BarChart3Context", newOrigName is "ChartBar"
-        
+
         if (newOrigName === alias) {
           return newOrigName;
         } else {
           return `${newOrigName} as ${alias}`;
         }
       });
-      content = content.replace(match, `import { ${newIcons.join(', ')} } from '@phosphor-icons/react'`);
+      content = content.replace(
+        match,
+        `import { ${newIcons.join(', ')} } from '@phosphor-icons/react'`,
+      );
     });
     fs.writeFileSync(file, content);
   }

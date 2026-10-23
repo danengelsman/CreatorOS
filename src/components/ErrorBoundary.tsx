@@ -25,13 +25,13 @@ export class ErrorBoundary extends React.Component<Props, State> {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     logErrorToFirestore(error, {
       componentStack: errorInfo.componentStack,
-      source: 'ErrorBoundary'
+      source: 'ErrorBoundary',
     });
   }
 
   render() {
     if (this.state.hasError) {
-      let errorMessage = "An unexpected error occurred.";
+      let errorMessage = 'An unexpected error occurred.';
       let isFirebaseError = false;
 
       try {
@@ -55,14 +55,18 @@ export class ErrorBoundary extends React.Component<Props, State> {
             <div>
               <h2 className="text-2xl font-extrabold tracking-tight mb-3">System Interruption</h2>
               <p className="text-premium-muted leading-relaxed">
-                {isFirebaseError ? "We encountered a permission or data issue with our cloud services." : "Something went wrong while rendering this view."}
+                {isFirebaseError
+                  ? 'We encountered a permission or data issue with our cloud services.'
+                  : 'Something went wrong while rendering this view.'}
               </p>
               <div className="mt-6 p-4 bg-premium-bg rounded-2xl text-left overflow-hidden">
-                <p className="text-[11px] font-bold text-premium-muted uppercase tracking-widest mb-2">Error Details</p>
+                <p className="text-[11px] font-bold text-premium-muted uppercase tracking-widest mb-2">
+                  Error Details
+                </p>
                 <p className="text-xs font-mono text-red-600 break-words">{errorMessage}</p>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="ios-button ios-button-filled w-full"
             >

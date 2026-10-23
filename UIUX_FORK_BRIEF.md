@@ -15,13 +15,13 @@
 
 ## Where UI/UX decisions intersect the plan of record
 
-| Plan item | Interface with design |
-|---|---|
-| **D7-A TanStack Router** | URL design *is* UX design — define the URL space (tabs as paths vs search params, shareable deep links, back semantics) before implementation |
-| **D8-A Zustand slices** | Store boundaries should follow UX domains (projects / brand / user) — settle information architecture first, then slice |
-| **F3.x honesty pass** | Removing fakes changes the nav map and empty states — design one "coming soon" pattern and apply it everywhere |
-| **D9-A create-focused launch** | IA should foreground the 8 real create tools; the growth layer recedes into gated/coming-soon |
-| **F5.4/F5.5** | Splitting CalendarView/LandingPage and font/CSS hygiene are the implementation side of any redesign — sequence redesign before or with the split, not after |
+| Plan item                      | Interface with design                                                                                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D7-A TanStack Router**       | URL design _is_ UX design — define the URL space (tabs as paths vs search params, shareable deep links, back semantics) before implementation               |
+| **D8-A Zustand slices**        | Store boundaries should follow UX domains (projects / brand / user) — settle information architecture first, then slice                                     |
+| **F3.x honesty pass**          | Removing fakes changes the nav map and empty states — design one "coming soon" pattern and apply it everywhere                                              |
+| **D9-A create-focused launch** | IA should foreground the 8 real create tools; the growth layer recedes into gated/coming-soon                                                               |
+| **F5.4/F5.5**                  | Splitting CalendarView/LandingPage and font/CSS hygiene are the implementation side of any redesign — sequence redesign before or with the split, not after |
 
 ## Open design questions for the fork
 
@@ -34,6 +34,6 @@
 
 ## How to start the forked conversation
 
-> *"Read `UIUX_FORK_BRIEF.md`, `APP_EVALUATION.md` §7, and `PRODUCTION_READINESS_PLAN.md` (F3, F5, D7–D9) — then let's work on [your topic]."*
+> _"Read `UIUX_FORK_BRIEF.md`, `APP_EVALUATION.md` §7, and `PRODUCTION_READINESS_PLAN.md` (F3, F5, D7–D9) — then let's work on [your topic]."_
 
 Ask for visual work or prototypes explicitly — the design agent should load its design skill entry point (design-core-rules) before producing any HTML/prototype deliverables.

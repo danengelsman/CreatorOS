@@ -28,7 +28,11 @@ import { register } from 'node:module';
 const repo = process.cwd();
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'f2-probe-'));
 const DUMMY_SERVICE_ACCOUNT = Buffer.from(
-  JSON.stringify({ client_email: 'probe@probe.iam.gserviceaccount.com', private_key: 'not-a-key', project_id: 'probe' })
+  JSON.stringify({
+    client_email: 'probe@probe.iam.gserviceaccount.com',
+    private_key: 'not-a-key',
+    project_id: 'probe',
+  }),
 ).toString('base64');
 // VERCEL=1 boots the app exactly like the serverless bundle (no vite/static
 // fallback middleware, so unregistered routes genuinely 404 — parity with
@@ -88,7 +92,9 @@ function _matchingDocs(dbId, colName, field, value) {
 //   getFirestore(admin.app(), databaseId)  -> named database (client projects)
 
 const adminStub2Path = path.join(tmp, '_admin_stub2.mjs');
-fs.writeFileSync(adminStub2Path, `
+fs.writeFileSync(
+  adminStub2Path,
+  `
 // --- in-memory Firestore shared across the stub ---
 // Uses the exact same store object the parent probe seeded (shared via
 // globalThis; module hooks run in-process). Falls back to the JSON file.
@@ -250,10 +256,13 @@ export function getFirestore(app, databaseId) {
   if (databaseId === 'ai-studio-0a8878a6-d050-428c-9f54-98a4c21ce712') return namedDb;
   return defaultDb;
 }
-`);
+`,
+);
 
 const hookPath = path.join(tmp, '_hook.mjs');
-fs.writeFileSync(hookPath, `
+fs.writeFileSync(
+  hookPath,
+  `
 const ADMIN = ${JSON.stringify(pathToFileURL(adminStub2Path).href)};
 // The esbuild bundle imports both "firebase-admin" (default) and
 // "firebase-admin/lib/firestore" (named getFirestore — the package's ESM
@@ -273,7 +282,8 @@ export async function resolve(specifier, context, next) {
   }
   return next(specifier, context);
 }
-`);
+`,
+);
 
 // Pre-seed a fake integration doc the routes can read back (route-reachable
 // write also exercised below via lazy-upgrade + OAuth-free paths).
@@ -319,7 +329,9 @@ async function call(route, method = 'GET', body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   let json = null;
-  try { json = await res.json(); } catch {}
+  try {
+    json = await res.json();
+  } catch {}
   return { status: res.status, json, headers: res.headers };
 }
 
@@ -328,7 +340,10 @@ await probe('integration-doc-readable-via-route', async () => {
   const r = await call('/api/accounts');
   const account = Array.isArray(r.json) ? r.json.find((a) => a.platform === 'youtube') : null;
   const profileOk = account?.profile?.id === 'UC_PROBE';
-  return { ok: r.status === 200 && profileOk, summary: `GET /api/accounts -> ${r.status}, youtube profile=${JSON.stringify(account?.profile)}` };
+  return {
+    ok: r.status === 200 && profileOk,
+    summary: `GET /api/accounts -> ${r.status}, youtube profile=${JSON.stringify(account?.profile)}`,
+  };
 });
 
 // 2. Decrypt + lazy-upgrade: legacy plaintext decrypts as-is and the update
@@ -337,8 +352,12 @@ await probe('integration-doc-readable-via-route', async () => {
 // VERCEL=1 by F1.4 design (cold-start write amplification), so this proves
 // the mechanism directly.
 await probe('decrypt-and-lazy-upgrade-to-envelope', async () => {
-  const { decryptToken } = await import(pathToFileURL(path.join(repo, 'src/server/crypto.ts')).href);
-  const { updateIntegrationFields } = await import(pathToFileURL(path.join(repo, 'src/server/firestore.ts')).href);
+  const { decryptToken } = await import(
+    pathToFileURL(path.join(repo, 'src/server/crypto.ts')).href
+  );
+  const { updateIntegrationFields } = await import(
+    pathToFileURL(path.join(repo, 'src/server/firestore.ts')).href
+  );
   const before = _dbs['(default)'].integrations[`${UID}_youtube`];
   // F1.4 suppresses the lazy upgrade under VERCEL=1 (cold-start write
   // amplification); temporarily unset it to exercise the upgrade branch,
@@ -355,8 +374,9 @@ await probe('decrypt-and-lazy-upgrade-to-envelope', async () => {
   }
   await new Promise((r) => setTimeout(r, 200));
   const after = _dbs['(default)'].integrations[`${UID}_youtube`];
-  const becameEnvelope = before.access_token === 'ya29.probe-legacy-plaintext-token'
-    && after.access_token?.startsWith('{"v":1');
+  const becameEnvelope =
+    before.access_token === 'ya29.probe-legacy-plaintext-token' &&
+    after.access_token?.startsWith('{"v":1');
   const roundtrip = decryptToken(after.access_token) === 'ya29.probe-legacy-plaintext-token';
   return {
     ok: becameEnvelope && roundtrip && plaintext === 'ya29.probe-legacy-plaintext-token',
@@ -369,21 +389,27 @@ await probe('decrypt-and-lazy-upgrade-to-envelope', async () => {
 // fake key before it records usage, so the ledger is driven via its public
 // API — the same QuotaLedger the server wires).
 await probe('envelope-roundtrip-through-quota-gate', async () => {
-  const { QuotaLedger } = await import(pathToFileURL(path.join(repo, 'src/server/quotaLedger.ts')).href);
+  const { QuotaLedger } = await import(
+    pathToFileURL(path.join(repo, 'src/server/quotaLedger.ts')).href
+  );
   const adminStub = (await import(pathToFileURL(adminStub2Path).href)).default;
   const ledger = new QuotaLedger({ firestore: adminStub.firestore('(default)') });
   // route-reachable proof: the quota guard on a live Gemini route reads the
   // Firestore-backed ledger and lets an under-budget request through
-  const r = await call('/api/gemini/video-status', 'POST', { uri: 'https://generativelanguage.googleapis.com/v1/files/x' });
+  const r = await call('/api/gemini/video-status', 'POST', {
+    uri: 'https://generativelanguage.googleapis.com/v1/files/x',
+  });
   const gatePassed = r.status !== 401 && r.status !== 429;
   // transactional create (doc missing -> set) through FirestoreQuotaStore
   ledger.record(UID, '/api/gemini/video-status', 50);
   await new Promise((res) => setTimeout(res, 200));
   const check = await ledger.check(UID);
   const doc = _dbs['(default)'].ai_quota?.[`${UID}_${dayCompact()}`];
-  const shapeOk = !!doc && doc.usedToday === 50
-    && doc.routes?.['/api/gemini/video-status']?.calls === 1
-    && doc.routes?.['/api/gemini/video-status']?.tokens === 50;
+  const shapeOk =
+    !!doc &&
+    doc.usedToday === 50 &&
+    doc.routes?.['/api/gemini/video-status']?.calls === 1 &&
+    doc.routes?.['/api/gemini/video-status']?.tokens === 50;
   return {
     ok: gatePassed && check.allowed && shapeOk,
     summary: `AI gate passed (${r.status}); transactional create ok=${shapeOk} usedToday=${doc?.usedToday}`,
@@ -398,12 +424,16 @@ function dayCompact() {
 
 // 4. Quota transaction: 50 parallel increments -> exactly 50
 await probe('quota-50-parallel-increments-exactly-50', async () => {
-  const { QuotaLedger } = await import(pathToFileURL(path.join(repo, 'src/server/quotaLedger.ts')).href);
+  const { QuotaLedger } = await import(
+    pathToFileURL(path.join(repo, 'src/server/quotaLedger.ts')).href
+  );
   const adminStub = (await import(pathToFileURL(adminStub2Path).href)).default;
   const ledger = new QuotaLedger({ firestore: adminStub.firestore('(default)') });
-  await Promise.all(Array.from({ length: 50 }, () =>
-    ledger.record('probe-user-quota', '/api/gemini/video-status', 1)
-  ));
+  await Promise.all(
+    Array.from({ length: 50 }, () =>
+      ledger.record('probe-user-quota', '/api/gemini/video-status', 1),
+    ),
+  );
   // record is fail-open async; give the transaction queue a beat to settle
   await new Promise((r) => setTimeout(r, 300));
   const used = await ledger.usedToday('probe-user-quota');
@@ -417,25 +447,48 @@ await probe('quota-over-budget-429', async () => {
     pathToFileURL(path.join(repo, 'src/server/quotaLedger.ts')).href
   );
   const adminStub = (await import(pathToFileURL(adminStub2Path).href)).default;
-  const ledger = new QuotaLedger({ firestore: adminStub.firestore('(default)'), now: () => new Date() });
+  const ledger = new QuotaLedger({
+    firestore: adminStub.firestore('(default)'),
+    now: () => new Date(),
+  });
   await ledger.record('probe-user-over', '/api/gemini/generate', 4000);
   await new Promise((r) => setTimeout(r, 100));
   const middleware = quotaGuardMiddleware(ledger);
-  let status = 0; let payload = null; const headers = {};
+  let status = 0;
+  let payload = null;
+  const headers = {};
   await new Promise((resolve) => {
     const res = {
-      setHeader(k, v) { headers[k] = v; },
-      status(s) { status = s; return { json(p) { payload = p; resolve(); } }; },
+      setHeader(k, v) {
+        headers[k] = v;
+      },
+      status(s) {
+        status = s;
+        return {
+          json(p) {
+            payload = p;
+            resolve();
+          },
+        };
+      },
     };
-    middleware({ user: { uid: 'probe-user-over' } }, res, () => { status = 200; resolve(); });
+    middleware({ user: { uid: 'probe-user-over' } }, res, () => {
+      status = 200;
+      resolve();
+    });
   });
-  const shapeOk = payload
-    && typeof payload.retryAfterSeconds === 'number'
-    && typeof payload.usedToday === 'number'
-    && typeof payload.dailyBudget === 'number'
-    && typeof payload.error === 'string';
+  const shapeOk =
+    payload &&
+    typeof payload.retryAfterSeconds === 'number' &&
+    typeof payload.usedToday === 'number' &&
+    typeof payload.dailyBudget === 'number' &&
+    typeof payload.error === 'string';
   return {
-    ok: status === 429 && shapeOk && Number(headers['Retry-After']) > 0 && headers['X-Quota-Used'] === '4000',
+    ok:
+      status === 429 &&
+      shapeOk &&
+      Number(headers['Retry-After']) > 0 &&
+      headers['X-Quota-Used'] === '4000',
     summary: `guard=${status} used=${payload?.usedToday}/${payload?.dailyBudget} Retry-After=${headers['Retry-After']} shape=${shapeOk}`,
   };
 });
@@ -457,7 +510,10 @@ await probe('dead-routes-404-live-routes-alive', async () => {
 await probe('diagnostics-firestore-ping', async () => {
   const r = await call('/api/diagnostics/check');
   return {
-    ok: r.status === 200 && r.json?.database?.status === 'healthy' && r.json?.firebase?.status === 'healthy',
+    ok:
+      r.status === 200 &&
+      r.json?.database?.status === 'healthy' &&
+      r.json?.firebase?.status === 'healthy',
     summary: `check=${r.status} database=${r.json?.database?.status} (${r.json?.database?.latency}ms) firebase=${r.json?.firebase?.status}`,
   };
 });
@@ -473,7 +529,11 @@ await probe('summary-aggregates-client-projects', async () => {
   const r = await call('/api/analytics/summary');
   const projects = r.json?.summary?.projects;
   const noBrandStat = !('isBrandKitComplete' in (r.json?.summary || {}));
-  const countsOk = projects?.total === 3 && projects?.published === 1 && projects?.scheduled === 1 && projects?.draft === 1;
+  const countsOk =
+    projects?.total === 3 &&
+    projects?.published === 1 &&
+    projects?.scheduled === 1 &&
+    projects?.draft === 1;
   return {
     ok: r.status === 200 && countsOk && noBrandStat,
     summary: `summary=${r.status} projects=${JSON.stringify(projects)} isBrandKitComplete removed=${noBrandStat}`,

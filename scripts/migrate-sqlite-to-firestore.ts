@@ -32,7 +32,9 @@ if (!process.env.TOKEN_ENCRYPTION_KEY) {
 }
 
 if (!process.env.FIREBASE_SERVICE_ACCOUNT && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  console.error('FATAL: set FIREBASE_SERVICE_ACCOUNT (base64 service-account JSON) or GOOGLE_APPLICATION_CREDENTIALS.');
+  console.error(
+    'FATAL: set FIREBASE_SERVICE_ACCOUNT (base64 service-account JSON) or GOOGLE_APPLICATION_CREDENTIALS.',
+  );
   process.exit(1);
 }
 
@@ -76,10 +78,14 @@ interface Row {
 }
 
 const rows = db
-  .prepare('SELECT user_id, platform, access_token, refresh_token, expiry_date, profile_data FROM user_accounts')
+  .prepare(
+    'SELECT user_id, platform, access_token, refresh_token, expiry_date, profile_data FROM user_accounts',
+  )
   .all() as Row[];
 
-console.log(`Found ${rows.length} user_accounts row(s) in ${DB_PATH}.${dryRun ? ' (dry run)' : ''}`);
+console.log(
+  `Found ${rows.length} user_accounts row(s) in ${DB_PATH}.${dryRun ? ' (dry run)' : ''}`,
+);
 if (rows.length === 0) {
   console.log('Nothing to migrate.');
   process.exit(0);
@@ -96,33 +102,41 @@ let errors = 0;
 
 for (const row of rows) {
   try {
-    const access = row.access_token && !looksEncrypted(row.access_token)
-      ? encryptToken(row.access_token)
-      : row.access_token;
-    const refresh = row.refresh_token && !looksEncrypted(row.refresh_token)
-      ? encryptToken(row.refresh_token)
-      : row.refresh_token;
+    const access =
+      row.access_token && !looksEncrypted(row.access_token)
+        ? encryptToken(row.access_token)
+        : row.access_token;
+    const refresh =
+      row.refresh_token && !looksEncrypted(row.refresh_token)
+        ? encryptToken(row.refresh_token)
+        : row.refresh_token;
 
     if (row.access_token && !looksEncrypted(row.access_token)) {
-      console.log(`  ${row.user_id} / ${row.platform}: ${mask(row.access_token)} -> encrypted envelope`);
+      console.log(
+        `  ${row.user_id} / ${row.platform}: ${mask(row.access_token)} -> encrypted envelope`,
+      );
     }
 
     if (!dryRun) {
       await firestore
         .collection('integrations')
         .doc(`${row.user_id}_${row.platform}`)
-        .set({
-          uid: row.user_id,
-          platform: row.platform,
-          access_token: access ?? null,
-          refresh_token: refresh ?? null,
-          expiry_date: typeof row.expiry_date === 'number' ? row.expiry_date : null,
-          profile_data: row.profile_data ?? null,
-          updated_at: new Date().toISOString(),
-        }, { merge: true });
+        .set(
+          {
+            uid: row.user_id,
+            platform: row.platform,
+            access_token: access ?? null,
+            refresh_token: refresh ?? null,
+            expiry_date: typeof row.expiry_date === 'number' ? row.expiry_date : null,
+            profile_data: row.profile_data ?? null,
+            updated_at: new Date().toISOString(),
+          },
+          { merge: true },
+        );
     }
     if (
-      row.access_token && looksEncrypted(row.access_token) &&
+      row.access_token &&
+      looksEncrypted(row.access_token) &&
       (!row.refresh_token || looksEncrypted(row.refresh_token))
     ) {
       alreadyEncrypted++;
@@ -136,5 +150,7 @@ for (const row of rows) {
 }
 
 console.log('');
-console.log(`Done: ${migrated} row(s) encrypted + written to Firestore integrations, ${alreadyEncrypted} already encrypted, ${errors} error(s).${dryRun ? ' (dry run — nothing written)' : ''}`);
+console.log(
+  `Done: ${migrated} row(s) encrypted + written to Firestore integrations, ${alreadyEncrypted} already encrypted, ${errors} error(s).${dryRun ? ' (dry run — nothing written)' : ''}`,
+);
 process.exit(errors > 0 ? 1 : 0);

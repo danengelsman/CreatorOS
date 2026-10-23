@@ -1,17 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-  --font-serif: "Space Grotesk", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans:
+    'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-serif: 'Space Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
   }
-  
+
   ::selection {
     background-color: rgba(244, 162, 97, 0.3);
     color: inherit;
@@ -32,21 +33,21 @@
     --bg-primary: #050507;
     --bg-secondary: #0c0c12;
     --bg-tertiary: #161622;
-    --label-primary: #FFFFFF;
-    --label-secondary: rgba(255,255,255,0.7);
-    --label-tertiary: rgba(255,255,255,0.4);
-    --separator: rgba(255,255,255,0.12);
-    
+    --label-primary: #ffffff;
+    --label-secondary: rgba(255, 255, 255, 0.7);
+    --label-tertiary: rgba(255, 255, 255, 0.4);
+    --separator: rgba(255, 255, 255, 0.12);
+
     /* System Colors */
-    --accent: rgba(244,162,97,1); /* Warm amber */
-    --system-green: #8FAA6E;
-    --system-orange: #D89B5C;
-    --system-red: #C5644A;
+    --accent: rgba(244, 162, 97, 1); /* Warm amber */
+    --system-green: #8faa6e;
+    --system-orange: #d89b5c;
+    --system-red: #c5644a;
 
     /* Material Backgrounds */
-    --bg-material-thin: rgba(5,5,7,0.72);
-    --bg-material-regular: rgba(5,5,7,0.82);
-    --bg-material-thick: rgba(12,12,18,0.94);
+    --bg-material-thin: rgba(5, 5, 7, 0.72);
+    --bg-material-regular: rgba(5, 5, 7, 0.82);
+    --bg-material-thick: rgba(12, 12, 18, 0.94);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -54,20 +55,20 @@
       --bg-primary: #050507;
       --bg-secondary: #0c0c12;
       --bg-tertiary: #161622;
-      --label-primary: #FFFFFF;
-      --label-secondary: rgba(255,255,255,0.7);
-      --label-tertiary: rgba(255,255,255,0.4);
-      --separator: rgba(255,255,255,0.12);
-      
-      --accent: rgba(244,162,97,1); /* Warm amber */
-      --system-green: #8FAA6E;
-      --system-orange: #D89B5C;
-      --system-red: #C5644A;
+      --label-primary: #ffffff;
+      --label-secondary: rgba(255, 255, 255, 0.7);
+      --label-tertiary: rgba(255, 255, 255, 0.4);
+      --separator: rgba(255, 255, 255, 0.12);
+
+      --accent: rgba(244, 162, 97, 1); /* Warm amber */
+      --system-green: #8faa6e;
+      --system-orange: #d89b5c;
+      --system-red: #c5644a;
 
       /* Dark Material Backgrounds */
-      --bg-material-thin: rgba(5,5,7,0.72);
-      --bg-material-regular: rgba(5,5,7,0.82);
-      --bg-material-thick: rgba(12,12,18,0.94);
+      --bg-material-thin: rgba(5, 5, 7, 0.72);
+      --bg-material-regular: rgba(5, 5, 7, 0.82);
+      --bg-material-thick: rgba(12, 12, 18, 0.94);
     }
   }
 
@@ -97,10 +98,22 @@
     }
   }
 
-  h1 { @apply font-bold tracking-[-0.022em]; font-size: var(--text-large-title); }
-  h2 { @apply font-bold tracking-[-0.020em]; font-size: var(--text-title-1); }
-  h3 { @apply font-bold tracking-[-0.016em]; font-size: var(--text-title-2); }
-  h4 { @apply font-semibold tracking-[-0.014em]; font-size: var(--text-headline); }
+  h1 {
+    @apply font-bold tracking-[-0.022em];
+    font-size: var(--text-large-title);
+  }
+  h2 {
+    @apply font-bold tracking-[-0.020em];
+    font-size: var(--text-title-1);
+  }
+  h3 {
+    @apply font-bold tracking-[-0.016em];
+    font-size: var(--text-title-2);
+  }
+  h4 {
+    @apply font-semibold tracking-[-0.014em];
+    font-size: var(--text-headline);
+  }
 }
 
 @layer components {
@@ -141,13 +154,15 @@
   .ios-button-filled {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(180deg, 
-      color-mix(in srgb, var(--accent) 100%, white 8%) 0%, 
-      var(--accent) 100%);
-    color: #FFFFFF;
-    box-shadow: 
-      0 1px 0 rgba(255,255,255,0.15) inset,
-      0 1px 2px rgba(0,0,0,0.1);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent) 100%, white 8%) 0%,
+      var(--accent) 100%
+    );
+    color: #ffffff;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.15) inset,
+      0 1px 2px rgba(0, 0, 0, 0.1);
     letter-spacing: -0.005em;
   }
   .ios-button-filled::after {
@@ -157,10 +172,12 @@
     left: -100%;
     width: 200%;
     height: 100%;
-    background: linear-gradient(90deg, 
-      transparent 0%, 
-      rgba(255, 255, 255, 0.2) 50%, 
-      transparent 100%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.2) 50%,
+      transparent 100%
+    );
     transform: skewX(-20deg);
     transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -193,12 +210,13 @@
     border: 0.5px solid var(--separator);
     position: relative;
     overflow: hidden;
-    box-shadow: 
-      0 1px 0 rgba(255,255,255,0.04) inset,
-      0 1px 3px rgba(0,0,0,0.06),
-      0 8px 20px -8px rgba(0,0,0,0.08);
-    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
-                box-shadow 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.04) inset,
+      0 1px 3px rgba(0, 0, 0, 0.06),
+      0 8px 20px -8px rgba(0, 0, 0, 0.08);
+    transition:
+      transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 300ms cubic-bezier(0.16, 1, 0.3, 1);
   }
   .ios-card::before {
     content: '';
@@ -207,49 +225,55 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 30%, transparent), transparent);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--accent) 30%, transparent),
+      transparent
+    );
     z-index: 10;
   }
   .ios-card:hover {
     transform: translateY(-4px);
-    box-shadow: 
-      0 1px 0 rgba(255,255,255,0.04) inset,
-      0 4px 12px rgba(0,0,0,0.08),
-      0 16px 32px -8px rgba(0,0,0,0.12);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.04) inset,
+      0 4px 12px rgba(0, 0, 0, 0.08),
+      0 16px 32px -8px rgba(0, 0, 0, 0.12);
   }
 
   @media (prefers-color-scheme: dark) {
     .ios-card {
-      box-shadow: 
-        0 1px 0 rgba(255,255,255,0.03) inset,
-        0 1px 3px rgba(0,0,0,0.3),
-        0 8px 20px -8px rgba(0,0,0,0.5);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.03) inset,
+        0 1px 3px rgba(0, 0, 0, 0.3),
+        0 8px 20px -8px rgba(0, 0, 0, 0.5);
     }
     .ios-card:hover {
-      box-shadow: 
-        0 1px 0 rgba(255,255,255,0.03) inset,
-        0 4px 12px rgba(0,0,0,0.4),
-        0 16px 32px -8px rgba(0,0,0,0.7);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.03) inset,
+        0 4px 12px rgba(0, 0, 0, 0.4),
+        0 16px 32px -8px rgba(0, 0, 0, 0.7);
     }
   }
 
   .ios-card-clickable {
     cursor: pointer;
-    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
-                box-shadow 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+      transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 300ms cubic-bezier(0.16, 1, 0.3, 1);
   }
   .ios-card-clickable:hover {
     transform: translateY(-4px);
   }
   .ios-card-clickable:active {
     transform: scale(0.992) translateY(1px);
-    box-shadow: 
-      0 1px 0 rgba(255,255,255,0.04) inset,
-      0 0px 1px rgba(0,0,0,0.08);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.04) inset,
+      0 0px 1px rgba(0, 0, 0, 0.08);
   }
 
   .ios-elevated {
-    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   }
 
   .ios-input {
@@ -293,16 +317,29 @@
     background-size: 200% auto;
     animation: gradientX 4s linear infinite;
   }
-  .stagger-1 { animation-delay: 100ms; }
-  .stagger-2 { animation-delay: 200ms; }
-  .stagger-3 { animation-delay: 300ms; }
+  .stagger-1 {
+    animation-delay: 100ms;
+  }
+  .stagger-2 {
+    animation-delay: 200ms;
+  }
+  .stagger-3 {
+    animation-delay: 300ms;
+  }
 
   @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   @keyframes gradientX {
-    0%, 100% {
+    0%,
+    100% {
       background-position: 0% 50%;
     }
     50% {
