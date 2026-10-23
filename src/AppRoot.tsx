@@ -50,6 +50,7 @@ function RouterWrapper() {
     const handleOnboardingComplete = async () => {
       if (!auth.user) return;
       await ensureFirstDollarJourney(auth.user.uid);
+      auth.setShowOnboarding(false);
       setShowOnboarding(false);
     };
 
