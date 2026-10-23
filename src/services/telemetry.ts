@@ -1,5 +1,5 @@
-
-import { UserData, Project } from '@/types';
+export type UserData = any;
+export type Project = any;
 
 export type Signal = {
   id: string;
@@ -19,7 +19,7 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
     return {
       id: 'onboarding-lever',
       title: 'Start Your First Project',
-      description: 'You haven\'t created any content yet. Let\'s set up your first niche strategy.',
+      description: "You haven't created any content yet. Let's set up your first niche strategy.",
       impact: 'Foundation',
       action: { type: 'navigate', path: '/dashboard/create' },
       priority: 'high',
@@ -31,7 +31,7 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
   // Here we implement the "Heuristic Engine" for the MVP.
 
   const recentProject = projects[0];
-  
+
   // Signal 1: Retention Dip (High Priority)
   if (recentProject.data?.retentionScore && recentProject.data.retentionScore < 40) {
     return {
@@ -39,7 +39,11 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
       title: 'Retention Dip Detected',
       description: `Your latest project "${recentProject.title}" has a retention drop at the 30s mark.`,
       impact: '+20% Watch Time',
-      action: { type: 'navigate', path: '/dashboard/retention', params: { projectId: recentProject.id } },
+      action: {
+        type: 'navigate',
+        path: '/dashboard/retention',
+        params: { projectId: recentProject.id },
+      },
       priority: 'high',
     };
   }
@@ -49,7 +53,7 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
     return {
       id: 'brand-signal',
       title: 'Brand Identity Gap',
-      description: 'Your visual assets aren\'t aligned with your niche archetype.',
+      description: "Your visual assets aren't aligned with your niche archetype.",
       impact: 'Higher Trust',
       action: { type: 'navigate', path: '/dashboard/brand' },
       priority: 'medium',
@@ -60,7 +64,7 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
   return {
     id: 'growth-signal',
     title: 'Scale Your Reach',
-    description: 'Your current scripts are performing well. Let\'s repurpose them for Shorts.',
+    description: "Your current scripts are performing well. Let's repurpose them for Shorts.",
     impact: 'Increased Reach',
     action: { type: 'navigate', path: '/dashboard/repurpose' },
     priority: 'low',

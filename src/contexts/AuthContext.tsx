@@ -1,7 +1,15 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, onAuthStateChanged, logout } from '@/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, collection, query, where } from 'firebase/firestore';
+import { auth, onAuthStateChanged } from '@/firebase';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  onSnapshot,
+  collection,
+  query,
+  where,
+} from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '@/firebase';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 
@@ -24,11 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
 
-  const { 
-    setProjects, 
-    setIsProjectsLoading, 
-    setIsProjectsLoadError 
-  } = useWorkspaceStore();
+  const { setProjects, setIsProjectsLoading, setIsProjectsLoadError, setBrand } =
+    useWorkspaceStore();
 
   useEffect(() => {
     let isActive = true;
@@ -88,43 +93,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       setProjects([]);
       setIsProjectsLoading(true);
+      setBrand(null);
       return;
     }
 
     const userRef = doc(db, 'users', user.uid);
-    const unsubscribeUser = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) setUserData(snap.data());
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
-    });
+    const unsubscribeUser = onSnapshot(
+      userRef,
+      (snap) => {
+        if (snap.exists()) setUserData(snap.data());
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+      },
+    );
+
+    const brandRef = doc(db, 'projects', `brand_${user.uid}`);
+    const unsubscribeBrand = onSnapshot(
+      brandRef,
+      (snap) => {
+        if (snap.exists()) {
+          const projectData = snap.data();
+          setBrand(projectData.status === 'draft' ? null : projectData.data || null);
+        } else {
+          setBrand(null);
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, `projects/brand_${user.uid}`);
+      },
+    );
 
     const projectsRef = collection(db, 'projects');
     const q = query(projectsRef, where('userId', '==', user.uid));
-    const unsubscribeProjects = onSnapshot(q, (snap) => {
-      const projectsData = snap.docs
-        .filter((doc) => !doc.id.startsWith('brand_'))
-        .map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-        .sort((a: any, b: any) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-      setProjects(projectsData);
-      setIsProjectsLoadError(false);
-      setIsProjectsLoading(false);
-    }, (error) => {
-      setIsProjectsLoadError(true);
-      setIsProjectsLoading(false);
-      handleFirestoreError(error, OperationType.GET, 'projects');
-    });
+    const unsubscribeProjects = onSnapshot(
+      q,
+      (snap) => {
+        const projectsData = snap.docs
+          .filter((doc) => !doc.id.startsWith('brand_'))
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .sort(
+            (a: any, b: any) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0),
+          );
+        setProjects(projectsData);
+        setIsProjectsLoadError(false);
+        setIsProjectsLoading(false);
+      },
+      (error) => {
+        setIsProjectsLoadError(true);
+        setIsProjectsLoading(false);
+        handleFirestoreError(error, OperationType.GET, 'projects');
+      },
+    );
 
     return () => {
       unsubscribeUser();
+      unsubscribeBrand();
       unsubscribeProjects();
     };
   }, [user, setProjects, setIsProjectsLoading, setIsProjectsLoadError]);
 
   return (
-    <AuthContext.Provider value={{ user, userData, isAuthLoading, showOnboarding, setShowOnboarding, activeTab, setActiveTab }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        userData,
+        isAuthLoading,
+        showOnboarding,
+        setShowOnboarding,
+        activeTab,
+        setActiveTab,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

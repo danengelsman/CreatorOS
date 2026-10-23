@@ -70,19 +70,19 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
   };
 
   const handleGoogleLogin = async () => {
-      setIsLoading(true);
-      setError('');
-      try {
-        await loginWithGoogle();
-        mintSessionCookie();
-        navigate?.('/_auth/dashboard');
-      } catch (error: any) {
-        console.error('Google Login failed:', error);
-        setError(getFriendlyError(error));
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    setIsLoading(true);
+    setError('');
+    try {
+      await loginWithGoogle();
+      mintSessionCookie();
+      navigate?.('/dashboard');
+    } catch (error: any) {
+      console.error('Google Login failed:', error);
+      setError(getFriendlyError(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,30 +132,30 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
     setError('');
     try {
       if (view === 'register') {
-              const credential = await registerWithEmail(email, password);
-              // Soft email-verification nudge — never blocks the new user; the app
-              // shows a dismissible banner until the address is verified.
-              if (credential?.user) {
-                sendVerificationEmail(credential.user).catch((err) => {
-                  console.warn('Verification email not sent:', err);
-                });
-              }
-              mintSessionCookie();
-              navigate?.('/_auth/dashboard');
-            } else {
-                    await loginWithEmail(email, password);
-                    try {
-                      if (rememberEmail) {
-                        localStorage.setItem(REMEMBER_EMAIL_KEY, email);
-                      } else {
-                        localStorage.removeItem(REMEMBER_EMAIL_KEY);
-                      }
-                    } catch {
-                      /* storage unavailable (private mode) — remember-email just no-ops */
-                    }
-                    mintSessionCookie();
-                    navigate?.('/_auth/dashboard');
-                  }
+        const credential = await registerWithEmail(email, password);
+        // Soft email-verification nudge — never blocks the new user; the app
+        // shows a dismissible banner until the address is verified.
+        if (credential?.user) {
+          sendVerificationEmail(credential.user).catch((err) => {
+            console.warn('Verification email not sent:', err);
+          });
+        }
+        mintSessionCookie();
+        navigate?.('/dashboard');
+      } else {
+        await loginWithEmail(email, password);
+        try {
+          if (rememberEmail) {
+            localStorage.setItem(REMEMBER_EMAIL_KEY, email);
+          } else {
+            localStorage.removeItem(REMEMBER_EMAIL_KEY);
+          }
+        } catch {
+          /* storage unavailable (private mode) — remember-email just no-ops */
+        }
+        mintSessionCookie();
+        navigate?.('/dashboard');
+      }
     } catch (err: any) {
       console.error('Auth failed:', err);
       setError(getFriendlyError(err));

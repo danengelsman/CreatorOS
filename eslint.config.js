@@ -28,6 +28,8 @@ export default tseslint.config(
       'coverage/',
       'playwright-report/',
       'test-results/',
+      '.hermes/',
+      '.zwork/',
     ],
   },
   js.configs.recommended,

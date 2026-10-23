@@ -621,7 +621,7 @@ export default function App() {
                     {NAV_GROUPS.map((group, groupIdx) => {
                       const groupItems = group.items
                         .map((id) => visibleNavItems.find((item) => item.id === id))
-                        .filter(Boolean);
+                        .filter((item): item is NonNullable<typeof item> => Boolean(item));
                       if (groupItems.length === 0) return null;
 
                       return (

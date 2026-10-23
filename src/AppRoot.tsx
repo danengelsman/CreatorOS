@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { RouterProvider } from '@tanstack/react-router';
 import { router } from './router';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -48,29 +47,28 @@ function RouterWrapper() {
 
   // If showOnboarding is true, render the onboarding flow
   if (showOnboarding) {
-    const handleOnboardingComplete = useCallback(async () => {
+    const handleOnboardingComplete = async () => {
       if (!auth.user) return;
       await ensureFirstDollarJourney(auth.user.uid);
       setShowOnboarding(false);
-    }, [auth.user]);
+    };
 
-    return (
-      <AuthProvider>
-        <Onboarding onComplete={handleOnboardingComplete} user={auth.user} />
-      </AuthProvider>
-    );
+    return <Onboarding onComplete={handleOnboardingComplete} user={auth.user} />;
   }
 
   // Otherwise, render the router
   return (
-    <AuthProvider>
-      <RouterProvider router={router} context={{ auth: { user: auth.user, isAuthenticated: !!auth.user } }} />
-    </AuthProvider>
+    <RouterProvider
+      router={router}
+      context={{ auth: { user: auth.user, isAuthenticated: !!auth.user } }}
+    />
   );
 }
 
 export default function AppRoot() {
   return (
-    <RouterWrapper />
+    <AuthProvider>
+      <RouterWrapper />
+    </AuthProvider>
   );
 }

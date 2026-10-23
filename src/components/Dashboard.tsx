@@ -13,7 +13,7 @@ import {
   TrendUp,
   Users,
 } from '@phosphor-icons/react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { calculateOneLever } from '@/services/telemetry';
 import SignalCard from './SignalCard';
 import { cn } from '../lib/utils';
@@ -37,8 +37,8 @@ export default function Dashboard({
   brand,
   setActiveTab,
   user,
-,
-  userData,  projects = [],
+  userData,
+  projects = [],
   isProjectsLoading = false,
   projectsLoadError = false,
   onOpenProject,
@@ -46,6 +46,7 @@ export default function Dashboard({
   brand: any;
   setActiveTab: (tab: string) => void;
   user: any;
+  userData?: any;
   projects?: any[];
   isProjectsLoading?: boolean;
   projectsLoadError?: boolean;
@@ -58,7 +59,10 @@ export default function Dashboard({
   const [loadKey, setLoadKey] = useState(0);
   const [journey, setJourney] = useState<CreatorJourney | null>(null);
   const [isJourneyLoading, setIsJourneyLoading] = useState(true);
-  const signal = useMemo(() => calculateOneLever(userData || {}, projects || []), [userData, projects]);
+  const signal = useMemo(
+    () => calculateOneLever(userData || {}, projects || []),
+    [userData, projects],
+  );
 
   useEffect(() => {
     if (!user?.uid) {
@@ -158,7 +162,7 @@ export default function Dashboard({
       return;
     if (
       journey?.activeProjectId === firstDraft.id &&
-      (!firstDraft.journeyDraftSavedAt || journey.activeMission === 'review_first_draft')
+      (!firstDraft.journeyDraftSavedAt || journey?.activeMission === 'review_first_draft')
     )
       return;
     void (async () => {
@@ -816,10 +820,8 @@ function MetricCard({ title, value, detail, icon: Icon, accent, isLoading, index
 }
 
 function MilestoneItem({ label, completed }: { label: string; completed: boolean }) {
-  const signal = calculateOneLever(userData || {}, projects || []);
   return (
     <div
-            
       className={cn(
         'rounded-2xl border p-3.5 transition-colors',
         completed

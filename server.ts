@@ -407,7 +407,7 @@ async function startServer() {
   // serves the routes src/ actually calls.
 
   // --- Gemini Video API ---
-  let _ai = null;
+  let _ai: any = null;
   const getAI = async () => {
     if (!_ai) {
       if (!process.env.GEMINI_API_KEY) {
@@ -1128,7 +1128,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       recordQuota(req, '/api/gemini/video-status', interaction);
 
       let done = false;
-      let data = null;
+      let data: any = null;
       // Honest signals for the client's progress model. progressPercentage is
       // null because the Interactions API exposes no percent — the client
       // derives progress from renderStatus + elapsed time instead.

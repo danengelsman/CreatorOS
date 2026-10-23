@@ -1,53 +1,70 @@
-
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '@/lib/utils';
 import {
-  UsersThree, List as Menu, X, CurrencyDollar as DollarSign,
-  SignOut as LogOut, CircleNotch as Loader2, UserCircle,
-  House, PenNib, Hexagon, Path, ChatsCircle, ChartLineUp,
-  BookOpen, Sparkle, ShieldCheck, Recycle, Lightbulb,
-  Lightning, VideoCamera
+  UsersThree,
+  List as Menu,
+  X,
+  CurrencyDollar as DollarSign,
+  SignOut as LogOut,
+  UserCircle,
+  House,
+  PenNib,
+  Hexagon,
+  Path,
+  ChatsCircle,
+  ChartLineUp,
+  BookOpen,
+  Sparkle,
+  ShieldCheck,
+  Recycle,
+  Lightbulb,
+  Lightning,
+  VideoCamera,
 } from '@phosphor-icons/react';
-import { Outlet, Link } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { logout } from '@/firebase';
 
 const FEATURE_COMMUNITY = import.meta.env.VITE_FEATURE_COMMUNITY === 'true';
 
 const baseNavItems = [
-  { id: 'home', label: 'Home', icon: House, path: '/_auth/dashboard' },
-  { id: 'first_dollar', label: 'First Dollar', icon: DollarSign, path: '/_auth/first-dollar' },
-  { id: 'create', label: 'Create', icon: PenNib, path: '/_auth/create' },
-  { id: 'retention', label: 'Retention Lab', icon: Lightning, path: '/_auth/retention' },
-  { id: 'analyzer', label: 'Video Analyzer', icon: VideoCamera, path: '/_auth/analyzer' },
-  { id: 'repurpose', label: 'Repurpose', icon: Recycle, path: '/_auth/repurpose' },
-  { id: 'brand', label: 'Brand', icon: Hexagon, path: '/_auth/brand' },
-  { id: 'ideas', label: 'Ideas', icon: Lightbulb, path: '/_auth/ideas' },
-  { id: 'roadmap', label: 'Roadmap', icon: Path, path: '/_auth/roadmap' },
-  { id: 'hub', label: 'Creator Hub', icon: UsersThree, path: '/_auth/hub' },
-  { id: 'community', label: 'Community', icon: ChatsCircle, path: '/_auth/community' },
-  { id: 'reports', label: 'Reports', icon: ChartLineUp, path: '/_auth/reports' },
-  { id: 'help', label: 'Help', icon: BookOpen, path: '/_auth/help' },
-  { id: 'prompts', label: 'Co-Pilot', icon: Sparkle, path: '/_auth/prompts' },
-  { id: 'profile', label: 'Profile', icon: UserCircle, path: '/_auth/profile' },
-  { id: 'support', label: 'Support Hub', icon: ShieldCheck, path: '/_auth/support' },
+  { id: 'home', label: 'Home', icon: House, path: '/dashboard' },
+  { id: 'first_dollar', label: 'First Dollar', icon: DollarSign, path: '/first-dollar' },
+  { id: 'create', label: 'Create', icon: PenNib, path: '/create' },
+  { id: 'retention', label: 'Retention Lab', icon: Lightning, path: '/retention' },
+  { id: 'analyzer', label: 'Video Analyzer', icon: VideoCamera, path: '/analyzer' },
+  { id: 'repurpose', label: 'Repurpose', icon: Recycle, path: '/repurpose' },
+  { id: 'brand', label: 'Brand', icon: Hexagon, path: '/brand' },
+  { id: 'ideas', label: 'Ideas', icon: Lightbulb, path: '/ideas' },
+  { id: 'roadmap', label: 'Roadmap', icon: Path, path: '/roadmap' },
+  { id: 'hub', label: 'Creator Hub', icon: UsersThree, path: '/hub' },
+  { id: 'community', label: 'Community', icon: ChatsCircle, path: '/community' },
+  { id: 'reports', label: 'Reports', icon: ChartLineUp, path: '/reports' },
+  { id: 'help', label: 'Help', icon: BookOpen, path: '/help' },
+  { id: 'prompts', label: 'Co-Pilot', icon: Sparkle, path: '/prompts' },
+  { id: 'profile', label: 'Profile', icon: UserCircle, path: '/profile' },
+  { id: 'support', label: 'Support Hub', icon: ShieldCheck, path: '/support' },
 ];
 
-const NAV_ITEMS = FEATURE_COMMUNITY ? baseNavItems : baseNavItems.filter(item => item.id !== 'community');
+const NAV_ITEMS = FEATURE_COMMUNITY
+  ? baseNavItems
+  : baseNavItems.filter((item) => item.id !== 'community');
 
 const baseNavGroups = [
   { title: 'Main', items: ['home'] },
-  { title: 'Studio', items: ['create', 'retention', 'analyzer', 'repurpose', 'brand', 'ideas', 'prompts'] },
+  {
+    title: 'Studio',
+    items: ['create', 'retention', 'analyzer', 'repurpose', 'brand', 'ideas', 'prompts'],
+  },
   { title: 'Growth', items: ['first_dollar', 'hub', 'reports', 'roadmap', 'community'] },
   { title: 'Settings', items: ['profile', 'help', 'support'] },
 ];
 
-const NAV_GROUPS = baseNavGroups.map(group => ({
+const NAV_GROUPS = baseNavGroups.map((group) => ({
   title: group.title,
-  items: FEATURE_COMMUNITY ? group.items : group.items.filter(item => item !== 'community'),
+  items: FEATURE_COMMUNITY ? group.items : group.items.filter((item) => item !== 'community'),
 }));
 
-export default function LayoutShell({ children, user }: { children: React.ReactNode, user: any }) {
+export default function LayoutShell({ children, user }: { children: React.ReactNode; user: any }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const userPhoto = user?.photoURL || '';
 
@@ -61,21 +78,33 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 -ml-2 flex items-center gap-2 text-[var(--accent)] hover:opacity-80 transition-opacity"
             >
-              {isMobileMenuOpen ? <X size={24} strokeWidth={1.5} /> : <Menu size={24} strokeWidth={1.5} />}
-              <span className="font-bold text-lg hidden sm:block tracking-tight text-[var(--label-primary)]">CreatorOS</span>
+              {isMobileMenuOpen ? (
+                <X size={24} strokeWidth={1.5} />
+              ) : (
+                <Menu size={24} strokeWidth={1.5} />
+              )}
+              <span className="font-bold text-lg hidden sm:block tracking-tight text-[var(--label-primary)]">
+                CreatorOS
+              </span>
             </button>
           </div>
 
           <div className="flex flex-col items-center flex-1 justify-center h-full">
-            <span className="font-semibold text-[17px] tracking-[-0.014em]">
-               Workspace
-            </span>
+            <span className="font-semibold text-[17px] tracking-[-0.014em]">Workspace</span>
           </div>
 
           <div className="flex-1 flex justify-end h-full items-center gap-3">
-            <Link to="/_auth/profile" className="cursor-pointer active:scale-95 transition-transform flex items-center justify-center w-8 h-8 rounded-full border border-[var(--separator)] overflow-hidden bg-[var(--bg-secondary)] shadow-sm">
+            <Link
+              to="/profile"
+              className="cursor-pointer active:scale-95 transition-transform flex items-center justify-center w-8 h-8 rounded-full border border-[var(--separator)] overflow-hidden bg-[var(--bg-secondary)] shadow-sm"
+            >
               {userPhoto ? (
-                <img src={userPhoto} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img
+                  src={userPhoto}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
               ) : (
                 <UserCircle size={20} weight="fill" className="text-[var(--label-tertiary)]" />
               )}
@@ -104,9 +133,14 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
                   <div className="flex lg:hidden items-center justify-between pb-2 border-b border-[var(--separator)]">
                     <div className="flex items-center gap-2 text-[var(--accent)]">
                       <Menu size={24} strokeWidth={1.5} />
-                      <span className="font-bold text-lg tracking-tight text-[var(--label-primary)]">CreatorOS</span>
+                      <span className="font-bold text-lg tracking-tight text-[var(--label-primary)]">
+                        CreatorOS
+                      </span>
                     </div>
-                    <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-[var(--label-secondary)] hover:text-[var(--label-primary)]">
+                    <button
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="p-2 text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
+                    >
                       <X size={24} />
                     </button>
                   </div>
@@ -114,7 +148,7 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
                   {NAV_GROUPS.map((group, groupIdx) => {
                     const groupItems = group.items
                       .map((id) => NAV_ITEMS.find((item) => item.id === id))
-                      .filter(Boolean);
+                      .filter((item): item is (typeof NAV_ITEMS)[number] => Boolean(item));
                     if (groupItems.length === 0) return null;
 
                     return (
@@ -127,7 +161,7 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
                         {groupItems.map((item) => (
                           <Link
                             key={item.id}
-                            to={item.path}
+                            to={item.path as any}
                             onClick={() => setIsMobileMenuOpen(false)}
                             className="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group text-[var(--label-secondary)] hover:bg-[var(--separator)]"
                           >
@@ -143,19 +177,19 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
 
                   <div className="my-4 border-t border-[var(--separator)]" />
                   <button
-                                      onClick={async () => {
-                                        try {
-                                          await logout();
-                                        } catch (err) {
-                                          console.error('Logout failed:', err);
-                                        }
-                                        window.location.href = '/login';
-                                      }}
-                                      className="w-full flex items-center gap-3 px-4 py-3 text-[var(--system-red)] hover:bg-[var(--separator)] transition-colors rounded-xl mb-8 lg:mb-0"
-                                    >
-                                      <LogOut size={20} />
-                                      <span className="text-[15px] font-semibold">Logout</span>
-                                    </button>
+                    onClick={async () => {
+                      try {
+                        await logout();
+                      } catch (err) {
+                        console.error('Logout failed:', err);
+                      }
+                      window.location.href = '/login';
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-[var(--system-red)] hover:bg-[var(--separator)] transition-colors rounded-xl mb-8 lg:mb-0"
+                  >
+                    <LogOut size={20} />
+                    <span className="text-[15px] font-semibold">Logout</span>
+                  </button>
                 </div>
               </motion.nav>
             </>
@@ -163,17 +197,17 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
         </AnimatePresence>
 
         <main className="flex-1 overflow-y-auto pt-[calc(env(safe-area-inset-top,0px)+64px)] pb-[calc(env(safe-area-inset-bottom,0px)+83px)] lg:pb-12 px-4 lg:px-10">
-          <div className="max-w-[1400px] mx-auto">
-            {children}
-          </div>
+          <div className="max-w-[1400px] mx-auto">{children}</div>
         </main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-[60] lg:hidden material-thick border-t border-[var(--separator)] px-2 pb-[env(safe-area-inset-bottom,4px)] pt-1 h-[calc(env(safe-area-inset-bottom,0px)+49px)]">
           <div className="flex items-center justify-around h-full">
-            {NAV_ITEMS.filter((item) => ['home', 'create', 'repurpose', 'brand', 'profile'].includes(item.id)).map((item) => (
-              <Link 
-                key={item.id} 
-                to={item.path} 
+            {NAV_ITEMS.filter((item) =>
+              ['home', 'create', 'repurpose', 'brand', 'profile'].includes(item.id),
+            ).map((item) => (
+              <Link
+                key={item.id}
+                to={item.path}
                 className="flex flex-col items-center justify-center flex-1 gap-1 py-1 text-[var(--label-secondary)] hover:text-[var(--accent)] transition-colors"
               >
                 <item.icon size={23} />

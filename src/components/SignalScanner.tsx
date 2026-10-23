@@ -1,8 +1,6 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MagnifyingGlass, Lightning, ArrowRight, CheckCircle } from '@phosphor-icons/react';
-import { cn } from '@/lib/utils';
+import { MagnifyingGlass, Lightning, CheckCircle, CircleNotch } from '@phosphor-icons/react';
 
 export default function SignalScanner() {
   const [input, setInput] = useState('');
@@ -19,13 +17,14 @@ export default function SignalScanner() {
   const handleScan = async () => {
     if (!input) return;
     setStatus('scanning');
-    
+
     // Simulate a "Deep Scan" experience
-    await new Promise(r => setTimeout(r, 2000));
-    
+    await new Promise((r) => setTimeout(r, 2000));
+
     setResult({
       signal: 'Retention Spike at 0:42',
-      insight: 'Your viewers drop off during the transition to the main topic. A faster hook could increase watch time.',
+      insight:
+        'Your viewers drop off during the transition to the main topic. A faster hook could increase watch time.',
       impact: 'Improved Watch Time',
     });
     setStatus('complete');
@@ -42,40 +41,53 @@ export default function SignalScanner() {
         </div>
 
         <div className="flex gap-3 mb-8">
-          <input 
+          <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Enter YouTube handle (@channel)"
             className="flex-1 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[var(--accent)] outline-none transition-all"
           />
-          <button 
+          <button
             onClick={handleScan}
             disabled={status === 'scanning' || !input}
             className="ios-button ios-button-tinted px-6 py-3 flex items-center gap-2 font-bold"
           >
-            {status === 'scanning' ? <CircleNotch className="animate-spin" size={18} /> : <Lightning size={18} />}
+            {status === 'scanning' ? (
+              <CircleNotch className="animate-spin" size={18} />
+            ) : (
+              <Lightning size={18} />
+            )}
             {status === 'scanning' ? 'Scanning...' : 'Scan'}
           </button>
         </div>
 
         <AnimatePresence mode="wait">
           {status === 'idle' && (
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="grid grid-cols-2 gap-4"
             >
               {signals.map((s, i) => (
-                <div key={i} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-primary)]/50 flex items-center gap-3">
+                <div
+                  key={i}
+                  className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-primary)]/50 flex items-center gap-3"
+                >
                   <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
-                  <span className="text-xs font-medium text-[var(--label-secondary)]">{s.label}</span>
+                  <span className="text-xs font-medium text-[var(--label-secondary)]">
+                    {s.label}
+                  </span>
                 </div>
               ))}
             </motion.div>
           )}
 
           {status === 'scanning' && (
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="py-12 flex flex-col items-center justify-center text-center"
             >
               <div className="relative w-24 h-24 mb-6">
@@ -92,8 +104,10 @@ export default function SignalScanner() {
           )}
 
           {status === 'complete' && result && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
               className="p-6 rounded-2xl border border-[var(--accent)] bg-[var(--accent)]/5"
             >
               <div className="flex items-center gap-2 text-[var(--accent)] mb-2">
@@ -108,7 +122,7 @@ export default function SignalScanner() {
                 <span className="text-xs font-medium">Estimated Impact:</span>
                 <span className="text-xs font-bold text-[var(--accent)]">{result.impact}</span>
               </div>
-              </motion.div>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>

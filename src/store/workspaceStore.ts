@@ -1,7 +1,8 @@
-
 import { create } from 'zustand';
 
 interface WorkspaceState {
+  brand: any | null;
+  setBrand: (brand: any) => void;
   selectedIdea: any | null;
   setSelectedIdea: (idea: any) => void;
   selectedProject: any | null;
@@ -15,6 +16,8 @@ interface WorkspaceState {
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
+  brand: null,
+  setBrand: (brand) => set({ brand }),
   selectedIdea: null,
   setSelectedIdea: (idea) => set({ selectedIdea: idea }),
   selectedProject: null,

@@ -2,7 +2,6 @@ import { initializeApp } from 'firebase/app';
 import {
   getAuth,
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   signInWithEmailAndPassword,
@@ -76,7 +75,7 @@ export const loginWithGoogle = async () => {
     // Redirect-first approach: most reliable for Vercel/Incognito/Mobile
     // We bypass the popup entirely to avoid third-party cookie blocks.
     await signInWithRedirect(auth, googleProvider);
-    return null; 
+    return null;
   } catch (error: any) {
     console.error('Google Redirect failed:', error);
     throw error;
