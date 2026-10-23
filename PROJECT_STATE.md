@@ -83,6 +83,19 @@ D0-A rebuild bot branch · D1-A archive dead scripts · **D2-A intrinsic route-l
 - **Phase B deferred until Dan enables Firebase Identity Platform** (his billing decision): TOTP MFA, breach-password screening, stricter enumeration settings. Free-tier Phase A uses a static common-password list instead.
 - LoginScreen now offers Google + email/password. Emulator note: server admin mirrors the client's `demo-creatoros` projectId when emulator env is set (e2e-only path; prod untouched).
 
+## PR #12 repair — router stabilization (2026-10-22/23, branch `fix/build-stability`)
+
+Week 5 D7-A work landed here (file-based TanStack Router routes under `src/routes/`, `LayoutShell` shell, pathless `_auth` layout with `beforeLoad` auth guard, `_auth/*` children register at `/<name>` fullPaths). Post-merge of the initial commits, CI was red; three rounds of fixes (commits `646db09`, `f4fd655`, `fac34ce`, `b02afd3`, `e89d5cf`, `f2a4913`, `636a143`):
+
+- **E2E regression 1 — verification banner during onboarding:** the Phase A banner lived in `LayoutShell`, but during onboarding the router isn't mounted (AppRoot renders only `<Onboarding>`), so the register test timed out. Fix: extracted `src/components/VerificationBanner.tsx`; rendered by LayoutShell (workspace) AND AppRoot (onboarding branch) — matches pre-router behavior (banner z-55 sits behind the onboarding modal z-200).
+- **E2E regression 2 — stale nav locators:** drawer entries are router `<Link>`s now; `button:has-text("Create")`/`("Profile")` matched nothing. Fixed to `getByRole('link', { name, exact: true })` (exact match so "Creator Hub" ≠ "Create").
+- **Signed-out transition gap:** `_auth` guard runs only on navigation; a mid-session sign-out (Profile → "Sign out of all devices" calls `auth.signOut()` with no navigate) stranded the user on a guarded route. Fix: RouterWrapper watches user→null and `router.navigate({ to: '/login' })`.
+- **tsconfig:** `strictNullChecks: true` required by TanStack Router's type-check; `@/*` paths fixed to `./src/*` (matches Vite alias).
+- **State:** `brand` (Firestore `projects/brand_<uid>` snapshot) moved into `workspaceStore` (Zustand), synced from AuthContext — routed views read it from the store, not props.
+- **CI result:** Typecheck/lint/build/artifact-gate ✅, E2E smoke ✅ (19 tests, 1m53s), Vercel ✅. Prettier check still red (non-blocking by design until repo-wide format pass — not a required check). Vitest 125/125 locally. PR #12 MERGEABLE (both required checks green).
+- Local e2e note: no JDK on this machine — Firestore emulator can't run locally; e2e verified via CI only.
+- Dead code note: legacy `src/App.tsx` (old hand-rolled `activeTab` tab system) is no longer mounted by anything; candidate for deletion in a follow-up cleanup PR.
+
 ## Next action
 
 1. EXECUTING Week 5 (Active) → Phase 5 frontend architecture: D7-A TanStack Router (URLs/deep links), D8-A Zustand slices, F5.4 CalendarView/LandingPage splits, F5.5 font/CSS hygiene — now safely PR-able with CI as the merge gate.
