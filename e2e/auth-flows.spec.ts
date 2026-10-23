@@ -148,9 +148,9 @@ test.describe.serial('Phase A email/password auth flows', () => {
 
     // Profile (Settings) → Sign out of all devices. This call goes to the REAL
     // dev server (not mocked): verifyIdToken + revokeRefreshTokens against the
-    // emulator, then a client sign-out.
+    // emulator, then a client sign-out. D7-A: drawer entries are router Links.
     await page.locator('header button').first().click();
-    await page.locator('button:has-text("Profile")').first().click();
+    await page.getByRole('link', { name: 'Profile', exact: true }).first().click();
     await expect(page.locator('[data-testid="sign-out-all-devices"]')).toBeVisible();
     await page.locator('[data-testid="sign-out-all-devices"]').click();
 

@@ -12,6 +12,23 @@ function RouterWrapper() {
   const auth = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
+  // Signed-out transition: pre-router, App.tsx swapped the tree inline to the
+  // login view when onAuthStateChanged fired with null. The router's _auth
+  // guard only runs on navigation, so a mid-session sign-out (e.g. "Sign out
+  // of all devices" from Profile) must navigate explicitly to leave guarded
+  // routes. Only reacts to user→null transitions, never the initial null.
+  const hadUser = React.useRef(false);
+  useEffect(() => {
+    if (auth.user) {
+      hadUser.current = true;
+      return;
+    }
+    if (hadUser.current && !auth.isAuthLoading) {
+      hadUser.current = false;
+      router.navigate({ to: '/login' });
+    }
+  }, [auth.user, auth.isAuthLoading]);
+
   // Handle auth expired event
   useEffect(() => {
     const handleAuthExpired = () => {
