@@ -1,20 +1,72 @@
-import { apiFetch } from "../firebase";
+import { apiFetch } from '../firebase';
 import React, { useState, useRef } from 'react';
-import { UploadSimple as Upload, ArrowsClockwise as RefreshCw, Check, DownloadSimple as Download, Trash as Trash2, X, Lightning as Zap, Palette, TextT as Type, CircleNotch as Loader2, Camera } from '@phosphor-icons/react';
+import {
+  UploadSimple as Upload,
+  ArrowsClockwise as RefreshCw,
+  Check,
+  DownloadSimple as Download,
+  Trash as Trash2,
+  X,
+  Lightning as Zap,
+  Palette,
+  TextT as Type,
+  CircleNotch as Loader2,
+  Camera,
+} from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { auth, db, handleFirestoreError, OperationType, compressBase64Image } from '../firebase';
-import { collection, addDoc, query, where, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
+  deleteDoc,
+  doc,
+  updateDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
 import BrandIcon from './BrandIcon';
 
 const AVATAR_STYLES = [
-  { id: 'futuristic', name: 'Futuristic AI', prompt: 'futuristic AI aesthetic, glowing circuits, sleek white and blue lighting' },
-  { id: 'tech-founder', name: 'Tech Founder', prompt: 'professional tech founder, minimalist office background, soft natural lighting, high-end corporate style' },
-  { id: 'cartoon', name: 'Cartoon', prompt: 'cartoon creator avatar, vibrant colors, clean lines, expressive features, Pixar style' },
-  { id: 'cyberpunk', name: 'Cyberpunk', prompt: 'cyberpunk style, neon pink and teal lighting, high-tech gear, rainy city background' },
-  { id: 'minimalist', name: 'Minimalist Vector', prompt: 'minimalist vector style, flat design, bold colors, clean geometric shapes' },
-  { id: '3d-metaverse', name: '3D Metaverse', prompt: '3D metaverse avatar, stylized 3D render, Unreal Engine 5 style, digital human' },
-  { id: 'anime', name: 'Anime', prompt: 'anime-style avatar, high-quality digital art, Studio Ghibli or Makoto Shinkai aesthetic' },
+  {
+    id: 'futuristic',
+    name: 'Futuristic AI',
+    prompt: 'futuristic AI aesthetic, glowing circuits, sleek white and blue lighting',
+  },
+  {
+    id: 'tech-founder',
+    name: 'Tech Founder',
+    prompt:
+      'professional tech founder, minimalist office background, soft natural lighting, high-end corporate style',
+  },
+  {
+    id: 'cartoon',
+    name: 'Cartoon',
+    prompt: 'cartoon creator avatar, vibrant colors, clean lines, expressive features, Pixar style',
+  },
+  {
+    id: 'cyberpunk',
+    name: 'Cyberpunk',
+    prompt: 'cyberpunk style, neon pink and teal lighting, high-tech gear, rainy city background',
+  },
+  {
+    id: 'minimalist',
+    name: 'Minimalist Vector',
+    prompt: 'minimalist vector style, flat design, bold colors, clean geometric shapes',
+  },
+  {
+    id: '3d-metaverse',
+    name: '3D Metaverse',
+    prompt: '3D metaverse avatar, stylized 3D render, Unreal Engine 5 style, digital human',
+  },
+  {
+    id: 'anime',
+    name: 'Anime',
+    prompt:
+      'anime-style avatar, high-quality digital art, Studio Ghibli or Makoto Shinkai aesthetic',
+  },
 ];
 
 interface Avatar {
@@ -27,7 +79,13 @@ interface Avatar {
   isActive: boolean;
 }
 
-export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () => void, onAvatarSet: (url: string) => void }) {
+export default function AvatarGenerator({
+  onClose,
+  onAvatarSet,
+}: {
+  onClose: () => void;
+  onAvatarSet: (url: string) => void;
+}) {
   const [activeTab, setActiveTab] = useState<'prompt' | 'photo'>('prompt');
   const [prompt, setPrompt] = useState('');
   const [selectedStyle, setSelectedStyle] = useState(AVATAR_STYLES[0]);
@@ -45,10 +103,10 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
       try {
         const q = query(collection(db, 'avatars'), where('userId', '==', auth.currentUser.uid));
         const snapshot = await getDocs(q);
-        const avatars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Avatar));
+        const avatars = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Avatar);
         setGeneratedAvatars(avatars.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
       } catch (error) {
-        console.error("Error loading avatars:", error);
+        console.error('Error loading avatars:', error);
       }
     };
     loadAvatars();
@@ -60,20 +118,21 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
     setIsGenerating(true);
 
     try {
-      const fullPrompt = activeTab === 'prompt' 
-        ? `A square profile avatar of a person. Style: ${selectedStyle.prompt}. Additional details: ${prompt}. High quality, professional, centered.`
-        : `Transform this person into a square profile avatar. Style: ${selectedStyle.prompt}. Maintain the person's core features but stylize them. High quality, professional, centered.`;
+      const fullPrompt =
+        activeTab === 'prompt'
+          ? `A square profile avatar of a person. Style: ${selectedStyle.prompt}. Additional details: ${prompt}. High quality, professional, centered.`
+          : `Transform this person into a square profile avatar. Style: ${selectedStyle.prompt}. Maintain the person's core features but stylize them. High quality, professional, centered.`;
 
       const contents: any = {
-        parts: [{ text: fullPrompt }]
+        parts: [{ text: fullPrompt }],
       };
 
       if (activeTab === 'photo' && referenceImage) {
         contents.parts.push({
           inlineData: {
             data: referenceImage.split(',')[1],
-            mimeType: 'image/png'
-          }
+            mimeType: 'image/png',
+          },
         });
       }
 
@@ -83,10 +142,10 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
         body: JSON.stringify({
           model: 'gemini-3.8-flash',
           contents,
-          config: {}
-        })
+          config: {},
+        }),
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         try {
@@ -94,7 +153,9 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
           throw new Error(errorJson.error || 'Server error generating avatar');
         } catch {
           if (errorText.includes('PayloadTooLargeError') || response.status === 413) {
-            throw new Error('Image file is too large. Please select a smaller photo or lower resolution image.');
+            throw new Error(
+              'Image file is too large. Please select a smaller photo or lower resolution image.',
+            );
           }
           throw new Error(errorText || 'Failed to generate avatar');
         }
@@ -114,7 +175,8 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
       }
 
       if (imageUrl) {
-        const genType: 'text' | 'photo_transform' = activeTab === 'prompt' ? 'text' : 'photo_transform';
+        const genType: 'text' | 'photo_transform' =
+          activeTab === 'prompt' ? 'text' : 'photo_transform';
         const avatarData = {
           userId: auth.currentUser.uid,
           url: imageUrl,
@@ -122,24 +184,26 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
           generationType: genType,
           styleType: selectedStyle.id,
           createdAt: serverTimestamp(),
-          isActive: false
+          isActive: false,
         };
 
-        const docRef = await addDoc(collection(db, 'avatars'), avatarData).catch(err => {
+        const docRef = await addDoc(collection(db, 'avatars'), avatarData).catch((err) => {
           handleFirestoreError(err, OperationType.CREATE, 'avatars');
           throw err;
         });
-        const newAvatar = { 
-          id: docRef.id, 
-          ...avatarData, 
-          createdAt: { seconds: Date.now() / 1000 } 
+        const newAvatar = {
+          id: docRef.id,
+          ...avatarData,
+          createdAt: { seconds: Date.now() / 1000 },
         } as unknown as Avatar;
         setGeneratedAvatars([newAvatar, ...generatedAvatars]);
       } else {
-        throw new Error('No avatar image was returned. Please try with different instructions or another photo.');
+        throw new Error(
+          'No avatar image was returned. Please try with different instructions or another photo.',
+        );
       }
     } catch (error: any) {
-      console.error("Error generating avatar:", error);
+      console.error('Error generating avatar:', error);
       setErrorMessage(error?.message || 'Failed to generate avatar. Please try again.');
     } finally {
       setIsGenerating(false);
@@ -154,8 +218,8 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
       const q = query(collection(db, 'avatars'), where('userId', '==', auth.currentUser.uid));
       const snapshot = await getDocs(q);
       const batchPromises = snapshot.docs
-        .filter(d => d.data().isActive === true)
-        .map(d => updateDoc(doc(db, 'avatars', d.id), { isActive: false }));
+        .filter((d) => d.data().isActive === true)
+        .map((d) => updateDoc(doc(db, 'avatars', d.id), { isActive: false }));
       await Promise.all(batchPromises);
 
       // 2. Set this avatar as active
@@ -165,10 +229,10 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
       await updateDoc(doc(db, 'users', auth.currentUser.uid), {
         photoURL: avatar.url,
         avatarType: 'ai_generated',
-        activeAvatarId: avatar.id
+        activeAvatarId: avatar.id,
       });
 
-      setGeneratedAvatars(generatedAvatars.map(a => ({ ...a, isActive: a.id === avatar.id })));
+      setGeneratedAvatars(generatedAvatars.map((a) => ({ ...a, isActive: a.id === avatar.id })));
       onAvatarSet(avatar.url);
       onClose();
     } catch (error) {
@@ -179,9 +243,9 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
   const handleDelete = async (avatarId: string) => {
     try {
       await deleteDoc(doc(db, 'avatars', avatarId));
-      setGeneratedAvatars(generatedAvatars.filter(a => a.id !== avatarId));
+      setGeneratedAvatars(generatedAvatars.filter((a) => a.id !== avatarId));
     } catch (error) {
-      console.error("Error deleting avatar:", error);
+      console.error('Error deleting avatar:', error);
     }
   };
 
@@ -229,13 +293,13 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
     >
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         className="bg-[var(--bg-secondary)] w-full max-w-5xl h-[85vh] rounded-[32px] overflow-hidden flex flex-col shadow-2xl"
@@ -243,15 +307,23 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
         {/* Header */}
         <div className="p-8 border-b border-[var(--separator)] flex items-center justify-between bg-[var(--bg-secondary)] sticky top-0 z-10">
           <div className="flex items-center gap-4 text-[var(--label-primary)]">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)'}}>
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center"
+              style={{
+                background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
+                color: 'var(--accent)',
+              }}
+            >
               <BrandIcon size={24} strokeWidth={1.5} />
             </div>
             <div>
               <h2 className="text-2xl font-serif font-bold tracking-tight">AI Avatar Generator</h2>
-              <p className="text-sm text-[var(--label-secondary)]">Design your digital identity with CreatorOS AI</p>
+              <p className="text-sm text-[var(--label-secondary)]">
+                Design your digital identity with CreatorOS AI
+              </p>
             </div>
           </div>
-          <div 
+          <div
             onClick={onClose}
             role="button"
             className="p-3 hover:bg-[var(--bg-tertiary)] rounded-2xl transition-colors text-[var(--label-secondary)] hover:text-[var(--label-primary)] cursor-pointer"
@@ -266,23 +338,27 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
             <div className="space-y-8">
               {/* Tabs */}
               <div className="flex p-1 bg-[var(--bg-primary)] rounded-2xl border border-[var(--separator)]">
-                <div 
+                <div
                   onClick={() => setActiveTab('prompt')}
                   role="button"
                   className={cn(
-                    "flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2",
-                    activeTab === 'prompt' ? "bg-[var(--bg-secondary)] text-[var(--label-primary)] shadow-sm border border-[var(--separator)]" : "text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
+                    'flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2',
+                    activeTab === 'prompt'
+                      ? 'bg-[var(--bg-secondary)] text-[var(--label-primary)] shadow-sm border border-[var(--separator)]'
+                      : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)]',
                   )}
                 >
                   <Type className="w-4 h-4" strokeWidth={1.5} />
                   Text Prompt
                 </div>
-                <div 
+                <div
                   onClick={() => setActiveTab('photo')}
                   role="button"
                   className={cn(
-                    "flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2",
-                    activeTab === 'photo' ? "bg-[var(--bg-secondary)] text-[var(--label-primary)] shadow-sm border border-[var(--separator)]" : "text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
+                    'flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2',
+                    activeTab === 'photo'
+                      ? 'bg-[var(--bg-secondary)] text-[var(--label-primary)] shadow-sm border border-[var(--separator)]'
+                      : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)]',
                   )}
                 >
                   <Camera className="w-4 h-4" strokeWidth={1.5} />
@@ -292,42 +368,61 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
 
               {activeTab === 'photo' && (
                 <div className="space-y-4">
-                  <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-widest">Reference Photo</label>
-                  <div 
+                  <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-widest">
+                    Reference Photo
+                  </label>
+                  <div
                     onClick={() => !isProcessingPhoto && fileInputRef.current?.click()}
                     className="aspect-square rounded-3xl border-2 border-dashed border-[var(--separator)] bg-[var(--bg-secondary)] flex flex-col items-center justify-center cursor-pointer hover:border-[var(--accent)] transition-colors overflow-hidden relative group"
                   >
                     {isProcessingPhoto ? (
                       <div className="flex flex-col items-center justify-center space-y-2">
-                        <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" strokeWidth={1.5} />
-                        <p className="text-xs font-bold text-[var(--label-secondary)]">Optimizing photo...</p>
+                        <Loader2
+                          className="w-8 h-8 text-[var(--accent)] animate-spin"
+                          strokeWidth={1.5}
+                        />
+                        <p className="text-xs font-bold text-[var(--label-secondary)]">
+                          Optimizing photo...
+                        </p>
                       </div>
                     ) : referenceImage ? (
                       <>
-                        <img loading="lazy" src={referenceImage || undefined} alt="Reference" className="w-full h-full object-cover" />
+                        <img
+                          loading="lazy"
+                          src={referenceImage || undefined}
+                          alt="Reference"
+                          className="w-full h-full object-cover"
+                        />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <RefreshCw className="w-8 h-8 text-white" strokeWidth={1.5} />
                         </div>
                       </>
                     ) : (
                       <>
-                        <Upload className="w-8 h-8 text-[var(--label-secondary)] mb-2" strokeWidth={1.5} />
-                        <p className="text-xs font-bold text-[var(--label-secondary)]">Upload Photo</p>
+                        <Upload
+                          className="w-8 h-8 text-[var(--label-secondary)] mb-2"
+                          strokeWidth={1.5}
+                        />
+                        <p className="text-xs font-bold text-[var(--label-secondary)]">
+                          Upload Photo
+                        </p>
                       </>
                     )}
                   </div>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handlePhotoUpload} 
-                    accept="image/*" 
-                    className="hidden" 
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handlePhotoUpload}
+                    accept="image/*"
+                    className="hidden"
                   />
                 </div>
               )}
 
               <div className="space-y-4">
-                <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-widest">Avatar Style</label>
+                <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-widest">
+                  Avatar Style
+                </label>
                 <div className="grid grid-cols-2 gap-3">
                   {AVATAR_STYLES.map((style) => (
                     <div
@@ -335,16 +430,20 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
                       onClick={() => setSelectedStyle(style)}
                       role="button"
                       className={cn(
-                        "p-4 rounded-2xl border text-left transition-all",
-                        selectedStyle.id === style.id 
-                          ? "bg-[var(--bg-secondary)] border-[var(--accent)] shadow-sm ring-1 ring-[var(--accent)]" 
-                          : "bg-[var(--bg-secondary)] border-[var(--separator)] hover:border-[var(--label-secondary)]"
+                        'p-4 rounded-2xl border text-left transition-all',
+                        selectedStyle.id === style.id
+                          ? 'bg-[var(--bg-secondary)] border-[var(--accent)] shadow-sm ring-1 ring-[var(--accent)]'
+                          : 'bg-[var(--bg-secondary)] border-[var(--separator)] hover:border-[var(--label-secondary)]',
                       )}
                     >
-                      <p className={cn(
-                        "text-xs font-bold",
-                        selectedStyle.id === style.id ? "text-[var(--accent)]" : "text-[var(--label-primary)]"
-                      )}>
+                      <p
+                        className={cn(
+                          'text-xs font-bold',
+                          selectedStyle.id === style.id
+                            ? 'text-[var(--accent)]'
+                            : 'text-[var(--label-primary)]',
+                        )}
+                      >
                         {style.name}
                       </p>
                     </div>
@@ -353,8 +452,10 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
               </div>
 
               <div className="space-y-4">
-                <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-widest">Custom Prompt (Optional)</label>
-                <textarea 
+                <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-widest">
+                  Custom Prompt (Optional)
+                </label>
+                <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="e.g. wearing a black hoodie, holding a coffee cup..."
@@ -371,9 +472,11 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
                 </div>
               )}
 
-              <button 
+              <button
                 onClick={handleGenerate}
-                disabled={isGenerating || isProcessingPhoto || (activeTab === 'photo' && !referenceImage)}
+                disabled={
+                  isGenerating || isProcessingPhoto || (activeTab === 'photo' && !referenceImage)
+                }
                 className="ios-button ios-button-filled w-full"
               >
                 {isGenerating ? (
@@ -396,38 +499,57 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
             <div className="space-y-8">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold">Your AI Avatars</h3>
-                <span className="text-xs font-bold text-[var(--label-secondary)]">{generatedAvatars.length} Avatars</span>
+                <span className="text-xs font-bold text-[var(--label-secondary)]">
+                  {generatedAvatars.length} Avatars
+                </span>
               </div>
 
               {generatedAvatars.length === 0 && !isGenerating ? (
                 <div className="h-[400px] flex flex-col items-center justify-center text-center space-y-4">
                   <div className="w-20 h-20 bg-[var(--bg-primary)] rounded-full flex items-center justify-center border border-[var(--separator)]">
-                    <Palette className="w-10 h-10 text-[var(--label-secondary)]" strokeWidth={1.5} />
+                    <Palette
+                      className="w-10 h-10 text-[var(--label-secondary)]"
+                      strokeWidth={1.5}
+                    />
                   </div>
                   <div>
-                    <p className="font-serif font-bold text-[var(--label-primary)]">No avatars yet</p>
-                    <p className="text-sm text-[var(--label-secondary)]">Generate your first AI avatar to see it here.</p>
+                    <p className="font-serif font-bold text-[var(--label-primary)]">
+                      No avatars yet
+                    </p>
+                    <p className="text-sm text-[var(--label-secondary)]">
+                      Generate your first AI avatar to see it here.
+                    </p>
                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                   {isGenerating && (
                     <div className="aspect-square rounded-[32px] bg-[var(--bg-primary)] border-2 border-dashed border-[var(--accent)]/20 flex flex-col items-center justify-center space-y-4 animate-pulse">
-                      <Loader2 className="w-10 h-10 text-[var(--accent)] animate-spin" strokeWidth={1.5} />
-                      <p className="text-xs font-bold text-[var(--accent)] uppercase tracking-widest">Generating...</p>
+                      <Loader2
+                        className="w-10 h-10 text-[var(--accent)] animate-spin"
+                        strokeWidth={1.5}
+                      />
+                      <p className="text-xs font-bold text-[var(--accent)] uppercase tracking-widest">
+                        Generating...
+                      </p>
                     </div>
                   )}
-                  
+
                   {generatedAvatars.map((avatar) => (
-                    <motion.div 
+                    <motion.div
                       key={avatar.id}
                       layout
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       className="group relative aspect-square rounded-[32px] overflow-hidden bg-[var(--bg-primary)] shadow-sm hover:shadow-xl transition-all border border-[var(--separator)]"
                     >
-                      <img loading="lazy" src={avatar.url || undefined} alt="AI Avatar" className="w-full h-full object-cover" />
-                      
+                      <img
+                        loading="lazy"
+                        src={avatar.url || undefined}
+                        alt="AI Avatar"
+                        className="w-full h-full object-cover"
+                      />
+
                       {avatar.isActive && (
                         <div className="absolute top-4 right-4 px-3 py-1 bg-[var(--system-green)] text-white text-[10px] font-bold rounded-full shadow-lg flex items-center gap-1">
                           <Check className="w-3 h-3" strokeWidth={1.5} />
@@ -437,7 +559,7 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
 
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-6 backdrop-blur-sm">
                         <div className="flex gap-3 mb-6">
-                          <div 
+                          <div
                             onClick={() => downloadAvatar(avatar.url)}
                             role="button"
                             className="p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors border border-white/10 cursor-pointer"
@@ -445,7 +567,7 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
                           >
                             <Download className="w-5 h-5 text-white" strokeWidth={1.5} />
                           </div>
-                          <div 
+                          <div
                             onClick={() => handleDelete(avatar.id)}
                             role="button"
                             className="p-3 bg-red-500/20 hover:bg-red-500/40 rounded-xl transition-colors border border-red-500/20 cursor-pointer"
@@ -454,9 +576,9 @@ export default function AvatarGenerator({ onClose, onAvatarSet }: { onClose: () 
                             <Trash2 className="w-5 h-5 text-red-500" strokeWidth={1.5} />
                           </div>
                         </div>
-                        
+
                         {!avatar.isActive && (
-                          <button 
+                          <button
                             onClick={() => handleSetAsActive(avatar)}
                             className="ios-button ios-button-tinted w-full"
                           >

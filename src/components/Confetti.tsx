@@ -35,28 +35,28 @@ export default function Confetti({ count = 50 }: { count?: number }) {
       {pieces.map((piece) => (
         <motion.div
           key={piece.id}
-          initial={{ 
-            opacity: 1, 
-            left: `${piece.x}%`, 
-            top: `${piece.y}%`, 
-            rotate: piece.rotation 
+          initial={{
+            opacity: 1,
+            left: `${piece.x}%`,
+            top: `${piece.y}%`,
+            rotate: piece.rotation,
           }}
-          animate={{ 
-            opacity: [1, 1, 0], 
-            top: '100%', 
-            rotate: piece.rotation + 180 + Math.random() * 180 
+          animate={{
+            opacity: [1, 1, 0],
+            top: '100%',
+            rotate: piece.rotation + 180 + Math.random() * 180,
           }}
-          transition={{ 
-            duration: piece.duration, 
-            delay: piece.delay, 
-            ease: "easeIn"
+          transition={{
+            duration: piece.duration,
+            delay: piece.delay,
+            ease: 'easeIn',
           }}
           style={{
             position: 'absolute',
             width: piece.size,
             height: piece.size,
             backgroundColor: piece.color,
-            borderRadius: Math.random() > 0.5 ? '50%' : '2px'
+            borderRadius: Math.random() > 0.5 ? '50%' : '2px',
           }}
         />
       ))}

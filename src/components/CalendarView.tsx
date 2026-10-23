@@ -1,12 +1,56 @@
-import { apiFetch } from "../firebase";
+import { apiFetch } from '../firebase';
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, updateDoc, doc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  doc,
+  addDoc,
+  serverTimestamp,
+  deleteDoc,
+} from 'firebase/firestore';
 import { db, authorizedFetch } from '../firebase';
-import { format, startOfWeek, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday } from 'date-fns';
+import {
+  format,
+  startOfWeek,
+  addDays,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameMonth,
+  isSameDay,
+  addMonths,
+  subMonths,
+  isToday,
+} from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { getFriendlyError } from '../lib/friendlyError';
-import { Youtube, Instagram, Twitter, Flame, Plus, Trash2, Clock, Sparkles, Check, CheckCircle, RefreshCw, Smartphone, ChevronLeft, ChevronRight, X, Search, Calendar as CalendarIcon, Video, AlertCircle, CloudUpload, ExternalLink } from 'lucide-react';
+import {
+  Youtube,
+  Instagram,
+  Twitter,
+  Flame,
+  Plus,
+  Trash2,
+  Clock,
+  Sparkles,
+  Check,
+  CheckCircle,
+  RefreshCw,
+  Smartphone,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Search,
+  Calendar as CalendarIcon,
+  Video,
+  AlertCircle,
+  CloudUpload,
+  ExternalLink,
+} from 'lucide-react';
 
 // Platform configurations with industry-accepted colors
 export const getPlatformStyle = (platform: string) => {
@@ -81,16 +125,22 @@ const getPlatformIcon = (platform: string, size = 16) => {
   }
 };
 
-export default function CalendarView({ user, setActiveTab }: { user: any, setActiveTab: (tab: string) => void }) {
+export default function CalendarView({
+  user,
+  setActiveTab,
+}: {
+  user: any;
+  setActiveTab: (tab: string) => void;
+}) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [heatmapMode, setHeatmapMode] = useState<'off' | 'volume' | 'score' | 'time'>('off');
 
   const getHeatmapClass = (day: Date, dayEvents: any[]) => {
     if (heatmapMode === 'off') return '';
-    
+
     const inMonth = isSameMonth(day, monthStart);
     if (!inMonth) return 'opacity-25';
-    
+
     if (heatmapMode === 'volume') {
       const count = dayEvents.length;
       if (count === 0) return 'bg-[var(--bg-tertiary)]';
@@ -99,18 +149,18 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
       if (count === 3) return 'bg-[var(--accent)]/[0.14] border-b-2 border-[var(--accent)]/60';
       return 'bg-[var(--accent)]/[0.22] border-b-2 border-[var(--accent)]';
     }
-    
+
     if (heatmapMode === 'score') {
-      const scores = dayEvents.map(e => e.data?.score || 0).filter(s => s > 0);
+      const scores = dayEvents.map((e) => e.data?.score || 0).filter((s) => s > 0);
       if (scores.length === 0) return 'bg-[var(--bg-tertiary)]';
       const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
-      
+
       if (avgScore < 50) return 'bg-amber-500/[0.04]';
       if (avgScore < 75) return 'bg-amber-500/[0.10]';
       if (avgScore < 90) return 'bg-amber-500/[0.18]';
       return 'bg-amber-500/[0.28] border-b-2 border-amber-500';
     }
-    
+
     if (heatmapMode === 'time') {
       const dayOfWeek = day.getDay();
       if (dayOfWeek === 2 || dayOfWeek === 4) {
@@ -121,7 +171,7 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
       }
       return 'bg-emerald-500/[0.03]';
     }
-    
+
     return '';
   };
 
@@ -129,10 +179,10 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
   const [scheduledEvents, setScheduledEvents] = useState<any[]>([]);
   const [unscheduledBlocks, setUnscheduledBlocks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
-  
+
   // Create state fields
   const [newEventTitle, setNewEventTitle] = useState('');
   const [newEventPlatform, setNewEventPlatform] = useState('youtube');
@@ -144,7 +194,7 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
   const [draggedBlock, setDraggedBlock] = useState<any>(null);
   const [publishTime, setPublishTime] = useState('12:00');
   const [autoPublishEnabled, setAutoPublishEnabled] = useState(true);
-  
+
   // Selected detail modal
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -154,7 +204,7 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
   const [selectedTargetPlatforms, setSelectedTargetPlatforms] = useState<string[]>([]);
   const [reformatSuggestions, setReformatSuggestions] = useState<any[]>([]);
   const [reformatError, setReformatError] = useState('');
-  
+
   // Search sidebar
   const [sidebarSearch, setSidebarSearch] = useState('');
 
@@ -190,25 +240,25 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
         body: JSON.stringify({
           title: originalTitle,
           body: originalBody,
-          platforms: selectedSyncPlatforms
-        })
+          platforms: selectedSyncPlatforms,
+        }),
       });
 
       if (result.success) {
         setSyncResults(result.results);
-        
+
         const hasSuccess = Object.values(result.results).some((r: any) => r.status === 'success');
         if (hasSuccess) {
           await updateDoc(doc(db, 'projects', selectedEvent.id), {
             status: 'Published',
-            updatedAt: serverTimestamp()
+            updatedAt: serverTimestamp(),
           });
-          
+
           await fetchAllBlocks();
-          
+
           setSelectedEvent((prev: any) => ({
             ...prev,
-            status: 'Published'
+            status: 'Published',
           }));
         }
       } else {
@@ -226,8 +276,12 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
     if (selectedEvent) {
       setSyncResults(null);
       setSyncError('');
-      const currentPlatform = (selectedEvent.platform || selectedEvent.data?.platform || '').toLowerCase();
-      const isConnected = connectedAccounts.some(acc => acc.platform === currentPlatform);
+      const currentPlatform = (
+        selectedEvent.platform ||
+        selectedEvent.data?.platform ||
+        ''
+      ).toLowerCase();
+      const isConnected = connectedAccounts.some((acc) => acc.platform === currentPlatform);
       if (isConnected) {
         setSelectedSyncPlatforms([currentPlatform]);
       } else {
@@ -240,28 +294,25 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
     if (!user) return;
     setIsLoading(true);
     try {
-      const q = query(
-        collection(db, 'projects'),
-        where('userId', '==', user.uid)
-      );
+      const q = query(collection(db, 'projects'), where('userId', '==', user.uid));
       const snapshot = await getDocs(q);
       const fetched = snapshot.docs
-        .filter(doc => doc.data().type === 'content')
-        .map(doc => {
+        .filter((doc) => doc.data().type === 'content')
+        .map((doc) => {
           const data = doc.data();
           return {
             id: doc.id,
             ...data,
-            scheduledDate: data.scheduledDate ? data.scheduledDate.toDate() : null
+            scheduledDate: data.scheduledDate ? data.scheduledDate.toDate() : null,
           };
         });
 
       setAllBlocks(fetched);
-      
+
       // Separate into scheduled and unscheduled
-      const scheduled = fetched.filter(b => b.scheduledDate !== null);
-      const unscheduled = fetched.filter(b => b.scheduledDate === null);
-      
+      const scheduled = fetched.filter((b) => b.scheduledDate !== null);
+      const unscheduled = fetched.filter((b) => b.scheduledDate === null);
+
       setScheduledEvents(scheduled);
       setUnscheduledBlocks(unscheduled);
     } catch (error) {
@@ -286,13 +337,13 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
   const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
   const endDate = startOfWeek(addDays(monthEnd, 6), { weekStartsOn: 1 });
 
-  const dateFormat = "MMMM yyyy";
+  const dateFormat = 'MMMM yyyy';
   const days = eachDayOfInterval({ start: startDate, end: addDays(endDate, 6) });
 
   // Add standard new event
   const handleAddEvent = async () => {
     if (!newEventTitle || !selectedDate || !user) return;
-    
+
     try {
       await addDoc(collection(db, 'projects'), {
         userId: user.uid,
@@ -308,11 +359,11 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
           platform: newEventPlatform,
         },
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
-      
+
       await fetchAllBlocks();
-      
+
       setNewEventTitle('');
       setNewEventBody('');
       setShowEventModal(false);
@@ -326,9 +377,9 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
     if (e) e.stopPropagation();
     try {
       await deleteDoc(doc(db, 'projects', id));
-      setAllBlocks(allBlocks.filter(b => b.id !== id));
-      setScheduledEvents(scheduledEvents.filter(b => b.id !== id));
-      setUnscheduledBlocks(unscheduledBlocks.filter(b => b.id !== id));
+      setAllBlocks(allBlocks.filter((b) => b.id !== id));
+      setScheduledEvents(scheduledEvents.filter((b) => b.id !== id));
+      setUnscheduledBlocks(unscheduledBlocks.filter((b) => b.id !== id));
       setShowDetailModal(false);
     } catch (error) {
       console.error('Error deleting block:', error);
@@ -350,20 +401,20 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
   const handleDropOnDay = (day: Date, e: React.DragEvent) => {
     e.preventDefault();
     e.currentTarget.classList.remove('bg-[var(--bg-secondary)]/50');
-    
+
     const blockId = e.dataTransfer.getData('blockId');
     if (!blockId) return;
 
-    const block = allBlocks.find(b => b.id === blockId);
+    const block = allBlocks.find((b) => b.id === blockId);
     if (!block) return;
 
     setSelectedDate(day);
     setDraggedBlock(block);
-    
+
     // Set default auto-publish settings
     setPublishTime(block.publishTime || '12:00');
     setAutoPublishEnabled(block.autoPublish !== undefined ? block.autoPublish : true);
-    
+
     // Open the pop-out auto-publish configuration window
     setShowAutoPublishModal(true);
   };
@@ -384,15 +435,15 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
         scheduledDate: finalDateTime,
         publishTime,
         autoPublish: autoPublishEnabled,
-        status: autoPublishEnabled ? 'Scheduled' : 'Draft'
+        status: autoPublishEnabled ? 'Scheduled' : 'Draft',
       };
 
-      setAllBlocks(allBlocks.map(b => b.id === draggedBlock.id ? updatedBlock : b));
+      setAllBlocks(allBlocks.map((b) => (b.id === draggedBlock.id ? updatedBlock : b)));
       setScheduledEvents([
-        ...scheduledEvents.filter(b => b.id !== draggedBlock.id),
-        updatedBlock
+        ...scheduledEvents.filter((b) => b.id !== draggedBlock.id),
+        updatedBlock,
       ]);
-      setUnscheduledBlocks(unscheduledBlocks.filter(b => b.id !== draggedBlock.id));
+      setUnscheduledBlocks(unscheduledBlocks.filter((b) => b.id !== draggedBlock.id));
 
       // Update in Firestore
       await updateDoc(doc(db, 'projects', draggedBlock.id), {
@@ -400,7 +451,7 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
         publishTime,
         autoPublish: autoPublishEnabled,
         status: autoPublishEnabled ? 'Scheduled' : 'Draft',
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
 
       setShowAutoPublishModal(false);
@@ -417,7 +468,7 @@ export default function CalendarView({ user, setActiveTab }: { user: any, setAct
       await updateDoc(doc(db, 'projects', event.id), {
         scheduledDate: null,
         status: 'Draft',
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
       await fetchAllBlocks();
       setShowDetailModal(false);
@@ -484,21 +535,21 @@ Return your response strictly in the following JSON format:
                     properties: {
                       platform: { type: 'STRING' },
                       title: { type: 'STRING' },
-                      body: { type: 'STRING' }
+                      body: { type: 'STRING' },
                     },
-                    required: ['platform', 'title', 'body']
-                  }
-                }
+                    required: ['platform', 'title', 'body'],
+                  },
+                },
               },
-              required: ['suggestions']
-            }
-          }
-        })
+              required: ['suggestions'],
+            },
+          },
+        }),
       });
 
       if (!response.ok) throw new Error('Failed to generate suggestions');
       const result = await response.json();
-      
+
       const parsed = JSON.parse(result.text);
       if (parsed?.suggestions) {
         setReformatSuggestions(parsed.suggestions);
@@ -528,17 +579,17 @@ Return your response strictly in the following JSON format:
           body: suggestion.body,
           platform: suggestion.platform,
           score: 80,
-          score_feedback: 'AI Reformatted Draft'
+          score_feedback: 'AI Reformatted Draft',
         },
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
 
       // Refresh list to put new drafts in the Sidebar!
       await fetchAllBlocks();
-      
+
       // Filter out saved suggestion from view
-      setReformatSuggestions(reformatSuggestions.filter(s => s !== suggestion));
+      setReformatSuggestions(reformatSuggestions.filter((s) => s !== suggestion));
     } catch (error) {
       console.error('Error saving AI draft:', error);
     }
@@ -551,7 +602,7 @@ Return your response strictly in the following JSON format:
     return new Date(event.scheduledDate) < new Date();
   };
 
-  const filteredUnscheduled = unscheduledBlocks.filter(block => {
+  const filteredUnscheduled = unscheduledBlocks.filter((block) => {
     const title = block.name || block.data?.title || '';
     const body = block.data?.body || '';
     const platform = block.platform || block.data?.platform || '';
@@ -565,16 +616,19 @@ Return your response strictly in the following JSON format:
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start min-h-[700px]">
-      
       {/* 1. Unscheduled Sidebar - 3 Columns */}
       <div className="lg:col-span-3 bg-[var(--bg-tertiary)] border border-[var(--separator)]/60 rounded-[24px] p-5 flex flex-col h-full max-h-[850px]">
         <div className="space-y-4 pb-4 border-b border-[var(--separator)]">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-[17px] font-bold tracking-tight text-[var(--label-primary)]">Unscheduled Content</h3>
-              <p className="text-[12px] text-[var(--label-secondary)] font-medium mt-0.5">Drag blocks onto calendar dates</p>
+              <h3 className="text-[17px] font-bold tracking-tight text-[var(--label-primary)]">
+                Unscheduled Content
+              </h3>
+              <p className="text-[12px] text-[var(--label-secondary)] font-medium mt-0.5">
+                Drag blocks onto calendar dates
+              </p>
             </div>
-            <button 
+            <button
               onClick={() => {
                 setSelectedDate(new Date());
                 setShowEventModal(true);
@@ -588,11 +642,11 @@ Return your response strictly in the following JSON format:
 
           <div className="relative">
             <Search className="absolute left-3 top-3.5 text-[var(--label-tertiary)] w-4 h-4" />
-            <input 
+            <input
               type="text"
               placeholder="Search drafts..."
               value={sidebarSearch}
-              onChange={e => setSidebarSearch(e.target.value)}
+              onChange={(e) => setSidebarSearch(e.target.value)}
               className="w-full bg-[var(--bg-secondary)] border border-[var(--separator)]/40 rounded-xl pl-9 pr-4 py-2.5 text-[13px] outline-none focus:border-[var(--accent)] transition-colors text-[var(--label-primary)]"
             />
           </div>
@@ -609,15 +663,17 @@ Return your response strictly in the following JSON format:
             <div className="py-20 text-center text-[var(--label-tertiary)] text-[13px] font-medium flex flex-col items-center gap-2">
               <CalendarIcon size={24} className="opacity-40" />
               <span>No unscheduled drafts.</span>
-              <p className="text-[11px] px-4">Create content in the Editor or click (+) above to build ideas.</p>
+              <p className="text-[11px] px-4">
+                Create content in the Editor or click (+) above to build ideas.
+              </p>
             </div>
           ) : (
-            filteredUnscheduled.map(block => {
+            filteredUnscheduled.map((block) => {
               const style = getPlatformStyle(block.platform || block.data?.platform);
               const title = block.name || block.data?.title || 'Draft Content';
               const body = block.data?.body || '';
               const score = block.data?.score || 0;
-              
+
               return (
                 <div
                   key={block.id}
@@ -634,12 +690,18 @@ Return your response strictly in the following JSON format:
                     setShowDetailModal(true);
                   }}
                   className={cn(
-                    "p-3.5 rounded-2xl border cursor-grab active:cursor-grabbing transition-all hover:scale-[1.02] bg-[var(--bg-secondary)] group flex flex-col gap-2 shadow-sm hover:shadow-md",
-                    style.border
+                    'p-3.5 rounded-2xl border cursor-grab active:cursor-grabbing transition-all hover:scale-[1.02] bg-[var(--bg-secondary)] group flex flex-col gap-2 shadow-sm hover:shadow-md',
+                    style.border,
                   )}
                 >
                   <div className="flex items-center justify-between">
-                    <span className={cn("text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full", style.bg, style.text)}>
+                    <span
+                      className={cn(
+                        'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full',
+                        style.bg,
+                        style.text,
+                      )}
+                    >
                       {style.name}
                     </span>
                     {score > 0 && (
@@ -648,19 +710,21 @@ Return your response strictly in the following JSON format:
                       </span>
                     )}
                   </div>
-                  <h4 className="text-[13px] font-bold text-[var(--label-primary)] truncate">{title}</h4>
+                  <h4 className="text-[13px] font-bold text-[var(--label-primary)] truncate">
+                    {title}
+                  </h4>
                   {body && (
                     <p className="text-[11px] text-[var(--label-secondary)] line-clamp-2 leading-relaxed font-medium">
                       {body}
                     </p>
                   )}
-                  
+
                   <div className="flex items-center justify-between pt-1 border-t border-[var(--separator)]/30 text-[10px] text-[var(--label-tertiary)] font-bold">
                     <span className="flex items-center gap-1">
                       {getPlatformIcon(block.platform || block.data?.platform, 12)}
                       Hold & Drag
                     </span>
-                    <button 
+                    <button
                       onClick={(e) => handleDeleteEvent(block.id, e)}
                       className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-red-500 transition-all"
                     >
@@ -679,14 +743,24 @@ Return your response strictly in the following JSON format:
         {/* Calendar Header */}
         <div className="flex items-center justify-between p-6 border-b border-[var(--separator)] bg-[var(--bg-tertiary)]">
           <div>
-            <h2 className="text-[20px] font-semibold tracking-tight text-[var(--label-primary)]">{format(currentDate, dateFormat)}</h2>
-            <p className="text-[13px] text-[var(--label-secondary)] font-medium mt-1">Plan, visualize and trigger auto-publishing</p>
+            <h2 className="text-[20px] font-semibold tracking-tight text-[var(--label-primary)]">
+              {format(currentDate, dateFormat)}
+            </h2>
+            <p className="text-[13px] text-[var(--label-secondary)] font-medium mt-1">
+              Plan, visualize and trigger auto-publishing
+            </p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handlePrevMonth} className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-primary)] transition-colors border border-[var(--separator)]/30 text-[var(--label-primary)]">
+            <button
+              onClick={handlePrevMonth}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-primary)] transition-colors border border-[var(--separator)]/30 text-[var(--label-primary)]"
+            >
               <ChevronLeft size={16} />
             </button>
-            <button onClick={handleNextMonth} className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-primary)] transition-colors border border-[var(--separator)]/30 text-[var(--label-primary)]">
+            <button
+              onClick={handleNextMonth}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] hover:bg-[var(--bg-primary)] transition-colors border border-[var(--separator)]/30 text-[var(--label-primary)]"
+            >
               <ChevronRight size={16} />
             </button>
           </div>
@@ -700,46 +774,46 @@ Return your response strictly in the following JSON format:
               <span>Heatmap view:</span>
             </div>
             <div className="flex bg-[var(--bg-secondary)] border border-[var(--separator)]/40 rounded-lg p-0.5 text-[11px] font-bold">
-              <button 
-                onClick={() => setHeatmapMode('off')} 
+              <button
+                onClick={() => setHeatmapMode('off')}
                 className={cn(
-                  "px-2.5 py-1 rounded-md transition-all cursor-pointer",
-                  heatmapMode === 'off' 
-                    ? "bg-[var(--bg-tertiary)] text-[var(--label-primary)] shadow-sm" 
-                    : "text-[var(--label-tertiary)] hover:text-[var(--label-secondary)]"
+                  'px-2.5 py-1 rounded-md transition-all cursor-pointer',
+                  heatmapMode === 'off'
+                    ? 'bg-[var(--bg-tertiary)] text-[var(--label-primary)] shadow-sm'
+                    : 'text-[var(--label-tertiary)] hover:text-[var(--label-secondary)]',
                 )}
               >
                 None
               </button>
-              <button 
-                onClick={() => setHeatmapMode('volume')} 
+              <button
+                onClick={() => setHeatmapMode('volume')}
                 className={cn(
-                  "px-2.5 py-1 rounded-md transition-all cursor-pointer",
-                  heatmapMode === 'volume' 
-                    ? "bg-[var(--accent)] text-white shadow-sm" 
-                    : "text-[var(--label-tertiary)] hover:text-[var(--label-secondary)]"
+                  'px-2.5 py-1 rounded-md transition-all cursor-pointer',
+                  heatmapMode === 'volume'
+                    ? 'bg-[var(--accent)] text-white shadow-sm'
+                    : 'text-[var(--label-tertiary)] hover:text-[var(--label-secondary)]',
                 )}
               >
                 Density
               </button>
-              <button 
-                onClick={() => setHeatmapMode('score')} 
+              <button
+                onClick={() => setHeatmapMode('score')}
                 className={cn(
-                  "px-2.5 py-1 rounded-md transition-all cursor-pointer",
-                  heatmapMode === 'score' 
-                    ? "bg-amber-500 text-white shadow-sm" 
-                    : "text-[var(--label-tertiary)] hover:text-[var(--label-secondary)]"
+                  'px-2.5 py-1 rounded-md transition-all cursor-pointer',
+                  heatmapMode === 'score'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'text-[var(--label-tertiary)] hover:text-[var(--label-secondary)]',
                 )}
               >
                 Content Score
               </button>
-              <button 
-                onClick={() => setHeatmapMode('time')} 
+              <button
+                onClick={() => setHeatmapMode('time')}
                 className={cn(
-                  "px-2.5 py-1 rounded-md transition-all cursor-pointer",
-                  heatmapMode === 'time' 
-                    ? "bg-emerald-600 text-white shadow-sm" 
-                    : "text-[var(--label-tertiary)] hover:text-[var(--label-secondary)]"
+                  'px-2.5 py-1 rounded-md transition-all cursor-pointer',
+                  heatmapMode === 'time'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-[var(--label-tertiary)] hover:text-[var(--label-secondary)]',
                 )}
               >
                 Best Time to Post
@@ -784,8 +858,11 @@ Return your response strictly in the following JSON format:
 
         {/* Days of Week */}
         <div className="grid grid-cols-7 border-b border-[var(--separator)] bg-[var(--bg-secondary)]/50">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-            <div key={day} className="py-3 text-center text-[11px] font-bold tracking-wider uppercase text-[var(--label-secondary)]">
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+            <div
+              key={day}
+              className="py-3 text-center text-[11px] font-bold tracking-wider uppercase text-[var(--label-secondary)]"
+            >
               {day}
             </div>
           ))}
@@ -794,9 +871,9 @@ Return your response strictly in the following JSON format:
         {/* Calendar Grid */}
         <div className="flex-1 grid grid-cols-7 grid-rows-5 bg-[var(--separator)]/30 gap-[1px]">
           {days.slice(0, 35).map((day) => {
-            const dayEvents = scheduledEvents.filter(e => isSameDay(e.scheduledDate, day));
+            const dayEvents = scheduledEvents.filter((e) => isSameDay(e.scheduledDate, day));
             return (
-              <div 
+              <div
                 key={day.toString()}
                 onClick={() => {
                   setSelectedDate(day);
@@ -808,52 +885,63 @@ Return your response strictly in the following JSON format:
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDropOnDay(day, e)}
                 className={cn(
-                  getHeatmapClass(day, dayEvents) || "bg-[var(--bg-tertiary)]",
-                  "min-h-[110px] p-2 hover:bg-[var(--bg-secondary)]/30 transition-colors cursor-pointer group flex flex-col gap-1.5 relative",
-                  !isSameMonth(day, monthStart) && "opacity-30"
+                  getHeatmapClass(day, dayEvents) || 'bg-[var(--bg-tertiary)]',
+                  'min-h-[110px] p-2 hover:bg-[var(--bg-secondary)]/30 transition-colors cursor-pointer group flex flex-col gap-1.5 relative',
+                  !isSameMonth(day, monthStart) && 'opacity-30',
                 )}
               >
                 <div className="flex items-center justify-between">
-                  <span className={cn(
-                    "w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-bold flex-shrink-0 text-[var(--label-primary)]",
-                    isToday(day) ? "bg-[var(--accent)] text-white shadow-sm" : ""
-                  )}>
+                  <span
+                    className={cn(
+                      'w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-bold flex-shrink-0 text-[var(--label-primary)]',
+                      isToday(day) ? 'bg-[var(--accent)] text-white shadow-sm' : '',
+                    )}
+                  >
                     {format(day, 'd')}
                   </span>
                   {heatmapMode === 'off' && (
-                    <Plus size={12} className="opacity-0 group-hover:opacity-100 text-[var(--label-tertiary)] transition-opacity" />
+                    <Plus
+                      size={12}
+                      className="opacity-0 group-hover:opacity-100 text-[var(--label-tertiary)] transition-opacity"
+                    />
                   )}
                   {heatmapMode === 'volume' && dayEvents.length > 0 && (
                     <span className="text-[9px] font-bold text-[var(--accent)] bg-[var(--accent)]/15 px-1.5 py-0.5 rounded-full">
                       {dayEvents.length}p
                     </span>
                   )}
-                  {heatmapMode === 'score' && dayEvents.some(e => (e.data?.score || 0) > 0) && (
+                  {heatmapMode === 'score' && dayEvents.some((e) => (e.data?.score || 0) > 0) && (
                     <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded-full">
-                      {Math.round(dayEvents.reduce((acc, e) => acc + (e.data?.score || 0), 0) / dayEvents.filter(e => (e.data?.score || 0) > 0).length)}%
+                      {Math.round(
+                        dayEvents.reduce((acc, e) => acc + (e.data?.score || 0), 0) /
+                          dayEvents.filter((e) => (e.data?.score || 0) > 0).length,
+                      )}
+                      %
                     </span>
                   )}
                   {heatmapMode === 'time' && (
-                    <span className={cn(
-                      "text-[8px] font-extrabold uppercase px-1 py-0.5 rounded",
-                      day.getDay() === 2 || day.getDay() === 4 
-                        ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/20" 
-                        : "text-emerald-500/80 bg-emerald-500/5"
-                    )}>
-                      {day.getDay() === 2 || day.getDay() === 4 ? "Peak" : "Good"}
+                    <span
+                      className={cn(
+                        'text-[8px] font-extrabold uppercase px-1 py-0.5 rounded',
+                        day.getDay() === 2 || day.getDay() === 4
+                          ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/20'
+                          : 'text-emerald-500/80 bg-emerald-500/5',
+                      )}
+                    >
+                      {day.getDay() === 2 || day.getDay() === 4 ? 'Peak' : 'Good'}
                     </span>
                   )}
                 </div>
-                
+
                 {/* Day events stack */}
                 <div className="flex-1 overflow-y-auto space-y-1.5 no-scrollbar max-h-[85px]">
-                  {dayEvents.map(event => {
+                  {dayEvents.map((event) => {
                     const style = getPlatformStyle(event.platform || event.data?.platform);
                     const title = event.name || event.data?.title || 'Draft Content';
                     const isPublished = isAutoPublished(event);
-                    
+
                     return (
-                      <div 
+                      <div
                         key={event.id}
                         draggable
                         onDragStart={(e) => {
@@ -870,21 +958,29 @@ Return your response strictly in the following JSON format:
                           setShowDetailModal(true);
                         }}
                         className={cn(
-                          "group/item border rounded-xl px-2 py-1.5 text-[11px] font-bold flex flex-col gap-0.5 shadow-sm cursor-grab active:cursor-grabbing transition-all hover:scale-[1.01] bg-[var(--bg-secondary)]",
-                          style.border
+                          'group/item border rounded-xl px-2 py-1.5 text-[11px] font-bold flex flex-col gap-0.5 shadow-sm cursor-grab active:cursor-grabbing transition-all hover:scale-[1.01] bg-[var(--bg-secondary)]',
+                          style.border,
                         )}
                       >
                         <div className="flex items-center justify-between gap-1.5">
-                          <span className={cn("text-[9px] px-1 py-0.5 rounded font-bold uppercase", style.bg, style.text)}>
+                          <span
+                            className={cn(
+                              'text-[9px] px-1 py-0.5 rounded font-bold uppercase',
+                              style.bg,
+                              style.text,
+                            )}
+                          >
                             {style.name}
                           </span>
                           <span className="text-[8px] text-[var(--label-tertiary)] font-bold">
                             {event.publishTime || '12:00'}
                           </span>
                         </div>
-                        
-                        <span className="truncate text-[11px] text-[var(--label-primary)] font-medium mt-0.5">{title}</span>
-                        
+
+                        <span className="truncate text-[11px] text-[var(--label-primary)] font-medium mt-0.5">
+                          {title}
+                        </span>
+
                         <div className="flex items-center justify-between gap-1 mt-1 border-t border-[var(--separator)]/20 pt-1 text-[8px] font-bold">
                           {isPublished ? (
                             <span className="text-emerald-500 flex items-center gap-0.5">
@@ -895,9 +991,7 @@ Return your response strictly in the following JSON format:
                               <Clock size={8} /> Auto-Publish
                             </span>
                           ) : (
-                            <span className="text-[var(--label-tertiary)]">
-                              Draft
-                            </span>
+                            <span className="text-[var(--label-tertiary)]">Draft</span>
                           )}
                         </div>
                       </div>
@@ -923,12 +1017,14 @@ Return your response strictly in the following JSON format:
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-[18px] font-bold tracking-tight text-[var(--label-primary)]">Configure Auto-Publish</h3>
+                  <h3 className="text-[18px] font-bold tracking-tight text-[var(--label-primary)]">
+                    Configure Auto-Publish
+                  </h3>
                   <p className="text-[13px] text-[var(--label-secondary)] mt-0.5">
                     For {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : ''}
                   </p>
                 </div>
-                <button 
+                <button
                   onClick={() => {
                     setShowAutoPublishModal(false);
                     setDraggedBlock(null);
@@ -940,21 +1036,29 @@ Return your response strictly in the following JSON format:
               </div>
 
               {/* Event Details Card */}
-              <div className={cn(
-                "p-4 rounded-2xl border bg-[var(--bg-secondary)]/50",
-                getPlatformStyle(draggedBlock.platform || draggedBlock.data?.platform).border
-              )}>
+              <div
+                className={cn(
+                  'p-4 rounded-2xl border bg-[var(--bg-secondary)]/50',
+                  getPlatformStyle(draggedBlock.platform || draggedBlock.data?.platform).border,
+                )}
+              >
                 <div className="flex items-center gap-2 mb-2">
-                  <span className={cn(
-                    "text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full",
-                    getPlatformStyle(draggedBlock.platform || draggedBlock.data?.platform).bg,
-                    getPlatformStyle(draggedBlock.platform || draggedBlock.data?.platform).text
-                  )}>
+                  <span
+                    className={cn(
+                      'text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full',
+                      getPlatformStyle(draggedBlock.platform || draggedBlock.data?.platform).bg,
+                      getPlatformStyle(draggedBlock.platform || draggedBlock.data?.platform).text,
+                    )}
+                  >
                     {getPlatformStyle(draggedBlock.platform || draggedBlock.data?.platform).name}
                   </span>
-                  <span className="text-[11px] text-[var(--label-tertiary)] font-bold">Draft Block</span>
+                  <span className="text-[11px] text-[var(--label-tertiary)] font-bold">
+                    Draft Block
+                  </span>
                 </div>
-                <h4 className="text-[14px] font-bold text-[var(--label-primary)]">{draggedBlock.name || draggedBlock.data?.title || 'Untitled'}</h4>
+                <h4 className="text-[14px] font-bold text-[var(--label-primary)]">
+                  {draggedBlock.name || draggedBlock.data?.title || 'Untitled'}
+                </h4>
                 {draggedBlock.data?.body && (
                   <p className="text-[12px] text-[var(--label-secondary)] line-clamp-3 mt-1.5 leading-relaxed font-medium">
                     {draggedBlock.data.body}
@@ -968,8 +1072,8 @@ Return your response strictly in the following JSON format:
                   <label className="text-[11px] font-bold tracking-wider text-[var(--label-secondary)] uppercase pl-1 flex items-center gap-1.5">
                     <Clock size={13} /> Select Publishing Time
                   </label>
-                  <input 
-                    type="time" 
+                  <input
+                    type="time"
                     value={publishTime}
                     onChange={(e) => setPublishTime(e.target.value)}
                     className="w-full bg-[var(--bg-secondary)] border border-[var(--separator)] rounded-xl px-4 py-3 text-[15px] outline-none font-bold text-[var(--label-primary)] focus:border-[var(--accent)] transition-colors"
@@ -986,24 +1090,26 @@ Return your response strictly in the following JSON format:
                       Link this block to the API auto-publisher to schedule automated posting.
                     </p>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setAutoPublishEnabled(!autoPublishEnabled)}
                     className={cn(
-                      "w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer",
-                      autoPublishEnabled ? "bg-[var(--accent)]" : "bg-gray-300 dark:bg-zinc-700"
+                      'w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer',
+                      autoPublishEnabled ? 'bg-[var(--accent)]' : 'bg-gray-300 dark:bg-zinc-700',
                     )}
                   >
-                    <div className={cn(
-                      "bg-white w-4 h-4 rounded-full shadow-md transform transition-transform",
-                      autoPublishEnabled ? "translate-x-5" : "translate-x-0"
-                    )} />
+                    <div
+                      className={cn(
+                        'bg-white w-4 h-4 rounded-full shadow-md transform transition-transform',
+                        autoPublishEnabled ? 'translate-x-5' : 'translate-x-0',
+                      )}
+                    />
                   </button>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-2">
-                <button 
+                <button
                   onClick={() => {
                     setShowAutoPublishModal(false);
                     setDraggedBlock(null);
@@ -1012,7 +1118,7 @@ Return your response strictly in the following JSON format:
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={handleConfirmAutoPublish}
                   className="flex-1 py-3.5 rounded-xl font-bold text-[14px] bg-[var(--accent)] text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                 >
@@ -1038,20 +1144,22 @@ Return your response strictly in the following JSON format:
               {/* Header */}
               <div className="p-6 border-b border-[var(--separator)] flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <span className={cn(
-                    "text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full",
-                    getPlatformStyle(selectedEvent.platform || selectedEvent.data?.platform).bg,
-                    getPlatformStyle(selectedEvent.platform || selectedEvent.data?.platform).text
-                  )}>
+                  <span
+                    className={cn(
+                      'text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full',
+                      getPlatformStyle(selectedEvent.platform || selectedEvent.data?.platform).bg,
+                      getPlatformStyle(selectedEvent.platform || selectedEvent.data?.platform).text,
+                    )}
+                  >
                     {getPlatformStyle(selectedEvent.platform || selectedEvent.data?.platform).name}
                   </span>
                   <span className="text-[13px] text-[var(--label-secondary)] font-bold">
-                    {selectedEvent.scheduledDate 
-                      ? `Scheduled on ${format(selectedEvent.scheduledDate, 'MMMM d, yyyy')} at ${selectedEvent.publishTime || '12:00'}` 
+                    {selectedEvent.scheduledDate
+                      ? `Scheduled on ${format(selectedEvent.scheduledDate, 'MMMM d, yyyy')} at ${selectedEvent.publishTime || '12:00'}`
                       : 'Unscheduled Draft'}
                   </span>
                 </div>
-                <button 
+                <button
                   onClick={() => setShowDetailModal(false)}
                   className="p-1.5 rounded-full hover:bg-[var(--bg-secondary)] text-[var(--label-tertiary)]"
                 >
@@ -1062,7 +1170,9 @@ Return your response strictly in the following JSON format:
               {/* Main Content Pane */}
               <div className="p-6 space-y-6 max-h-[600px] overflow-y-auto no-scrollbar">
                 <div className="space-y-2">
-                  <h3 className="text-[20px] font-bold text-[var(--label-primary)]">{selectedEvent.name || selectedEvent.data?.title || 'Untitled Content'}</h3>
+                  <h3 className="text-[20px] font-bold text-[var(--label-primary)]">
+                    {selectedEvent.name || selectedEvent.data?.title || 'Untitled Content'}
+                  </h3>
                   {(selectedEvent.data?.body || selectedEvent.body) && (
                     <div className="bg-[var(--bg-secondary)]/50 border border-[var(--separator)]/40 p-4 rounded-2xl">
                       <p className="text-[14px] text-[var(--label-primary)] leading-relaxed whitespace-pre-wrap font-medium">
@@ -1077,14 +1187,20 @@ Return your response strictly in the following JSON format:
                   <div className="p-4 rounded-2xl bg-zinc-100/50 dark:bg-zinc-800/30 border border-[var(--separator)] flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500">
-                        {isAutoPublished(selectedEvent) ? <CheckCircle size={20} /> : <Clock size={20} />}
+                        {isAutoPublished(selectedEvent) ? (
+                          <CheckCircle size={20} />
+                        ) : (
+                          <Clock size={20} />
+                        )}
                       </div>
                       <div>
                         <span className="text-[13px] font-bold text-[var(--label-primary)] block">
-                          {isAutoPublished(selectedEvent) ? 'Successfully Auto-Published' : 'Linked to Auto-Publish'}
+                          {isAutoPublished(selectedEvent)
+                            ? 'Successfully Auto-Published'
+                            : 'Linked to Auto-Publish'}
                         </span>
                         <p className="text-[11px] text-[var(--label-secondary)] font-medium leading-tight mt-0.5">
-                          {isAutoPublished(selectedEvent) 
+                          {isAutoPublished(selectedEvent)
                             ? `Content went live automatically on ${getPlatformStyle(selectedEvent.platform || selectedEvent.data?.platform).name}.`
                             : `Automatic API integration triggers on ${format(selectedEvent.scheduledDate, 'MMM d, yyyy')} at ${selectedEvent.publishTime || '12:00'}.`}
                         </p>
@@ -1102,44 +1218,51 @@ Return your response strictly in the following JSON format:
                 <div className="border-t border-[var(--separator)]/60 pt-6 space-y-4">
                   <div className="flex items-center gap-2">
                     <CloudUpload size={18} className="text-[var(--accent)]" />
-                    <h4 className="text-[15px] font-bold text-[var(--label-primary)]">Push and Sync to Connected Social Networks</h4>
+                    <h4 className="text-[15px] font-bold text-[var(--label-primary)]">
+                      Push and Sync to Connected Social Networks
+                    </h4>
                   </div>
                   <p className="text-[12px] text-[var(--label-secondary)] font-medium leading-relaxed">
-                    Instantly push this scheduled content block to your connected social channels via OAuth.
+                    Instantly push this scheduled content block to your connected social channels
+                    via OAuth.
                   </p>
 
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2.5">
-                      {['youtube', 'tiktok', 'instagram', 'twitter'].map(p => {
+                      {['youtube', 'tiktok', 'instagram', 'twitter'].map((p) => {
                         const style = getPlatformStyle(p);
-                        const isConnected = connectedAccounts.some(acc => acc.platform === p);
+                        const isConnected = connectedAccounts.some((acc) => acc.platform === p);
                         const isSelected = selectedSyncPlatforms.includes(p);
-                        const accountInfo = connectedAccounts.find(acc => acc.platform === p);
+                        const accountInfo = connectedAccounts.find((acc) => acc.platform === p);
 
                         return (
                           <div
                             key={p}
                             className={cn(
-                              "relative flex items-center justify-between p-3.5 rounded-2xl border transition-all duration-200",
-                              isConnected 
-                                ? "bg-[var(--bg-secondary)] border-[var(--separator)] cursor-pointer hover:border-[var(--accent)]" 
-                                : "bg-[var(--bg-tertiary)]/50 border-[var(--separator)]/30 opacity-75"
+                              'relative flex items-center justify-between p-3.5 rounded-2xl border transition-all duration-200',
+                              isConnected
+                                ? 'bg-[var(--bg-secondary)] border-[var(--separator)] cursor-pointer hover:border-[var(--accent)]'
+                                : 'bg-[var(--bg-tertiary)]/50 border-[var(--separator)]/30 opacity-75',
                             )}
                             onClick={() => {
                               if (!isConnected) return;
                               if (isSelected) {
-                                setSelectedSyncPlatforms(prev => prev.filter(item => item !== p));
+                                setSelectedSyncPlatforms((prev) =>
+                                  prev.filter((item) => item !== p),
+                                );
                               } else {
-                                setSelectedSyncPlatforms(prev => [...prev, p]);
+                                setSelectedSyncPlatforms((prev) => [...prev, p]);
                               }
                             }}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className={cn(
-                                "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
-                                style.bg,
-                                style.text
-                              )}>
+                              <div
+                                className={cn(
+                                  'w-7 h-7 rounded-lg flex items-center justify-center shrink-0',
+                                  style.bg,
+                                  style.text,
+                                )}
+                              >
                                 {getPlatformIcon(p, 16)}
                               </div>
                               <div className="min-w-0">
@@ -1147,18 +1270,22 @@ Return your response strictly in the following JSON format:
                                   {style.name}
                                 </span>
                                 <span className="text-[10px] text-[var(--label-tertiary)] font-semibold block truncate">
-                                  {isConnected ? `@${accountInfo?.profile?.name || accountInfo?.profile?.username || 'connected'}` : 'Not connected'}
+                                  {isConnected
+                                    ? `@${accountInfo?.profile?.name || accountInfo?.profile?.username || 'connected'}`
+                                    : 'Not connected'}
                                 </span>
                               </div>
                             </div>
-                            
+
                             {isConnected ? (
-                              <div className={cn(
-                                "w-5 h-5 rounded-md border flex items-center justify-center transition-colors shadow-sm",
-                                isSelected 
-                                  ? "bg-[var(--accent)] border-[var(--accent)] text-white" 
-                                  : "border-[var(--separator)] bg-[var(--bg-primary)] text-transparent"
-                              )}>
+                              <div
+                                className={cn(
+                                  'w-5 h-5 rounded-md border flex items-center justify-center transition-colors shadow-sm',
+                                  isSelected
+                                    ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
+                                    : 'border-[var(--separator)] bg-[var(--bg-primary)] text-transparent',
+                                )}
+                              >
                                 <Check size={12} strokeWidth={3} />
                               </div>
                             ) : (
@@ -1181,9 +1308,12 @@ Return your response strictly in the following JSON format:
                     {connectedAccounts.length === 0 ? (
                       <div className="bg-[var(--bg-secondary)] border border-[var(--separator)]/60 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
                         <div className="space-y-1">
-                          <p className="text-[13px] font-bold text-[var(--label-primary)]">No connected channels detected</p>
+                          <p className="text-[13px] font-bold text-[var(--label-primary)]">
+                            No connected channels detected
+                          </p>
                           <p className="text-[11px] text-[var(--label-secondary)] font-medium leading-normal">
-                            Connect your social accounts via secure OAuth under your Profile tab to unlock instant publishing.
+                            Connect your social accounts via secure OAuth under your Profile tab to
+                            unlock instant publishing.
                           </p>
                         </div>
                         <button
@@ -1231,12 +1361,23 @@ Return your response strictly in the following JSON format:
                               {Object.entries(syncResults).map(([plat, res]: [string, any]) => {
                                 const style = getPlatformStyle(plat);
                                 return (
-                                  <div key={plat} className="flex items-start justify-between gap-3 text-[12px] font-medium">
+                                  <div
+                                    key={plat}
+                                    className="flex items-start justify-between gap-3 text-[12px] font-medium"
+                                  >
                                     <div className="flex items-center gap-2 min-w-0">
-                                      <div className={cn("w-5 h-5 rounded flex items-center justify-center text-[10px]", style.bg, style.text)}>
+                                      <div
+                                        className={cn(
+                                          'w-5 h-5 rounded flex items-center justify-center text-[10px]',
+                                          style.bg,
+                                          style.text,
+                                        )}
+                                      >
                                         {getPlatformIcon(plat, 11)}
                                       </div>
-                                      <span className="font-bold text-[var(--label-primary)]">{style.name}</span>
+                                      <span className="font-bold text-[var(--label-primary)]">
+                                        {style.name}
+                                      </span>
                                     </div>
                                     <div className="text-right min-w-0 shrink-0">
                                       {res.status === 'success' ? (
@@ -1276,19 +1417,23 @@ Return your response strictly in the following JSON format:
                 <div className="border-t border-[var(--separator)]/60 pt-6 space-y-4">
                   <div className="flex items-center gap-2">
                     <Sparkles size={18} className="text-[var(--accent)]" />
-                    <h4 className="text-[15px] font-bold text-[var(--label-primary)]">Reformat for Multiple Platforms with AI</h4>
+                    <h4 className="text-[15px] font-bold text-[var(--label-primary)]">
+                      Reformat for Multiple Platforms with AI
+                    </h4>
                   </div>
                   <p className="text-[12px] text-[var(--label-secondary)] font-medium leading-relaxed">
-                    Instantly rewrite and format this content block into separate native drafts for your other social channels using Gemini.
+                    Instantly rewrite and format this content block into separate native drafts for
+                    your other social channels using Gemini.
                   </p>
 
                   {/* Platforms selection toggles */}
                   <div className="flex flex-wrap gap-2.5 pt-1">
-                    {['youtube', 'tiktok', 'instagram', 'twitter'].map(p => {
-                      const isCurrent = (selectedEvent.platform || selectedEvent.data?.platform) === p;
+                    {['youtube', 'tiktok', 'instagram', 'twitter'].map((p) => {
+                      const isCurrent =
+                        (selectedEvent.platform || selectedEvent.data?.platform) === p;
                       const isSelected = selectedTargetPlatforms.includes(p);
                       const config = getPlatformStyle(p);
-                      
+
                       if (isCurrent) return null; // Can't reformat to its own platform
 
                       return (
@@ -1297,16 +1442,18 @@ Return your response strictly in the following JSON format:
                           type="button"
                           onClick={() => {
                             if (isSelected) {
-                              setSelectedTargetPlatforms(selectedTargetPlatforms.filter(item => item !== p));
+                              setSelectedTargetPlatforms(
+                                selectedTargetPlatforms.filter((item) => item !== p),
+                              );
                             } else {
                               setSelectedTargetPlatforms([...selectedTargetPlatforms, p]);
                             }
                           }}
                           className={cn(
-                            "flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-[13px] font-semibold transition-all",
-                            isSelected 
-                              ? `${config.bg} ${config.border} ${config.text} scale-[1.03]` 
-                              : "border-[var(--separator)]/40 hover:bg-[var(--bg-secondary)] text-[var(--label-secondary)]"
+                            'flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-[13px] font-semibold transition-all',
+                            isSelected
+                              ? `${config.bg} ${config.border} ${config.text} scale-[1.03]`
+                              : 'border-[var(--separator)]/40 hover:bg-[var(--bg-secondary)] text-[var(--label-secondary)]',
                           )}
                         >
                           {getPlatformIcon(p, 14)}
@@ -1352,14 +1499,28 @@ Return your response strictly in the following JSON format:
                   {/* Suggestions Display */}
                   {reformatSuggestions.length > 0 && (
                     <div className="space-y-4 pt-3 border-t border-[var(--separator)]/40">
-                      <h5 className="text-[13px] font-bold text-[var(--label-primary)] uppercase tracking-widest px-1">Gemini Proposed Drafts</h5>
+                      <h5 className="text-[13px] font-bold text-[var(--label-primary)] uppercase tracking-widest px-1">
+                        Gemini Proposed Drafts
+                      </h5>
                       <div className="space-y-4">
                         {reformatSuggestions.map((s, idx) => {
                           const config = getPlatformStyle(s.platform);
                           return (
-                            <div key={idx} className={cn("p-4 rounded-2xl border bg-[var(--bg-secondary)]/30 flex flex-col gap-2.5", config.border)}>
+                            <div
+                              key={idx}
+                              className={cn(
+                                'p-4 rounded-2xl border bg-[var(--bg-secondary)]/30 flex flex-col gap-2.5',
+                                config.border,
+                              )}
+                            >
                               <div className="flex items-center justify-between">
-                                <span className={cn("text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full", config.bg, config.text)}>
+                                <span
+                                  className={cn(
+                                    'text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full',
+                                    config.bg,
+                                    config.text,
+                                  )}
+                                >
                                   {config.name} Draft
                                 </span>
                                 <button
@@ -1369,7 +1530,9 @@ Return your response strictly in the following JSON format:
                                   <Plus size={14} /> Save Draft
                                 </button>
                               </div>
-                              <h6 className="text-[13px] font-bold text-[var(--label-primary)]">{s.title}</h6>
+                              <h6 className="text-[13px] font-bold text-[var(--label-primary)]">
+                                {s.title}
+                              </h6>
                               <p className="text-[12px] text-[var(--label-secondary)] whitespace-pre-wrap leading-relaxed font-medium">
                                 {s.body}
                               </p>
@@ -1390,7 +1553,7 @@ Return your response strictly in the following JSON format:
                 >
                   <Trash2 size={15} /> Delete Block
                 </button>
-                
+
                 <div className="flex items-center gap-2">
                   {selectedEvent.scheduledDate && (
                     <button
@@ -1425,7 +1588,9 @@ Return your response strictly in the following JSON format:
               className="bg-[var(--bg-tertiary)] w-full max-w-md rounded-[28px] shadow-2xl overflow-hidden border border-[var(--separator)] p-6 space-y-5"
             >
               <div>
-                <h3 className="text-[18px] font-bold tracking-tight text-[var(--label-primary)]">Schedule Content</h3>
+                <h3 className="text-[18px] font-bold tracking-tight text-[var(--label-primary)]">
+                  Schedule Content
+                </h3>
                 <p className="text-[13px] text-[var(--label-secondary)] mt-0.5">
                   For {format(selectedDate, 'MMMM d, yyyy')}
                 </p>
@@ -1433,9 +1598,11 @@ Return your response strictly in the following JSON format:
 
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold tracking-wider text-[var(--label-secondary)] uppercase pl-1">Title / Hook</label>
-                  <input 
-                    type="text" 
+                  <label className="text-[11px] font-bold tracking-wider text-[var(--label-secondary)] uppercase pl-1">
+                    Title / Hook
+                  </label>
+                  <input
+                    type="text"
                     value={newEventTitle}
                     onChange={(e) => setNewEventTitle(e.target.value)}
                     placeholder="e.g. 5 AI tools that will save you 10 hours"
@@ -1445,8 +1612,10 @@ Return your response strictly in the following JSON format:
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold tracking-wider text-[var(--label-secondary)] uppercase pl-1">Content Body / Script</label>
-                  <textarea 
+                  <label className="text-[11px] font-bold tracking-wider text-[var(--label-secondary)] uppercase pl-1">
+                    Content Body / Script
+                  </label>
+                  <textarea
                     value={newEventBody}
                     onChange={(e) => setNewEventBody(e.target.value)}
                     placeholder="Draft the narrative script, outline, or captions here..."
@@ -1455,7 +1624,9 @@ Return your response strictly in the following JSON format:
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold tracking-wider text-[var(--label-secondary)] uppercase pl-1">Target Platform</label>
+                  <label className="text-[11px] font-bold tracking-wider text-[var(--label-secondary)] uppercase pl-1">
+                    Target Platform
+                  </label>
                   <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl gap-1">
                     {['youtube', 'tiktok', 'instagram', 'twitter'].map((p) => {
                       const active = newEventPlatform === p;
@@ -1465,10 +1636,10 @@ Return your response strictly in the following JSON format:
                           key={p}
                           onClick={() => setNewEventPlatform(p)}
                           className={cn(
-                            "flex-1 py-2 rounded-lg text-[12px] font-bold text-center transition-all cursor-pointer flex items-center justify-center gap-1 capitalize",
-                            active 
-                              ? `${style.bg} ${style.text} shadow-sm border ${style.border}` 
-                              : "text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
+                            'flex-1 py-2 rounded-lg text-[12px] font-bold text-center transition-all cursor-pointer flex items-center justify-center gap-1 capitalize',
+                            active
+                              ? `${style.bg} ${style.text} shadow-sm border ${style.border}`
+                              : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)]',
                           )}
                         >
                           {getPlatformIcon(p, 13)}
@@ -1480,17 +1651,19 @@ Return your response strictly in the following JSON format:
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold tracking-wider text-[var(--label-secondary)] uppercase pl-1">Publishing Status</label>
+                  <label className="text-[11px] font-bold tracking-wider text-[var(--label-secondary)] uppercase pl-1">
+                    Publishing Status
+                  </label>
                   <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl gap-1">
                     {['Draft', 'Scheduled'].map((s) => (
                       <div
                         key={s}
                         onClick={() => setNewEventStatus(s)}
                         className={cn(
-                          "flex-1 py-2 rounded-lg text-[12px] font-bold text-center transition-all cursor-pointer",
-                          newEventStatus === s 
-                            ? "bg-[var(--bg-tertiary)] text-[var(--accent)] shadow-sm" 
-                            : "text-[var(--label-secondary)]"
+                          'flex-1 py-2 rounded-lg text-[12px] font-bold text-center transition-all cursor-pointer',
+                          newEventStatus === s
+                            ? 'bg-[var(--bg-tertiary)] text-[var(--accent)] shadow-sm'
+                            : 'text-[var(--label-secondary)]',
                         )}
                       >
                         {s}
@@ -1502,13 +1675,13 @@ Return your response strictly in the following JSON format:
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-2">
-                <button 
+                <button
                   onClick={() => setShowEventModal(false)}
                   className="flex-1 py-3.5 rounded-xl font-bold text-[14px] bg-[var(--bg-secondary)] hover:bg-[var(--bg-primary)] text-[var(--label-primary)] transition-colors border border-[var(--separator)]/30"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={handleAddEvent}
                   disabled={!newEventTitle}
                   className="flex-1 py-3.5 rounded-xl font-bold text-[14px] bg-[var(--accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
@@ -1523,4 +1696,3 @@ Return your response strictly in the following JSON format:
     </div>
   );
 }
-

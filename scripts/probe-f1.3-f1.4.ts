@@ -24,7 +24,9 @@ function fromB64url(s: string): Buffer {
 }
 function sign(payloadObj: unknown): string {
   const body = b64url(Buffer.from(JSON.stringify(payloadObj), 'utf8'));
-  const sig = b64url(crypto.createHmac('sha256', process.env.OAUTH_STATE_SECRET!).update(body).digest());
+  const sig = b64url(
+    crypto.createHmac('sha256', process.env.OAUTH_STATE_SECRET!).update(body).digest(),
+  );
   return `${body}.${sig}`;
 }
 
@@ -60,18 +62,18 @@ async function main() {
   record(
     'sign->verify roundtrip',
     typeof state === 'string' && state.split('.').length === 2,
-    `${state.slice(0, 24)}… (${state.length} chars)`
+    `${state.slice(0, 24)}… (${state.length} chars)`,
   );
   const payload = await verifyAndConsumeOAuthState(state);
   record(
     'verified payload fields',
     payload.uid === 'user-abc-123' && payload.platform === 'youtube' && payload.aud === 'oauth',
-    `uid=${payload.uid} platform=${payload.platform} aud=${payload.aud}`
+    `uid=${payload.uid} platform=${payload.platform} aud=${payload.aud}`,
   );
   record(
     'TTL is 10 minutes',
     OAUTH_STATE_TTL_MS === 10 * 60 * 1000 && payload.exp - payload.iat === OAUTH_STATE_TTL_MS,
-    `exp-iat=${payload.exp - payload.iat}ms`
+    `exp-iat=${payload.exp - payload.iat}ms`,
   );
 
   await expectReject('jti replay rejected', verifyAndConsumeOAuthState(state), 'already used');
@@ -81,24 +83,54 @@ async function main() {
   const bodyBuf = fromB64url(body);
   bodyBuf[3] ^= 0x01;
   const tamperedState = `${b64url(bodyBuf)}.${sig}`;
-  await expectReject('tampered payload rejected', verifyAndConsumeOAuthState(tamperedState), 'signature');
+  await expectReject(
+    'tampered payload rejected',
+    verifyAndConsumeOAuthState(tamperedState),
+    'signature',
+  );
 
   // Tamper: flip one char of the signature
   const sigFlipped = (sig[0] === 'A' ? 'B' : 'A') + sig.slice(1);
-  await expectReject('tampered signature rejected', verifyAndConsumeOAuthState(`${body}.${sigFlipped}`), 'signature');
+  await expectReject(
+    'tampered signature rejected',
+    verifyAndConsumeOAuthState(`${body}.${sigFlipped}`),
+    'signature',
+  );
 
   // Expired state (correctly signed, exp in the past)
-  const expired = sign({ uid: 'u1', platform: 'youtube', iat: Date.now() - 601000, exp: Date.now() - 1000, jti: 'jti-exp-1', aud: 'oauth' });
+  const expired = sign({
+    uid: 'u1',
+    platform: 'youtube',
+    iat: Date.now() - 601000,
+    exp: Date.now() - 1000,
+    jti: 'jti-exp-1',
+    aud: 'oauth',
+  });
   await expectReject('expired state rejected', verifyAndConsumeOAuthState(expired), 'expired');
 
   // Wrong audience
-  const badAud = sign({ uid: 'u1', platform: 'youtube', iat: Date.now(), exp: Date.now() + 60000, jti: 'jti-aud-1', aud: 'something-else' });
+  const badAud = sign({
+    uid: 'u1',
+    platform: 'youtube',
+    iat: Date.now(),
+    exp: Date.now() + 60000,
+    jti: 'jti-aud-1',
+    aud: 'something-else',
+  });
   await expectReject('wrong audience rejected', verifyAndConsumeOAuthState(badAud), 'audience');
 
   // Garbage / missing state
-  await expectReject('garbage state rejected', verifyAndConsumeOAuthState('not-a-state'), 'invalid');
+  await expectReject(
+    'garbage state rejected',
+    verifyAndConsumeOAuthState('not-a-state'),
+    'invalid',
+  );
   await expectReject('empty state rejected', verifyAndConsumeOAuthState(''), 'invalid');
-  await expectReject('non-string state rejected', verifyAndConsumeOAuthState({ evil: true }), 'invalid');
+  await expectReject(
+    'non-string state rejected',
+    verifyAndConsumeOAuthState({ evil: true }),
+    'invalid',
+  );
 
   // Second user cannot reuse a state minted for someone else even before consumption
   const forAlice = createOAuthState('alice', 'tiktok');
@@ -106,7 +138,7 @@ async function main() {
   record(
     'platform binding survives roundtrip',
     alicePayload.uid === 'alice' && alicePayload.platform === 'tiktok',
-    `uid=${alicePayload.uid} platform=${alicePayload.platform}`
+    `uid=${alicePayload.uid} platform=${alicePayload.platform}`,
   );
 
   // ---------- F1.4: token encryption at rest ----------
@@ -118,16 +150,21 @@ async function main() {
   record(
     'encrypt->decrypt roundtrip',
     decryptToken(enc) === token,
-    `keyVersion=${envelope.keyVersion}`
+    `keyVersion=${envelope.keyVersion}`,
   );
   record(
     'envelope shape (v1, iv/tag/ciphertext present)',
-    envelope.v === 1 && envelope.keyVersion === 'v1' && looksEncrypted(enc)
-      && fromB64url(envelope.iv).length === 12
-      && fromB64url(envelope.tag).length === 16
-      && fromB64url(envelope.ciphertext).length > 0
+    envelope.v === 1 &&
+      envelope.keyVersion === 'v1' &&
+      looksEncrypted(enc) &&
+      fromB64url(envelope.iv).length === 12 &&
+      fromB64url(envelope.tag).length === 16 &&
+      fromB64url(envelope.ciphertext).length > 0,
   );
-  record('ciphertext does not contain plaintext', !enc.includes('ya29') && !enc.includes('super-secret'));
+  record(
+    'ciphertext does not contain plaintext',
+    !enc.includes('ya29') && !enc.includes('super-secret'),
+  );
   record('random IV -> unique ciphertexts', encryptToken(token) !== encryptToken(token));
 
   // Tamper with ciphertext -> GCM auth must fail (null, not a wrong value)
@@ -145,20 +182,21 @@ async function main() {
   // Legacy plaintext passthrough + lazy upgrade hook
   let upgradedTo: string | null = null;
   const legacy = 'ya29.legacy-plaintext-token';
-  const out = decryptToken(legacy, { update: (e) => { upgradedTo = e; } });
+  const out = decryptToken(legacy, {
+    update: (e) => {
+      upgradedTo = e;
+    },
+  });
   record('legacy plaintext passthrough', out === legacy);
   record(
     'legacy row upgrade hook fired with valid envelope',
-    !!upgradedTo && looksEncrypted(upgradedTo) && decryptToken(upgradedTo) === legacy
+    !!upgradedTo && looksEncrypted(upgradedTo) && decryptToken(upgradedTo) === legacy,
   );
 
   record('null/empty passthrough', decryptToken(null) === null && decryptToken('') === '');
 
   // keyVersion field is present for future rotation
-  record(
-    'keyVersion present for rotation',
-    JSON.parse(encryptToken('x')).keyVersion === 'v1'
-  );
+  record('keyVersion present for rotation', JSON.parse(encryptToken('x')).keyVersion === 'v1');
 
   // ---------- Summary ----------
   const failed = results.filter((r) => !r.pass);

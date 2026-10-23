@@ -30,7 +30,11 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'quota-probe-'));
 // base64 service account; the real firebase-admin module is swapped for a stub
 // by the loader hook below, so nothing contacts Google.
 const DUMMY_SERVICE_ACCOUNT = Buffer.from(
-  JSON.stringify({ client_email: 'probe@probe.iam.gserviceaccount.com', private_key: 'not-a-key', project_id: 'probe' })
+  JSON.stringify({
+    client_email: 'probe@probe.iam.gserviceaccount.com',
+    private_key: 'not-a-key',
+    project_id: 'probe',
+  }),
 ).toString('base64');
 process.env.VERCEL = '1';
 process.env.NODE_ENV = 'test';
@@ -44,7 +48,9 @@ fs.writeFileSync(stateFile, JSON.stringify({ rows: [] }));
 
 // --- stub modules the loader hook swaps in ---
 const sqliteStubPath = path.join(tmp, '_sqlite_stub.mjs');
-fs.writeFileSync(sqliteStubPath, `
+fs.writeFileSync(
+  sqliteStubPath,
+  `
 import fs from 'node:fs';
 const stateFile = ${JSON.stringify(stateFile)};
 function load() { return JSON.parse(fs.readFileSync(stateFile, 'utf8')).rows; }
@@ -95,10 +101,13 @@ export default function Database() {
     },
   };
 }
-`);
+`,
+);
 
 const adminStubPath = path.join(tmp, '_admin_stub.mjs');
-fs.writeFileSync(adminStubPath, `
+fs.writeFileSync(
+  adminStubPath,
+  `
 const VALID_TOKEN = 'probe-valid-token';
 export default {
   apps: [],
@@ -113,11 +122,14 @@ export default {
     };
   },
 };
-`);
+`,
+);
 
 // --- module customization hook: swap firebase-admin + better-sqlite3 ---
 const hookPath = path.join(tmp, '_hook.mjs');
-fs.writeFileSync(hookPath, `
+fs.writeFileSync(
+  hookPath,
+  `
 const ADMIN = ${JSON.stringify(pathToFileURL(adminStubPath).href)};
 const SQLITE = ${JSON.stringify(pathToFileURL(sqliteStubPath).href)};
 export async function resolve(specifier, context, next) {
@@ -125,7 +137,8 @@ export async function resolve(specifier, context, next) {
   if (specifier === 'better-sqlite3') return { shortCircuit: true, url: SQLITE };
   return next(specifier, context);
 }
-`);
+`,
+);
 
 register(pathToFileURL(hookPath).href);
 
@@ -151,9 +164,15 @@ async function probe(name, fn) {
 async function call(route, body, token) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(base + route, { method: 'POST', headers, body: JSON.stringify(body || {}) });
+  const res = await fetch(base + route, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body || {}),
+  });
   let json = null;
-  try { json = await res.json(); } catch {}
+  try {
+    json = await res.json();
+  } catch {}
   return { status: res.status, json, headers: res.headers };
 }
 
@@ -164,7 +183,10 @@ await probe('unauthenticated-401', async () => {
 
 await probe('bad-token-401', async () => {
   const r = await call('/api/gemini/generate', { contents: 'x' }, 'garbage-token');
-  return { ok: r.status === 401, summary: `garbage token -> ${r.status} ${JSON.stringify(r.json)}` };
+  return {
+    ok: r.status === 401,
+    summary: `garbage token -> ${r.status} ${JSON.stringify(r.json)}`,
+  };
 });
 
 await probe('valid-token-passes-gate', async () => {
@@ -205,7 +227,9 @@ await probe('ledger-records-and-429s', async () => {
   const quotaHeaders = {};
   await new Promise((resolve) => {
     const res = {
-      setHeader(k, v) { quotaHeaders[k] = v; },
+      setHeader(k, v) {
+        quotaHeaders[k] = v;
+      },
       status(s) {
         status = s;
         return {
@@ -216,16 +240,25 @@ await probe('ledger-records-and-429s', async () => {
         };
       },
     };
-    middleware({ user: { uid: 'probe-user-1' } }, res, () => { status = 200; resolve(); });
+    middleware({ user: { uid: 'probe-user-1' } }, res, () => {
+      status = 200;
+      resolve();
+    });
   });
   return {
-    ok: under.allowed === true && over.allowed === false && status === 429 && Number(quotaHeaders['Retry-After']) > 0,
+    ok:
+      under.allowed === true &&
+      over.allowed === false &&
+      status === 429 &&
+      Number(quotaHeaders['Retry-After']) > 0,
     summary: `4k/5k allowed=${under.allowed}; 34k/5k allowed=${over.allowed}; guard=${status} Retry-After=${quotaHeaders['Retry-After']}s X-Quota-Used=${quotaHeaders['X-Quota-Used']}/${quotaHeaders['X-Quota-Limit']} payload=${JSON.stringify(payload)}`,
   };
 });
 
 await probe('ledger-persisted-rows', async () => {
-  const rows = JSON.parse(fs.readFileSync(stateFile, 'utf8')).rows.filter((r) => r.user_id === 'probe-user-1');
+  const rows = JSON.parse(fs.readFileSync(stateFile, 'utf8')).rows.filter(
+    (r) => r.user_id === 'probe-user-1',
+  );
   const tokens = rows.reduce((a, r) => a + r.tokens, 0);
   return {
     ok: rows.length === 2 && tokens === 34000,

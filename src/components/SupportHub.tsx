@@ -1,4 +1,4 @@
-import { apiFetch } from "../firebase";
+import { apiFetch } from '../firebase';
 import React, { useState, useEffect } from 'react';
 import {
   Chat as MessageSquare,
@@ -12,17 +12,24 @@ import {
   CaretRight as ChevronRight,
   ShieldCheck,
   Terminal,
-  
   Cpu,
   CircleNotch as Loader2,
   Database,
   Key,
   Globe,
-  XCircle
+  XCircle,
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, query, onSnapshot, doc, updateDoc, serverTimestamp, where } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  onSnapshot,
+  doc,
+  updateDoc,
+  serverTimestamp,
+  where,
+} from 'firebase/firestore';
 import { cn } from '../lib/utils';
 import { getFriendlyError } from '../lib/friendlyError';
 
@@ -35,7 +42,7 @@ export default function SupportHub({ user }: { user: any }) {
 
   // Tab state
   const [activeSubTab, setActiveSubTab] = useState<'tickets' | 'diagnostics'>('tickets');
-  
+
   // Diagnostics states
   const [diagnosticsData, setDiagnosticsData] = useState<any>(null);
   const [isCheckingDiagnostics, setIsCheckingDiagnostics] = useState(false);
@@ -64,13 +71,13 @@ export default function SupportHub({ user }: { user: any }) {
 
   useEffect(() => {
     if (!user) return;
-    
+
     const DEVELOPER_EMAILS = ['danengelsman@gmail.com'];
     const isDeveloper = DEVELOPER_EMAILS.includes(user.email);
-    
+
     const ticketsRef = collection(db, 'support_tickets');
     let q;
-    
+
     if (isDeveloper) {
       // Admins see all tickets
       q = query(ticketsRef);
@@ -79,11 +86,17 @@ export default function SupportHub({ user }: { user: any }) {
       q = query(ticketsRef, where('userId', '==', user.uid));
     }
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      docs.sort((a: any, b: any) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-      setTickets(docs);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'support_tickets'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        const docs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        docs.sort(
+          (a: any, b: any) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0),
+        );
+        setTickets(docs);
+      },
+      (err) => handleFirestoreError(err, OperationType.LIST, 'support_tickets'),
+    );
     return () => unsubscribe();
   }, [user]);
 
@@ -107,16 +120,16 @@ export default function SupportHub({ user }: { user: any }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gemini-3.8-flash",
-          contents: prompt
-        })
+          model: 'gemini-3.8-flash',
+          contents: prompt,
+        }),
       });
-      
+
       if (!response.ok) throw new Error(await response.text());
       const data = await response.json();
       setSuggestion(data.text || '');
     } catch (error) {
-      console.error("AI Suggestion failed:", error);
+      console.error('AI Suggestion failed:', error);
     } finally {
       setIsGenerating(false);
     }
@@ -128,7 +141,7 @@ export default function SupportHub({ user }: { user: any }) {
       await updateDoc(doc(db, 'support_tickets', selectedTicket.id), {
         status: 'resolved',
         resolvedAt: serverTimestamp(),
-        resolvedBy: user.uid
+        resolvedBy: user.uid,
       });
       setReplyText('');
       setSelectedTicket({ ...selectedTicket, status: 'resolved' });
@@ -142,13 +155,13 @@ export default function SupportHub({ user }: { user: any }) {
       await updateDoc(doc(db, 'support_tickets', ticketId), {
         status: 'resolved',
         resolvedAt: serverTimestamp(),
-        resolvedBy: user.uid
+        resolvedBy: user.uid,
       });
       if (selectedTicket?.id === ticketId) {
         setSelectedTicket({ ...selectedTicket, status: 'resolved' });
       }
     } catch (error) {
-       handleFirestoreError(error, OperationType.UPDATE, `support_tickets/${ticketId}`);
+      handleFirestoreError(error, OperationType.UPDATE, `support_tickets/${ticketId}`);
     }
   };
 
@@ -157,24 +170,24 @@ export default function SupportHub({ user }: { user: any }) {
       {/* Top Segmented Control Tab Bar */}
       <div className="flex items-center justify-between border-b border-[var(--separator)] pb-4 flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={() => setActiveSubTab('tickets')}
             className={cn(
-              "px-4 py-2 text-[14px] font-bold rounded-xl transition-all",
-              activeSubTab === 'tickets' 
-                ? "bg-[var(--accent)] text-white shadow-md shadow-[#007AFF1A]" 
-                : "text-[var(--label-secondary)] hover:bg-[var(--separator)]"
+              'px-4 py-2 text-[14px] font-bold rounded-xl transition-all',
+              activeSubTab === 'tickets'
+                ? 'bg-[var(--accent)] text-white shadow-md shadow-[#007AFF1A]'
+                : 'text-[var(--label-secondary)] hover:bg-[var(--separator)]',
             )}
           >
             Support Tickets
           </button>
-          <button 
+          <button
             onClick={() => setActiveSubTab('diagnostics')}
             className={cn(
-              "px-4 py-2 text-[14px] font-bold rounded-xl transition-all flex items-center gap-2",
-              activeSubTab === 'diagnostics' 
-                ? "bg-[var(--accent)] text-white shadow-md shadow-[#007AFF1A]" 
-                : "text-[var(--label-secondary)] hover:bg-[var(--separator)]"
+              'px-4 py-2 text-[14px] font-bold rounded-xl transition-all flex items-center gap-2',
+              activeSubTab === 'diagnostics'
+                ? 'bg-[var(--accent)] text-white shadow-md shadow-[#007AFF1A]'
+                : 'text-[var(--label-secondary)] hover:bg-[var(--separator)]',
             )}
           >
             <Cpu size={16} />
@@ -188,7 +201,7 @@ export default function SupportHub({ user }: { user: any }) {
 
       <AnimatePresence mode="wait">
         {activeSubTab === 'tickets' ? (
-          <motion.div 
+          <motion.div
             key="tickets"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -199,9 +212,9 @@ export default function SupportHub({ user }: { user: any }) {
             <div className="w-full lg:w-96 flex flex-col gap-4">
               <div className="ios-card p-4 flex items-center gap-3 bg-[var(--bg-secondary)] border border-[var(--separator)]">
                 <Search className="w-4 h-4 text-[var(--label-secondary)]" strokeWidth={1.5} />
-                <input 
-                  type="text" 
-                  placeholder="Search tickets..." 
+                <input
+                  type="text"
+                  placeholder="Search tickets..."
                   className="bg-transparent border-none outline-none text-[13px] w-full"
                 />
               </div>
@@ -213,7 +226,7 @@ export default function SupportHub({ user }: { user: any }) {
                     <p className="text-[13px]">No active tickets</p>
                   </div>
                 ) : (
-                  tickets.map(ticket => (
+                  tickets.map((ticket) => (
                     <div
                       key={ticket.id}
                       role="button"
@@ -222,15 +235,21 @@ export default function SupportHub({ user }: { user: any }) {
                         setSuggestion('');
                       }}
                       className={cn(
-                        "w-full text-left p-5 rounded-2xl border transition-all group",
-                        selectedTicket?.id === ticket.id 
-                          ? "bg-[var(--label-primary)] text-[var(--bg-primary)] border-[var(--label-primary)] shadow-lg shadow-black/10" 
-                          : "bg-[var(--bg-secondary)] border-[var(--separator)] hover:border-[var(--accent)]/30"
+                        'w-full text-left p-5 rounded-2xl border transition-all group',
+                        selectedTicket?.id === ticket.id
+                          ? 'bg-[var(--label-primary)] text-[var(--bg-primary)] border-[var(--label-primary)] shadow-lg shadow-black/10'
+                          : 'bg-[var(--bg-secondary)] border-[var(--separator)] hover:border-[var(--accent)]/30',
                       )}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{background: 'color-mix(in srgb, var(--accent) 10%, transparent)', color: 'var(--accent)'}}>
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center"
+                            style={{
+                              background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
+                              color: 'var(--accent)',
+                            }}
+                          >
                             <User className="w-4 h-4" strokeWidth={1.5} />
                           </div>
                           <div>
@@ -241,7 +260,10 @@ export default function SupportHub({ user }: { user: any }) {
                           </div>
                         </div>
                         {ticket.status === 'resolved' ? (
-                          <CheckCircle2 className="w-4 h-4 text-[var(--system-green)]" strokeWidth={1.5} />
+                          <CheckCircle2
+                            className="w-4 h-4 text-[var(--system-green)]"
+                            strokeWidth={1.5}
+                          />
                         ) : (
                           <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
                         )}
@@ -254,7 +276,9 @@ export default function SupportHub({ user }: { user: any }) {
                           <Clock className="w-3 h-3" strokeWidth={1.5} />
                           {ticket.createdAt?.toDate().toLocaleDateString()}
                         </span>
-                        <span className="uppercase font-bold tracking-widest">{ticket.userData?.subscriptionTier || 'Free'}</span>
+                        <span className="uppercase font-bold tracking-widest">
+                          {ticket.userData?.subscriptionTier || 'Free'}
+                        </span>
                       </div>
                     </div>
                   ))
@@ -270,19 +294,27 @@ export default function SupportHub({ user }: { user: any }) {
                     <div className="flex items-start justify-between mb-8">
                       <div>
                         <div className="flex items-center gap-3 mb-2">
-                          <span className={cn(
-                            "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em]",
-                            selectedTicket.status === 'resolved' ? "bg-[var(--system-green)]/10 text-[var(--system-green)]" : "bg-[var(--accent)]/10 text-[var(--accent)]"
-                          )}>
+                          <span
+                            className={cn(
+                              'px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em]',
+                              selectedTicket.status === 'resolved'
+                                ? 'bg-[var(--system-green)]/10 text-[var(--system-green)]'
+                                : 'bg-[var(--accent)]/10 text-[var(--accent)]',
+                            )}
+                          >
                             {selectedTicket.status || 'open'}
                           </span>
-                          <span className="text-[var(--label-secondary)] text-[13px]">Ticket ID: {selectedTicket.id.slice(0, 8)}</span>
+                          <span className="text-[var(--label-secondary)] text-[13px]">
+                            Ticket ID: {selectedTicket.id.slice(0, 8)}
+                          </span>
                         </div>
-                        <h3 className="font-serif text-2xl font-semibold tracking-[-0.015em]">{selectedTicket.subject}</h3>
+                        <h3 className="font-serif text-2xl font-semibold tracking-[-0.015em]">
+                          {selectedTicket.subject}
+                        </h3>
                       </div>
                       <div className="flex gap-3">
                         {selectedTicket.status !== 'resolved' && (
-                          <button 
+                          <button
                             onClick={() => handleResolve(selectedTicket.id)}
                             className="ios-button ios-button-tinted"
                           >
@@ -295,13 +327,22 @@ export default function SupportHub({ user }: { user: any }) {
 
                     <div className="p-6 bg-[var(--bg-primary)] rounded-2xl border border-[var(--separator)] space-y-4">
                       <div className="flex items-center justify-between border-b border-[var(--separator)]/50 pb-4">
-                         <div className="flex items-center gap-3">
-                            <img loading="lazy" src={selectedTicket.userData?.photoURL || undefined} alt="" className="w-10 h-10 rounded-full grayscale opacity-50 animate-fade-in" />
-                            <div>
-                              <p className="text-[13px] font-bold">{selectedTicket.userData?.displayName}</p>
-                              <p className="text-[11px] text-[var(--label-secondary)]">{selectedTicket.userData?.email}</p>
-                            </div>
-                         </div>
+                        <div className="flex items-center gap-3">
+                          <img
+                            loading="lazy"
+                            src={selectedTicket.userData?.photoURL || undefined}
+                            alt=""
+                            className="w-10 h-10 rounded-full grayscale opacity-50 animate-fade-in"
+                          />
+                          <div>
+                            <p className="text-[13px] font-bold">
+                              {selectedTicket.userData?.displayName}
+                            </p>
+                            <p className="text-[11px] text-[var(--label-secondary)]">
+                              {selectedTicket.userData?.email}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                       <p className="text-[15px] leading-relaxed text-[var(--label-primary)]/80 pt-2 whitespace-pre-wrap">
                         {selectedTicket.message}
@@ -311,67 +352,74 @@ export default function SupportHub({ user }: { user: any }) {
 
                   {/* AI Assistance Layer */}
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
-                     {/* AI Suggestion */}
-                     <div className="ios-card p-6 border-[var(--accent)]/20 flex flex-col bg-[var(--bg-secondary)]/50">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-2 text-[var(--accent)]">
-                            <Brain className="w-4 h-4" strokeWidth={1.5} />
-                            <span className="text-[11px] font-black uppercase tracking-widest">Assurance Suggestion</span>
-                          </div>
-                          {!suggestion && (
-                            <a 
-                              onClick={() => getAiSuggestion(selectedTicket)}
-                              className="text-[11px] font-bold hover:underline opacity-50 text-[var(--accent)] cursor-pointer"
-                            >
-                              {isGenerating ? 'Analyzing...' : 'Generate Helper'}
-                            </a>
-                          )}
+                    {/* AI Suggestion */}
+                    <div className="ios-card p-6 border-[var(--accent)]/20 flex flex-col bg-[var(--bg-secondary)]/50">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2 text-[var(--accent)]">
+                          <Brain className="w-4 h-4" strokeWidth={1.5} />
+                          <span className="text-[11px] font-black uppercase tracking-widest">
+                            Assurance Suggestion
+                          </span>
                         </div>
-                        <div className="flex-1 relative overflow-hidden">
-                          {suggestion ? (
-                            <div className="absolute inset-0 overflow-y-auto pr-2 custom-scrollbar">
-                              <p className="text-[13px] leading-relaxed text-[var(--label-primary)]/70 italic p-4 bg-[var(--accent)]/5 rounded-xl border border-[var(--accent)]/10">
-                                {suggestion}
-                              </p>
-                              <a 
-                                onClick={() => setReplyText(suggestion)}
-                                className="mt-3 text-[11px] font-bold text-[var(--accent)] flex items-center gap-1 hover:gap-2 transition-all cursor-pointer"
-                              >
-                                Use this response <ChevronRight className="w-3 h-3" strokeWidth={1.5} />
-                              </a>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center h-full opacity-20 text-center">
-                              <Brain className="w-12 h-12 mb-4" strokeWidth={1.5} />
-                              <p className="text-[12px] max-w-[140px]">AI can analyze the ticket and suggest a response</p>
-                            </div>
-                          )}
-                        </div>
-                     </div>
-
-                     {/* Reply Box */}
-                     <div className="ios-card p-6 flex flex-col bg-[var(--bg-secondary)] pb-20 md:pb-6">
-                        <div className="flex items-center gap-2 mb-4 text-[var(--label-secondary)]">
-                          <Send className="w-4 h-4" strokeWidth={1.5} />
-                          <span className="text-[11px] font-black uppercase tracking-widest">Draft Reply</span>
-                        </div>
-                        <textarea 
-                          value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
-                          placeholder="Type your response or select an AI suggestion..."
-                          className="flex-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--separator)] p-4 text-[13px] resize-none outline-none focus:ring-2 focus:ring-[var(--accent)]/10 transition-all text-[var(--label-primary)] placeholder:text-[var(--label-tertiary)]"
-                        />
-                        <div className="mt-4 flex justify-end">
-                          <button 
-                            onClick={handleSendReply}
-                            disabled={!replyText.trim() || selectedTicket.status === 'resolved'}
-                            className="ios-button ios-button-filled px-8 disabled:opacity-50"
+                        {!suggestion && (
+                          <a
+                            onClick={() => getAiSuggestion(selectedTicket)}
+                            className="text-[11px] font-bold hover:underline opacity-50 text-[var(--accent)] cursor-pointer"
                           >
-                            <Send className="w-4 h-4" strokeWidth={1.5} />
-                            Send Response
-                          </button>
-                        </div>
-                     </div>
+                            {isGenerating ? 'Analyzing...' : 'Generate Helper'}
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex-1 relative overflow-hidden">
+                        {suggestion ? (
+                          <div className="absolute inset-0 overflow-y-auto pr-2 custom-scrollbar">
+                            <p className="text-[13px] leading-relaxed text-[var(--label-primary)]/70 italic p-4 bg-[var(--accent)]/5 rounded-xl border border-[var(--accent)]/10">
+                              {suggestion}
+                            </p>
+                            <a
+                              onClick={() => setReplyText(suggestion)}
+                              className="mt-3 text-[11px] font-bold text-[var(--accent)] flex items-center gap-1 hover:gap-2 transition-all cursor-pointer"
+                            >
+                              Use this response{' '}
+                              <ChevronRight className="w-3 h-3" strokeWidth={1.5} />
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-full opacity-20 text-center">
+                            <Brain className="w-12 h-12 mb-4" strokeWidth={1.5} />
+                            <p className="text-[12px] max-w-[140px]">
+                              AI can analyze the ticket and suggest a response
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Reply Box */}
+                    <div className="ios-card p-6 flex flex-col bg-[var(--bg-secondary)] pb-20 md:pb-6">
+                      <div className="flex items-center gap-2 mb-4 text-[var(--label-secondary)]">
+                        <Send className="w-4 h-4" strokeWidth={1.5} />
+                        <span className="text-[11px] font-black uppercase tracking-widest">
+                          Draft Reply
+                        </span>
+                      </div>
+                      <textarea
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Type your response or select an AI suggestion..."
+                        className="flex-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--separator)] p-4 text-[13px] resize-none outline-none focus:ring-2 focus:ring-[var(--accent)]/10 transition-all text-[var(--label-primary)] placeholder:text-[var(--label-tertiary)]"
+                      />
+                      <div className="mt-4 flex justify-end">
+                        <button
+                          onClick={handleSendReply}
+                          disabled={!replyText.trim() || selectedTicket.status === 'resolved'}
+                          className="ios-button ios-button-filled px-8 disabled:opacity-50"
+                        >
+                          <Send className="w-4 h-4" strokeWidth={1.5} />
+                          Send Response
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -380,13 +428,15 @@ export default function SupportHub({ user }: { user: any }) {
                     <MessageSquare className="w-10 h-10" strokeWidth={1.5} />
                   </div>
                   <h3 className="font-serif text-xl font-bold mb-2">Select a ticket to review</h3>
-                  <p className="text-[13px] max-w-[240px]">High-assurance AI analysis will be available for all selected tickets.</p>
+                  <p className="text-[13px] max-w-[240px]">
+                    High-assurance AI analysis will be available for all selected tickets.
+                  </p>
                 </div>
               )}
             </div>
           </motion.div>
         ) : (
-          <motion.div 
+          <motion.div
             key="diagnostics"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -403,7 +453,9 @@ export default function SupportHub({ user }: { user: any }) {
                   </div>
                   <div>
                     <h3 className="text-[14px] font-bold">Firestore Handshake</h3>
-                    <p className="text-[11px] text-[var(--label-secondary)]">Live data persistence (F2)</p>
+                    <p className="text-[11px] text-[var(--label-secondary)]">
+                      Live data persistence (F2)
+                    </p>
                   </div>
                 </div>
                 <div className="mt-6 flex items-center justify-between">
@@ -420,8 +472,8 @@ export default function SupportHub({ user }: { user: any }) {
                       <XCircle size={16} /> Unhealthy
                     </div>
                   )}
-                  <button 
-                    onClick={runDiagnosticsCheck} 
+                  <button
+                    onClick={runDiagnosticsCheck}
                     className="text-[11px] text-[var(--accent)] font-bold hover:underline"
                   >
                     Ping DB
@@ -437,7 +489,9 @@ export default function SupportHub({ user }: { user: any }) {
                   </div>
                   <div>
                     <h3 className="text-[14px] font-bold">Firebase Admin</h3>
-                    <p className="text-[11px] text-[var(--label-secondary)]">Token signing & sync layer</p>
+                    <p className="text-[11px] text-[var(--label-secondary)]">
+                      Token signing & sync layer
+                    </p>
                   </div>
                 </div>
                 <div className="mt-6 flex items-center justify-between">
@@ -468,7 +522,9 @@ export default function SupportHub({ user }: { user: any }) {
                   </div>
                   <div>
                     <h3 className="text-[14px] font-bold">Gemini Engine</h3>
-                    <p className="text-[11px] text-[var(--label-secondary)]">Model: gemini-3.8-flash</p>
+                    <p className="text-[11px] text-[var(--label-secondary)]">
+                      Model: gemini-3.8-flash
+                    </p>
                   </div>
                 </div>
                 <div className="mt-6 flex items-center justify-between">
@@ -489,8 +545,8 @@ export default function SupportHub({ user }: { user: any }) {
                       <XCircle size={16} /> Degraded API Pipeline
                     </div>
                   )}
-                  <button 
-                    onClick={runDiagnosticsCheck} 
+                  <button
+                    onClick={runDiagnosticsCheck}
                     className="text-[11px] text-[var(--accent)] font-bold hover:underline"
                   >
                     Test Pipeline
@@ -520,16 +576,41 @@ export default function SupportHub({ user }: { user: any }) {
                 </div>
                 <div className="space-y-4">
                   {[
-                    { key: 'GEMINI_API_KEY', desc: 'Google AI Model Pipeline', status: diagnosticsData?.env?.GEMINI_API_KEY },
-                    { key: 'GOOGLE_CLIENT_ID', desc: 'YouTube Analytics Authorization', status: diagnosticsData?.env?.GOOGLE_CLIENT_ID },
-                    { key: 'GOOGLE_CLIENT_SECRET', desc: 'OAuth handshake secret', status: diagnosticsData?.env?.GOOGLE_CLIENT_SECRET },
-                    { key: 'TIKTOK_CLIENT_KEY', desc: 'TikTok Analytics Connection', status: diagnosticsData?.env?.TIKTOK_CLIENT_KEY },
-                    { key: 'TIKTOK_CLIENT_SECRET', desc: 'TikTok validation secret', status: diagnosticsData?.env?.TIKTOK_CLIENT_SECRET },
+                    {
+                      key: 'GEMINI_API_KEY',
+                      desc: 'Google AI Model Pipeline',
+                      status: diagnosticsData?.env?.GEMINI_API_KEY,
+                    },
+                    {
+                      key: 'GOOGLE_CLIENT_ID',
+                      desc: 'YouTube Analytics Authorization',
+                      status: diagnosticsData?.env?.GOOGLE_CLIENT_ID,
+                    },
+                    {
+                      key: 'GOOGLE_CLIENT_SECRET',
+                      desc: 'OAuth handshake secret',
+                      status: diagnosticsData?.env?.GOOGLE_CLIENT_SECRET,
+                    },
+                    {
+                      key: 'TIKTOK_CLIENT_KEY',
+                      desc: 'TikTok Analytics Connection',
+                      status: diagnosticsData?.env?.TIKTOK_CLIENT_KEY,
+                    },
+                    {
+                      key: 'TIKTOK_CLIENT_SECRET',
+                      desc: 'TikTok validation secret',
+                      status: diagnosticsData?.env?.TIKTOK_CLIENT_SECRET,
+                    },
                   ].map((envItem) => (
-                    <div key={envItem.key} className="flex items-center justify-between border-b border-[var(--separator)]/50 pb-2 last:border-0 last:pb-0">
+                    <div
+                      key={envItem.key}
+                      className="flex items-center justify-between border-b border-[var(--separator)]/50 pb-2 last:border-0 last:pb-0"
+                    >
                       <div>
                         <p className="text-xs font-mono font-bold">{envItem.key}</p>
-                        <p className="text-[10px] text-[var(--label-secondary)] mt-0.5">{envItem.desc}</p>
+                        <p className="text-[10px] text-[var(--label-secondary)] mt-0.5">
+                          {envItem.desc}
+                        </p>
                       </div>
                       {isCheckingDiagnostics ? (
                         <div className="w-4 h-4 rounded-full bg-[var(--separator)] animate-pulse" />
@@ -549,7 +630,9 @@ export default function SupportHub({ user }: { user: any }) {
                       <span className="flex items-center gap-1">
                         <Globe size={13} /> Target Host:
                       </span>
-                      <span className="font-mono font-semibold">{diagnosticsData?.env?.APP_URL || 'http://localhost:3000'}</span>
+                      <span className="font-mono font-semibold">
+                        {diagnosticsData?.env?.APP_URL || 'http://localhost:3000'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -578,11 +661,17 @@ export default function SupportHub({ user }: { user: any }) {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="bg-[var(--bg-primary)] rounded-xl border border-[var(--separator)] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-[var(--label-tertiary)]">App Version</p>
-                      <p className="text-[15px] font-mono font-bold mt-1">{__APP_VERSION__ || 'development build'}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[var(--label-tertiary)]">
+                        App Version
+                      </p>
+                      <p className="text-[15px] font-mono font-bold mt-1">
+                        {__APP_VERSION__ || 'development build'}
+                      </p>
                     </div>
                     <div className="bg-[var(--bg-primary)] rounded-xl border border-[var(--separator)] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-[var(--label-tertiary)]">Git Commit</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[var(--label-tertiary)]">
+                        Git Commit
+                      </p>
                       {__GIT_COMMIT__ ? (
                         <a
                           href={`https://github.com/danengelsman/CreatorOS/commit/${__GIT_COMMIT__}`}
@@ -597,7 +686,9 @@ export default function SupportHub({ user }: { user: any }) {
                       )}
                     </div>
                     <div className="bg-[var(--bg-primary)] rounded-xl border border-[var(--separator)] p-4 sm:col-span-2">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-[var(--label-tertiary)]">Deployment</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[var(--label-tertiary)]">
+                        Deployment
+                      </p>
                       <a
                         href="https://creator-os-delta-lilac.vercel.app"
                         target="_blank"
@@ -606,7 +697,9 @@ export default function SupportHub({ user }: { user: any }) {
                       >
                         creator-os-delta-lilac.vercel.app
                       </a>
-                      <p className="text-[11px] text-[var(--label-secondary)] mt-1">Hosted on Vercel</p>
+                      <p className="text-[11px] text-[var(--label-secondary)] mt-1">
+                        Hosted on Vercel
+                      </p>
                     </div>
                   </div>
                 </div>

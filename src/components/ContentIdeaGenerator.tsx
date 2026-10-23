@@ -1,14 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lightbulb, Sparkle, Clock, TrendUp, ArrowRight, ArrowsClockwise as RefreshCw } from '@phosphor-icons/react';
+import {
+  Lightbulb,
+  Sparkle,
+  Clock,
+  TrendUp,
+  ArrowRight,
+  ArrowsClockwise as RefreshCw,
+} from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { authorizedFetch, apiFetch } from '../firebase';
 import { cn } from '../lib/utils';
 import { getFriendlyError } from '../lib/friendlyError';
 
-export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: any, onSelectIdea: (idea: any) => void }) {
+export default function ContentIdeaGenerator({
+  brand,
+  onSelectIdea,
+}: {
+  brand: any;
+  onSelectIdea: (idea: any) => void;
+}) {
   const [ideas, setIdeas] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingText, setLoadingText] = useState("Analyzing trends and performance...");
+  const [loadingText, setLoadingText] = useState('Analyzing trends and performance...');
   const [, setAnalytics] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -39,7 +52,7 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
     // window.addEventListener('keypress', resetIdleTimer);
     // window.addEventListener('scroll', resetIdleTimer);
     // window.addEventListener('click', resetIdleTimer);
-    
+
     // resetIdleTimer();
 
     return () => {
@@ -53,7 +66,8 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
 
   const fetchAnalyticsAndIdeas = async () => {
     try {
-      setIsLoading(true); setLoadingText("Analyzing trends and performance...");
+      setIsLoading(true);
+      setLoadingText('Analyzing trends and performance...');
       const res = await authorizedFetch('/api/analytics/summary');
       let currentAnalytics = null;
       if (res && res.success) {
@@ -62,7 +76,7 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
       }
       await generateWeeklyIdeas(currentAnalytics);
     } catch (err) {
-      console.warn("Failed to fetch analytics:", err);
+      console.warn('Failed to fetch analytics:', err);
       // Generate ideas without analytics if it fails
       await generateWeeklyIdeas(null);
     } finally {
@@ -71,11 +85,12 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
   };
 
   const generateWeeklyIdeas = async (currentAnalytics: any) => {
-    setLoadingText("Generating your weekly content ideas...");
-    setIsLoading(true); setLoadingText("Analyzing trends and performance...");
+    setLoadingText('Generating your weekly content ideas...');
+    setIsLoading(true);
+    setLoadingText('Analyzing trends and performance...');
     setErrorMsg('');
     try {
-      let analyticsContext = "No prior analytics available.";
+      let analyticsContext = 'No prior analytics available.';
       if (currentAnalytics) {
         analyticsContext = `Recent Performance: 
         YouTube: ${currentAnalytics.youtube?.views || 0} views, ${currentAnalytics.youtube?.subscribers || 0} subs.
@@ -98,37 +113,50 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gemini-3.8-flash",
+          model: 'gemini-3.8-flash',
           contents: prompt,
           config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
-              type: "OBJECT",
+              type: 'OBJECT',
               properties: {
                 ideas: {
-                  type: "ARRAY",
+                  type: 'ARRAY',
                   items: {
-                    type: "OBJECT",
+                    type: 'OBJECT',
                     properties: {
-                      title: { type: "STRING" },
-                      hook: { type: "STRING" },
-                      description: { type: "STRING" },
-                      trend_factor: { type: "STRING", description: "Why this works right now (e.g. 'Capitalizes on current DIY trend')" },
-                      estimated_prep_time: { type: "STRING" }
+                      title: { type: 'STRING' },
+                      hook: { type: 'STRING' },
+                      description: { type: 'STRING' },
+                      trend_factor: {
+                        type: 'STRING',
+                        description:
+                          "Why this works right now (e.g. 'Capitalizes on current DIY trend')",
+                      },
+                      estimated_prep_time: { type: 'STRING' },
                     },
-                    required: ["title", "hook", "description", "trend_factor", "estimated_prep_time"]
-                  }
-                }
+                    required: [
+                      'title',
+                      'hook',
+                      'description',
+                      'trend_factor',
+                      'estimated_prep_time',
+                    ],
+                  },
+                },
               },
-              required: ["ideas"]
-            }
-          }
-        })
+              required: ['ideas'],
+            },
+          },
+        }),
       });
 
-      if (!response.ok) { const err = await response.json().catch(()=>({})); throw new Error(err.error || "Failed to generate ideas."); }
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to generate ideas.');
+      }
       const data = await response.json();
-      
+
       if (data.text) {
         const parsed = JSON.parse(data.text);
         setIdeas(parsed.ideas || []);
@@ -143,7 +171,7 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
   const generateQuickIdea = async () => {
     // Only generate if we don't already have one showing
     if (quickIdea || isGeneratingQuickIdea) return;
-    
+
     setIsGeneratingQuickIdea(true);
     try {
       const prompt = `Generate a SINGLE quick, 5-minute post idea for a creator experiencing writer's block.
@@ -155,21 +183,21 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gemini-3.8-flash",
+          model: 'gemini-3.8-flash',
           contents: prompt,
           config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
-              type: "OBJECT",
+              type: 'OBJECT',
               properties: {
-                title: { type: "STRING" },
-                hook: { type: "STRING" },
-                description: { type: "STRING" }
+                title: { type: 'STRING' },
+                hook: { type: 'STRING' },
+                description: { type: 'STRING' },
               },
-              required: ["title", "hook", "description"]
-            }
-          }
-        })
+              required: ['title', 'hook', 'description'],
+            },
+          },
+        }),
       });
 
       if (response.ok) {
@@ -180,7 +208,7 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
         }
       }
     } catch (err) {
-      console.warn("Quick idea generation failed:", err);
+      console.warn('Quick idea generation failed:', err);
     } finally {
       setIsGeneratingQuickIdea(false);
     }
@@ -198,13 +226,13 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
             Personalized content ideas tailored to your niche, trends, and recent analytics.
           </p>
         </div>
-        
-        <button 
+
+        <button
           onClick={() => fetchAnalyticsAndIdeas()}
           disabled={isLoading}
           className="w-full md:w-auto ios-button bg-[var(--bg-secondary)] border border-[var(--separator)] text-[var(--label-primary)] px-4 py-2 rounded-xl text-[14px] font-bold hover:bg-[var(--separator)] transition-colors flex items-center justify-center md:justify-start gap-2 disabled:opacity-50"
         >
-          <RefreshCw size={18} className={cn(isLoading && "animate-spin")} />
+          <RefreshCw size={18} className={cn(isLoading && 'animate-spin')} />
           Regenerate Weekly Mix
         </button>
       </div>
@@ -223,7 +251,7 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {ideas.map((idea, idx) => (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
@@ -238,7 +266,7 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
                   <Lightbulb size={20} weight="fill" />
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3 mb-4 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--accent)]/10 text-[var(--accent)] text-[12px] font-bold rounded-full">
                   <TrendUp size={14} weight="bold" />
@@ -252,20 +280,24 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
 
               <div className="space-y-3 mb-6 flex-1">
                 <div className="bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--separator)]/50">
-                  <span className="text-[11px] uppercase tracking-wider font-bold text-[var(--label-tertiary)] mb-1 block">Hook</span>
+                  <span className="text-[11px] uppercase tracking-wider font-bold text-[var(--label-tertiary)] mb-1 block">
+                    Hook
+                  </span>
                   <p className="text-[14px] text-[var(--label-primary)] font-medium leading-relaxed">
                     "{idea.hook}"
                   </p>
                 </div>
                 <div>
-                  <span className="text-[11px] uppercase tracking-wider font-bold text-[var(--label-tertiary)] mb-1 block">Concept</span>
+                  <span className="text-[11px] uppercase tracking-wider font-bold text-[var(--label-tertiary)] mb-1 block">
+                    Concept
+                  </span>
                   <p className="text-[14px] text-[var(--label-secondary)] leading-relaxed">
                     {idea.description}
                   </p>
                 </div>
               </div>
 
-              <button 
+              <button
                 onClick={() => onSelectIdea(idea)}
                 className="w-full mt-auto ios-button bg-[var(--bg-primary)] border border-[var(--separator)] hover:border-[var(--accent)] hover:text-[var(--accent)] text-[var(--label-primary)] py-3 rounded-xl text-[14px] font-bold transition-colors flex items-center justify-center gap-2"
               >
@@ -294,8 +326,11 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
                   <span className="text-[13px] font-bold uppercase tracking-wider text-[var(--label-primary)]">
                     Stuck? Quick 5-Min Idea
                   </span>
-                  <button 
-                    onClick={() => { setQuickIdea(null); setIsIdle(false); }}
+                  <button
+                    onClick={() => {
+                      setQuickIdea(null);
+                      setIsIdle(false);
+                    }}
                     className="ml-auto text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
                   >
                     ✕
@@ -307,7 +342,7 @@ export default function ContentIdeaGenerator({ brand, onSelectIdea }: { brand: a
                 <p className="text-[14px] text-[var(--label-secondary)] leading-relaxed mb-4">
                   {quickIdea.description}
                 </p>
-                <button 
+                <button
                   onClick={() => {
                     onSelectIdea(quickIdea);
                     setQuickIdea(null);

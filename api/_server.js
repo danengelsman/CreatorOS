@@ -113,9 +113,7 @@ function loadKey() {
   }
   const buffer = decodeKey(raw);
   if (buffer.length !== 32) {
-    throw new Error(
-      `TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes (got ${buffer.length})`
-    );
+    throw new Error(`TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes (got ${buffer.length})`);
   }
   return buffer;
 }
@@ -168,11 +166,7 @@ function decryptToken(serialized, legacy) {
   try {
     const envelope = JSON.parse(serialized);
     const key = loadKey();
-    const decipher = crypto2.createDecipheriv(
-      "aes-256-gcm",
-      key,
-      fromB64u(envelope.iv)
-    );
+    const decipher = crypto2.createDecipheriv("aes-256-gcm", key, fromB64u(envelope.iv));
     decipher.setAuthTag(fromB64u(envelope.tag));
     const plaintext = Buffer.concat([
       decipher.update(fromB64u(envelope.ciphertext)),
@@ -225,15 +219,18 @@ function rowFromDoc(id, data) {
 }
 async function upsertIntegration(input) {
   const ref = integrationCol().doc(integrationDocId(input.uid, input.platform));
-  await ref.set({
-    uid: input.uid,
-    platform: input.platform,
-    access_token: input.access_token ?? null,
-    refresh_token: input.refresh_token ?? null,
-    expiry_date: typeof input.expiry_date === "number" ? input.expiry_date : null,
-    profile_data: input.profile_data ?? null,
-    updated_at: (/* @__PURE__ */ new Date()).toISOString()
-  }, { merge: true });
+  await ref.set(
+    {
+      uid: input.uid,
+      platform: input.platform,
+      access_token: input.access_token ?? null,
+      refresh_token: input.refresh_token ?? null,
+      expiry_date: typeof input.expiry_date === "number" ? input.expiry_date : null,
+      profile_data: input.profile_data ?? null,
+      updated_at: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    { merge: true }
+  );
 }
 async function updateIntegrationFields(uid, platform, patch) {
   const ref = integrationCol().doc(integrationDocId(uid, platform));

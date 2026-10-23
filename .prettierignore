@@ -5,3 +5,5 @@ node_modules/
 package-lock.json
 coverage/
 playwright-report/
+test-results/
+src/routeTree.gen.ts

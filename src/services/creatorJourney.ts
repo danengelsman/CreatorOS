@@ -7,7 +7,13 @@ export interface CreatorJourney {
   activeMission: MissionId;
   activeProjectId: string | null;
   skippedIdeas: string[];
-  history: { mission: MissionId; outcome: 'completed' | 'skipped'; at: string; projectId?: string; detail?: string }[];
+  history: {
+    mission: MissionId;
+    outcome: 'completed' | 'skipped';
+    at: string;
+    projectId?: string;
+    detail?: string;
+  }[];
   updatedAt: string;
 }
 
@@ -21,7 +27,7 @@ type JourneyEvent =
 // another tab's more recent journey state. Project records remain the source of truth.
 export async function recordJourneyEvent(userId: string, event: JourneyEvent): Promise<void> {
   const ref = doc(db, 'preferences', userId);
-  await runTransaction(db, async transaction => {
+  await runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(ref);
     const current = snapshot.data()?.creatorJourney as CreatorJourney | undefined;
     const now = new Date().toISOString();
@@ -30,22 +36,37 @@ export async function recordJourneyEvent(userId: string, event: JourneyEvent): P
       activeProjectId: current?.activeProjectId || null,
       skippedIdeas: current?.skippedIdeas || [],
       history: current?.history || [],
-      updatedAt: now
+      updatedAt: now,
     };
 
     if (event.type === 'skip_idea' && !next.skippedIdeas.includes(event.title)) {
       next.skippedIdeas = [...next.skippedIdeas, event.title];
-      next.history.push({ mission: 'choose_first_idea', outcome: 'skipped', detail: event.title, at: now });
+      next.history.push({
+        mission: 'choose_first_idea',
+        outcome: 'skipped',
+        detail: event.title,
+        at: now,
+      });
     }
     if (event.type === 'start_draft' && next.activeProjectId !== event.projectId) {
       next.activeMission = 'revise_first_draft';
       next.activeProjectId = event.projectId;
-      next.history.push({ mission: 'choose_first_idea', outcome: 'completed', projectId: event.projectId, at: now });
+      next.history.push({
+        mission: 'choose_first_idea',
+        outcome: 'completed',
+        projectId: event.projectId,
+        at: now,
+      });
     }
     if (event.type === 'save_draft' && next.activeMission !== 'review_first_draft') {
       next.activeMission = 'review_first_draft';
       next.activeProjectId = event.projectId;
-      next.history.push({ mission: 'revise_first_draft', outcome: 'completed', projectId: event.projectId, at: now });
+      next.history.push({
+        mission: 'revise_first_draft',
+        outcome: 'completed',
+        projectId: event.projectId,
+        at: now,
+      });
     }
     transaction.set(ref, { creatorJourney: next }, { merge: true });
   });

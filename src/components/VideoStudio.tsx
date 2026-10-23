@@ -15,10 +15,26 @@ interface VideoStudioProps {
   onVideoSaved?: () => void;
 }
 
-export default function VideoStudio({ body, title, platform, brand, showToast, user, onVideoSaved }: VideoStudioProps) {
+export default function VideoStudio({
+  body,
+  title,
+  platform,
+  brand,
+  showToast,
+  user,
+  onVideoSaved,
+}: VideoStudioProps) {
   const [showSettings, setShowSettings] = useState(false);
-  
-  const videoGen = useVideoGeneration({ body, title, platform, brand, user, showToast, onVideoSaved });
+
+  const videoGen = useVideoGeneration({
+    body,
+    title,
+    platform,
+    brand,
+    user,
+    showToast,
+    onVideoSaved,
+  });
 
   return (
     <div className="space-y-4 w-full">
@@ -29,9 +45,14 @@ export default function VideoStudio({ body, title, platform, brand, showToast, u
             <h3 className="font-semibold text-[17px]">Gemini Studio</h3>
           </div>
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setShowSettings(!showSettings)} 
-              className={cn("p-2 rounded-full transition-colors", showSettings ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-secondary)] text-[var(--label-secondary)] hover:text-[var(--label-primary)]")}
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={cn(
+                'p-2 rounded-full transition-colors',
+                showSettings
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-[var(--bg-secondary)] text-[var(--label-secondary)] hover:text-[var(--label-primary)]',
+              )}
               title="Advanced Settings"
             >
               <Faders size={18} weight="bold" />
@@ -39,23 +60,39 @@ export default function VideoStudio({ body, title, platform, brand, showToast, u
           </div>
         </div>
 
-        <VideoScriptEditor 
+        <VideoScriptEditor
           showSettings={showSettings}
-          videoStyle={videoGen.videoStyle} setVideoStyle={videoGen.setVideoStyle}
-          videoAspect={videoGen.videoAspect} setVideoAspect={videoGen.setVideoAspect}
-          videoLength={videoGen.videoLength} setVideoLength={videoGen.setVideoLength}
-          avatarGender={videoGen.avatarGender} setAvatarGender={videoGen.setAvatarGender}
-          avatarClothing={videoGen.avatarClothing} setAvatarClothing={videoGen.setAvatarClothing}
-          backgroundStyle={videoGen.backgroundStyle} setBackgroundStyle={videoGen.setBackgroundStyle}
-          textOverlay={videoGen.textOverlay} setTextOverlay={videoGen.setTextOverlay}
-          ttsScript={videoGen.ttsScript} setTtsScript={videoGen.setTtsScript}
-          editedPrompt={videoGen.editedPrompt} setEditedPrompt={videoGen.setEditedPrompt}
-          isPromptCustomized={videoGen.isPromptCustomized} setIsPromptCustomized={videoGen.setIsPromptCustomized}
+          videoStyle={videoGen.videoStyle}
+          setVideoStyle={videoGen.setVideoStyle}
+          videoAspect={videoGen.videoAspect}
+          setVideoAspect={videoGen.setVideoAspect}
+          videoLength={videoGen.videoLength}
+          setVideoLength={videoGen.setVideoLength}
+          avatarGender={videoGen.avatarGender}
+          setAvatarGender={videoGen.setAvatarGender}
+          avatarClothing={videoGen.avatarClothing}
+          setAvatarClothing={videoGen.setAvatarClothing}
+          backgroundStyle={videoGen.backgroundStyle}
+          setBackgroundStyle={videoGen.setBackgroundStyle}
+          textOverlay={videoGen.textOverlay}
+          setTextOverlay={videoGen.setTextOverlay}
+          ttsScript={videoGen.ttsScript}
+          setTtsScript={videoGen.setTtsScript}
+          editedPrompt={videoGen.editedPrompt}
+          setEditedPrompt={videoGen.setEditedPrompt}
+          isPromptCustomized={videoGen.isPromptCustomized}
+          setIsPromptCustomized={videoGen.setIsPromptCustomized}
         />
 
         <div className="flex justify-end pt-2">
-          <input type="file" ref={videoGen.fileInputRef} onChange={videoGen.handleFileUpload} accept="video/*" className="hidden" />
-          <button 
+          <input
+            type="file"
+            ref={videoGen.fileInputRef}
+            onChange={videoGen.handleFileUpload}
+            accept="video/*"
+            className="hidden"
+          />
+          <button
             onClick={videoGen.handleGenerateVideo}
             disabled={videoGen.isVideoGenerating}
             className="ios-button ios-button-tinted w-full md:w-auto"
@@ -70,7 +107,7 @@ export default function VideoStudio({ body, title, platform, brand, showToast, u
         </div>
       </div>
 
-      <VideoGenerationPlayer 
+      <VideoGenerationPlayer
         videoUrl={videoGen.videoUrl}
         isVideoGenerating={videoGen.isVideoGenerating}
         videoAspect={videoGen.videoAspect}

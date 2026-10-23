@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { FilmScript, Sparkle, Clock, Copy, Check, VideoCamera, Image as ImageIcon, TextAa, Warning, ArrowRight, ListChecks, Export, ArrowClockwise } from '@phosphor-icons/react';
+import {
+  FilmScript,
+  Sparkle,
+  Clock,
+  Copy,
+  Check,
+  VideoCamera,
+  Image as ImageIcon,
+  TextAa,
+  Warning,
+  ArrowRight,
+  ListChecks,
+  Export,
+  ArrowClockwise,
+} from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import { generateScenePlan } from '../services/gemini';
 import { getFriendlyError } from '../lib/friendlyError';
@@ -13,7 +27,13 @@ interface ScenePlannerProps {
   brand?: any;
 }
 
-export default function ScenePlanner({ initialScript = '', initialTitle = '', showToast, onSendToVideoStudio, brand }: ScenePlannerProps) {
+export default function ScenePlanner({
+  initialScript = '',
+  initialTitle = '',
+  showToast,
+  onSendToVideoStudio,
+  brand,
+}: ScenePlannerProps) {
   const [scriptText, setScriptText] = useState(initialScript);
   const [titleText, setTitleText] = useState(initialTitle);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -58,21 +78,24 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
 
   const copyToMarkdownTable = () => {
     if (!scenePlan) return;
-    
+
     let md = `| Section | Duration | Narration | Visual Type | Visual Detail |\n`;
     md += `| :--- | :--- | :--- | :--- | :--- |\n`;
-    
+
     scenePlan.sections?.forEach((section: any) => {
       section.beats?.forEach((beat: any) => {
         const visual = beat.visual;
-        const visualDetail = visual.type === 'stock_video' ? visual.stock_query : 
-                             visual.type === 'title_card' ? visual.title_card_text : 
-                             visual.ai_image_prompt;
-                             
+        const visualDetail =
+          visual.type === 'stock_video'
+            ? visual.stock_query
+            : visual.type === 'title_card'
+              ? visual.title_card_text
+              : visual.ai_image_prompt;
+
         md += `| ${section.section_label} | ${beat.est_seconds}s | ${beat.narration.replace(/\n/g, ' ')} | ${visual.type} | ${visualDetail} |\n`;
       });
     });
-    
+
     navigator.clipboard.writeText(md);
     showToast('Markdown table copied to clipboard!');
   };
@@ -119,8 +142,12 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
           <div className="flex items-center gap-2.5">
             <FilmScript size={22} className="text-[var(--accent)]" weight="fill" />
             <div>
-              <h3 className="font-semibold text-[16px] text-[var(--label-primary)]">Vertano Scene Planner</h3>
-              <p className="text-[12px] text-[var(--label-tertiary)]">Segment scripts into timed visual beats & camera shot lists for YouTube</p>
+              <h3 className="font-semibold text-[16px] text-[var(--label-primary)]">
+                Vertano Scene Planner
+              </h3>
+              <p className="text-[12px] text-[var(--label-tertiary)]">
+                Segment scripts into timed visual beats & camera shot lists for YouTube
+              </p>
             </div>
           </div>
           {scenePlan && (
@@ -145,7 +172,9 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
 
         <div className="space-y-3">
           <div>
-            <label className="text-[12px] font-semibold text-[var(--label-secondary)] mb-1 block">Video Working Title</label>
+            <label className="text-[12px] font-semibold text-[var(--label-secondary)] mb-1 block">
+              Video Working Title
+            </label>
             <input
               type="text"
               value={titleText}
@@ -156,7 +185,9 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
           </div>
 
           <div>
-            <label className="text-[12px] font-semibold text-[var(--label-secondary)] mb-1 block">Finished Script</label>
+            <label className="text-[12px] font-semibold text-[var(--label-secondary)] mb-1 block">
+              Finished Script
+            </label>
             <textarea
               value={scriptText}
               onChange={(e) => setScriptText(e.target.value)}
@@ -191,7 +222,9 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
             <div className="flex items-start gap-2.5">
               <Warning size={20} weight="fill" className="text-amber-500 shrink-0 mt-0.5" />
               <div>
-                <p className="text-[13px] font-semibold text-[var(--label-primary)]">Shot Planning Stalled</p>
+                <p className="text-[13px] font-semibold text-[var(--label-primary)]">
+                  Shot Planning Stalled
+                </p>
                 <p className="text-[12px] text-[var(--label-secondary)] leading-relaxed">{error}</p>
               </div>
             </div>
@@ -217,7 +250,9 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
           {/* Summary Overview Bar */}
           <div className="bg-[var(--bg-tertiary)] p-4 rounded-2xl border border-[var(--separator)] grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <span className="text-[11px] font-medium text-[var(--label-tertiary)] uppercase tracking-wider block">Estimated Duration</span>
+              <span className="text-[11px] font-medium text-[var(--label-tertiary)] uppercase tracking-wider block">
+                Estimated Duration
+              </span>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <Clock size={16} className="text-[var(--accent)]" />
                 <span className="text-[16px] font-bold text-[var(--label-primary)]">
@@ -227,28 +262,38 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
             </div>
 
             <div>
-              <span className="text-[11px] font-medium text-[var(--label-tertiary)] uppercase tracking-wider block">Target Pace</span>
+              <span className="text-[11px] font-medium text-[var(--label-tertiary)] uppercase tracking-wider block">
+                Target Pace
+              </span>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className={cn(
-                  "px-2 py-0.5 rounded-full text-[11px] font-bold uppercase border",
-                  scenePlan.length_flag === 'ok' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                  scenePlan.length_flag === 'under' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                  'bg-rose-500/10 text-rose-500 border-rose-500/20'
-                )}>
+                <span
+                  className={cn(
+                    'px-2 py-0.5 rounded-full text-[11px] font-bold uppercase border',
+                    scenePlan.length_flag === 'ok'
+                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                      : scenePlan.length_flag === 'under'
+                        ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                        : 'bg-rose-500/10 text-rose-500 border-rose-500/20',
+                  )}
+                >
                   {scenePlan.length_flag || 'ok'} target
                 </span>
               </div>
             </div>
 
             <div>
-              <span className="text-[11px] font-medium text-[var(--label-tertiary)] uppercase tracking-wider block">Speech Rate</span>
+              <span className="text-[11px] font-medium text-[var(--label-tertiary)] uppercase tracking-wider block">
+                Speech Rate
+              </span>
               <span className="text-[14px] font-semibold text-[var(--label-primary)] mt-0.5 block">
                 {scenePlan.wpm_assumed || 150} WPM Assumed
               </span>
             </div>
 
             <div>
-              <span className="text-[11px] font-medium text-[var(--label-tertiary)] uppercase tracking-wider block">Total Sections</span>
+              <span className="text-[11px] font-medium text-[var(--label-tertiary)] uppercase tracking-wider block">
+                Total Sections
+              </span>
               <span className="text-[14px] font-semibold text-[var(--label-primary)] mt-0.5 block">
                 {scenePlan.sections?.length || 0} Sections
               </span>
@@ -258,11 +303,16 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
           {/* Sections and Beats list */}
           <div className="space-y-5">
             {scenePlan.sections?.map((section: any, idx: number) => (
-              <div key={section.section_id || idx} className="bg-[var(--bg-tertiary)] rounded-2xl p-5 border border-[var(--separator)] space-y-3">
+              <div
+                key={section.section_id || idx}
+                className="bg-[var(--bg-tertiary)] rounded-2xl p-5 border border-[var(--separator)] space-y-3"
+              >
                 <div className="flex items-center justify-between border-b border-[var(--separator)] pb-2.5">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-[var(--accent)]" />
-                    <h4 className="font-bold text-[15px] text-[var(--label-primary)]">{section.section_label || section.section_type}</h4>
+                    <h4 className="font-bold text-[15px] text-[var(--label-primary)]">
+                      {section.section_label || section.section_type}
+                    </h4>
                     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] text-[var(--label-secondary)] uppercase">
                       {section.section_type}
                     </span>
@@ -289,10 +339,12 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border",
-                            getVisualBadgeColor(beat.visual?.type)
-                          )}>
+                          <span
+                            className={cn(
+                              'flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border',
+                              getVisualBadgeColor(beat.visual?.type),
+                            )}
+                          >
                             {getVisualIcon(beat.visual?.type)}
                             <span>{beat.visual?.type?.replace('_', ' ')}</span>
                           </span>
@@ -300,7 +352,10 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
                           {onSendToVideoStudio && (
                             <button
                               onClick={() => {
-                                const prompt = beat.visual?.ai_image_prompt || beat.visual?.stock_query || beat.narration;
+                                const prompt =
+                                  beat.visual?.ai_image_prompt ||
+                                  beat.visual?.stock_query ||
+                                  beat.narration;
                                 onSendToVideoStudio(prompt);
                                 showToast('Sent beat prompt to Gemini Video Studio');
                               }}
@@ -322,13 +377,21 @@ export default function ScenePlanner({ initialScript = '', initialTitle = '', sh
                       {/* Visual Details */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[12px] pt-1">
                         <div className="bg-[var(--bg-tertiary)] p-2.5 rounded-lg border border-[var(--separator)]/40 space-y-1">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--label-tertiary)] block">Stock Query (Plan A)</span>
-                          <span className="font-semibold text-[var(--label-primary)]">{beat.visual?.stock_query}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--label-tertiary)] block">
+                            Stock Query (Plan A)
+                          </span>
+                          <span className="font-semibold text-[var(--label-primary)]">
+                            {beat.visual?.stock_query}
+                          </span>
                         </div>
 
                         <div className="bg-[var(--bg-tertiary)] p-2.5 rounded-lg border border-[var(--separator)]/40 space-y-1">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--label-tertiary)] block">AI Image Prompt (Plan B)</span>
-                          <span className="font-semibold text-[var(--label-primary)]">{beat.visual?.ai_image_prompt}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--label-tertiary)] block">
+                            AI Image Prompt (Plan B)
+                          </span>
+                          <span className="font-semibold text-[var(--label-primary)]">
+                            {beat.visual?.ai_image_prompt}
+                          </span>
                         </div>
                       </div>
 

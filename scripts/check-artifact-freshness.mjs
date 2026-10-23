@@ -13,7 +13,7 @@ try {
 } catch {
   console.error(
     '\n[check:artifact] STALE: api/_server.js does not match server.ts.\n' +
-    'Run `npm run build:server` and commit the regenerated artifact.'
+      'Run `npm run build:server` and commit the regenerated artifact.',
   );
   process.exit(1);
 }

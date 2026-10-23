@@ -6,7 +6,12 @@ import { CreatorJourney, recordJourneyEvent } from '../services/creatorJourney';
 
 type Idea = { title: string; hook: string; description: string };
 
-export default function FirstCreationMission({ brand, user, journey, onOpenDraft }: {
+export default function FirstCreationMission({
+  brand,
+  user,
+  journey,
+  onOpenDraft,
+}: {
   brand: any;
   user: any;
   journey: CreatorJourney | null;
@@ -21,11 +26,13 @@ export default function FirstCreationMission({ brand, user, journey, onOpenDraft
   const requestedFor = useRef<string | null>(null);
   const [locallySkipped, setLocallySkipped] = useState<string[]>([]);
   const excluded = new Set([...(journey?.skippedIdeas || []), ...locallySkipped]);
-  const availableIdeas = ideas.filter(idea => !excluded.has(idea.title));
+  const availableIdeas = ideas.filter((idea) => !excluded.has(idea.title));
 
   useEffect(() => {
     if (user?.uid && !journey) {
-      void recordJourneyEvent(user.uid, { type: 'initialize' }).catch(error => console.warn('Could not initialize mission:', error));
+      void recordJourneyEvent(user.uid, { type: 'initialize' }).catch((error) =>
+        console.warn('Could not initialize mission:', error),
+      );
     }
   }, [user?.uid, journey]);
 
@@ -41,11 +48,13 @@ export default function FirstCreationMission({ brand, user, journey, onOpenDraft
     setLoading(true);
     setError('');
     try {
-      const generated = (await generateContentIdeas(brand)).filter((idea: Idea) => idea?.title && idea?.description);
+      const generated = (await generateContentIdeas(brand)).filter(
+        (idea: Idea) => idea?.title && idea?.description,
+      );
       if (!generated.length) throw new Error('No ideas were returned.');
       await updateDoc(doc(db, 'projects', `brand_${user.uid}`), {
         'data.content_ideas': generated,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
       setIdeas(generated);
       setSelected(0);
@@ -58,7 +67,8 @@ export default function FirstCreationMission({ brand, user, journey, onOpenDraft
   };
 
   useEffect(() => {
-    if (!user?.uid || !brand || brand.content_ideas?.length || requestedFor.current === user.uid) return;
+    if (!user?.uid || !brand || brand.content_ideas?.length || requestedFor.current === user.uid)
+      return;
     requestedFor.current = user.uid;
     void prepareIdeas();
   }, [user?.uid, brand]);
@@ -66,12 +76,18 @@ export default function FirstCreationMission({ brand, user, journey, onOpenDraft
   const startDraft = async () => {
     const ownTopic = customIdea.trim();
     const idea = ownTopic
-      ? { title: ownTopic, hook: '', description: `What would help your audience understand ${ownTopic}?` }
+      ? {
+          title: ownTopic,
+          hook: '',
+          description: `What would help your audience understand ${ownTopic}?`,
+        }
       : availableIdeas[selected] || availableIdeas[0];
     if (!user?.uid || !idea || starting) return;
     setStarting(true);
     setError('');
-    const body = idea.hook ? `Hook: ${idea.hook}\n\nConcept: ${idea.description}` : `Concept: ${idea.description}`;
+    const body = idea.hook
+      ? `Hook: ${idea.hook}\n\nConcept: ${idea.description}`
+      : `Concept: ${idea.description}`;
     try {
       const project = {
         userId: user.uid,
@@ -82,7 +98,7 @@ export default function FirstCreationMission({ brand, user, journey, onOpenDraft
         starterBody: body,
         data: { title: idea.title, body, platform: 'youtube', score: 0 },
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       };
       const ref = await addDoc(collection(db, 'projects'), project);
       try {
@@ -104,7 +120,7 @@ export default function FirstCreationMission({ brand, user, journey, onOpenDraft
     if (!user?.uid || !title) return;
     try {
       await recordJourneyEvent(user.uid, { type: 'skip_idea', title });
-      setLocallySkipped(previous => [...previous, title]);
+      setLocallySkipped((previous) => [...previous, title]);
       setSelected(0);
     } catch (err) {
       console.error('Could not save skipped idea:', err);
@@ -113,43 +129,91 @@ export default function FirstCreationMission({ brand, user, journey, onOpenDraft
   };
 
   return (
-    <section aria-label="Your first creator mission" className="mb-6 rounded-[28px] border border-[var(--accent)]/30 bg-[var(--bg-secondary)] p-6 md:p-8">
-      <p className="text-xs font-bold uppercase tracking-widest text-[var(--accent)]">Your first mission · Step 1 of 2</p>
+    <section
+      aria-label="Your first creator mission"
+      className="mb-6 rounded-[28px] border border-[var(--accent)]/30 bg-[var(--bg-secondary)] p-6 md:p-8"
+    >
+      <p className="text-xs font-bold uppercase tracking-widest text-[var(--accent)]">
+        Your first mission · Step 1 of 2
+      </p>
       <h2 className="mt-2 text-2xl font-bold">Make one piece for your audience</h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--label-secondary)]">
-        Your brand has a direction. Now let's turn it into a first draft you can shape in your own voice. Pick a starting idea; you can change every word in Studio.
+        Your brand has a direction. Now let's turn it into a first draft you can shape in your own
+        voice. Pick a starting idea; you can change every word in Studio.
       </p>
 
-      {loading && <p className="mt-5 text-sm" role="status">Preparing ideas from your brand...</p>}
+      {loading && (
+        <p className="mt-5 text-sm" role="status">
+          Preparing ideas from your brand...
+        </p>
+      )}
       {!loading && availableIdeas.length > 0 && (
-        <div className="mt-5 grid gap-3 md:grid-cols-3" role="group" aria-label="Choose a starting idea">
+        <div
+          className="mt-5 grid gap-3 md:grid-cols-3"
+          role="group"
+          aria-label="Choose a starting idea"
+        >
           {availableIdeas.slice(0, 3).map((idea, index) => (
-            <button key={`${idea.title}-${index}`} type="button" aria-pressed={!customIdea && selected === index}
-              onClick={() => { setSelected(index); setCustomIdea(''); }}
-              className={`rounded-2xl border p-4 text-left transition-colors ${!customIdea && selected === index ? 'border-[var(--accent)] bg-[var(--accent)]/10' : 'border-[var(--separator)] hover:border-[var(--accent)]/50'}`}>
-              <span className="block text-xs font-semibold text-[var(--accent)]">{index === 0 ? 'Recommended' : 'Another option'}</span>
+            <button
+              key={`${idea.title}-${index}`}
+              type="button"
+              aria-pressed={!customIdea && selected === index}
+              onClick={() => {
+                setSelected(index);
+                setCustomIdea('');
+              }}
+              className={`rounded-2xl border p-4 text-left transition-colors ${!customIdea && selected === index ? 'border-[var(--accent)] bg-[var(--accent)]/10' : 'border-[var(--separator)] hover:border-[var(--accent)]/50'}`}
+            >
+              <span className="block text-xs font-semibold text-[var(--accent)]">
+                {index === 0 ? 'Recommended' : 'Another option'}
+              </span>
               <span className="mt-2 block font-semibold">{idea.title}</span>
-              <span className="mt-2 block text-sm text-[var(--label-secondary)]">{idea.description}</span>
+              <span className="mt-2 block text-sm text-[var(--label-secondary)]">
+                {idea.description}
+              </span>
             </button>
           ))}
         </div>
       )}
 
-      <label className="mt-5 block text-sm font-medium" htmlFor="first-idea">Or use your own topic</label>
-      <input id="first-idea" value={customIdea} onChange={event => setCustomIdea(event.target.value)}
+      <label className="mt-5 block text-sm font-medium" htmlFor="first-idea">
+        Or use your own topic
+      </label>
+      <input
+        id="first-idea"
+        value={customIdea}
+        onChange={(event) => setCustomIdea(event.target.value)}
         placeholder="Something I want to help people with..."
-        className="mt-2 w-full max-w-lg rounded-xl border border-[var(--separator)] bg-[var(--bg-primary)] px-4 py-3 text-[var(--label-primary)]" />
-      {error && <p className="mt-3 text-sm text-[var(--system-red)]" role="alert">{error}</p>}
+        className="mt-2 w-full max-w-lg rounded-xl border border-[var(--separator)] bg-[var(--bg-primary)] px-4 py-3 text-[var(--label-primary)]"
+      />
+      {error && (
+        <p className="mt-3 text-sm text-[var(--system-red)]" role="alert">
+          {error}
+        </p>
+      )}
       <div className="mt-5 flex flex-wrap items-center gap-4">
-        <button type="button" onClick={startDraft} disabled={starting || (!customIdea.trim() && !availableIdeas.length)}
-          className="ios-button ios-button-filled px-5 disabled:opacity-50">
+        <button
+          type="button"
+          onClick={startDraft}
+          disabled={starting || (!customIdea.trim() && !availableIdeas.length)}
+          className="ios-button ios-button-filled px-5 disabled:opacity-50"
+        >
           {starting ? 'Saving your draft...' : 'Start this draft'}
         </button>
-        <button type="button" onClick={() => void prepareIdeas()} disabled={loading} className="text-sm font-semibold text-[var(--accent)] disabled:opacity-50">
+        <button
+          type="button"
+          onClick={() => void prepareIdeas()}
+          disabled={loading}
+          className="text-sm font-semibold text-[var(--accent)] disabled:opacity-50"
+        >
           Suggest different ideas
         </button>
         {!customIdea.trim() && availableIdeas.length > 0 && (
-          <button type="button" onClick={() => void skipIdea()} className="text-sm text-[var(--label-secondary)] hover:text-[var(--label-primary)]">
+          <button
+            type="button"
+            onClick={() => void skipIdea()}
+            className="text-sm text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
+          >
             Not for me
           </button>
         )}

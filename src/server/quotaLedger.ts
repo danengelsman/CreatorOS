@@ -41,12 +41,12 @@ export const DAILY_BUDGET_DEFAULT = 250_000;
 
 /** Conservative per-call token estimates when the API gives no usage data. */
 export const ROUTE_COST_ESTIMATES: Record<string, number> = {
-  '/api/gemini/generate': 4_000,        // typical chat/script generation
-  '/api/gemini/analyze-video': 30_000,  // video upload = expensive
+  '/api/gemini/generate': 4_000, // typical chat/script generation
+  '/api/gemini/analyze-video': 30_000, // video upload = expensive
   '/api/gemini/generate-image': 5_000,
   '/api/gemini/generate-video': 60_000, // most expensive per call
-  '/api/gemini/video-status': 50,       // status poll, cheap
-  '/api/gemini/video-download': 50,     // download, no generation
+  '/api/gemini/video-status': 50, // status poll, cheap
+  '/api/gemini/video-download': 50, // download, no generation
   '/api/onboarding/niche-sparks': 1_500,
 };
 
@@ -113,10 +113,12 @@ export class QuotaLedger {
   private store: QuotaStore | null;
 
   constructor(deps: QuotaLedgerDeps) {
-    this.getDailyBudget = deps.getDailyBudget ?? (() => {
-      const raw = Number(process.env.DAILY_AI_BUDGET_TOKENS);
-      return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DAILY_BUDGET_DEFAULT;
-    });
+    this.getDailyBudget =
+      deps.getDailyBudget ??
+      (() => {
+        const raw = Number(process.env.DAILY_AI_BUDGET_TOKENS);
+        return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DAILY_BUDGET_DEFAULT;
+      });
     this.nowFn = deps.now ?? (() => new Date());
     // The Firestore-backed store is resolved lazily (first use) so probes can
     // stub firebase-admin before the server resolves it.
@@ -287,7 +289,9 @@ export function quotaGuardMiddleware(ledger: QuotaLedger) {
 export function extractTokensUsed(response: any): number | null {
   const usage = response?.usageMetadata ?? response?.usage_metadata ?? null;
   const total = usage?.totalTokenCount ?? usage?.total_token_count ?? null;
-  return typeof total === 'number' && Number.isFinite(total) && total > 0 ? Math.floor(total) : null;
+  return typeof total === 'number' && Number.isFinite(total) && total > 0
+    ? Math.floor(total)
+    : null;
 }
 
 export { DAY_MS };
