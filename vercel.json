@@ -43,6 +43,10 @@
     {
       "source": "/login",
       "destination": "/index.html"
+    },
+    {
+      "source": "/((?!api/|__).*)",
+      "destination": "/index.html"
     }
   ],
   "functions": {
