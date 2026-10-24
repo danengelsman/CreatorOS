@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const safetyTimeout = setTimeout(() => {
       if (isActive) setIsAuthLoading(false);
-    }, 5000);
+    }, 15000);
 
     const initAuth = async () => {
       try {
