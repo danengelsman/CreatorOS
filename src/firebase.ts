@@ -72,15 +72,23 @@ if (firestoreEmulatorHost) {
  */
 export const loginWithGoogle = async () => {
   try {
-    // Redirect-first approach: most reliable for Vercel/Incognito/Mobile
-    // We bypass the popup entirely to avoid third-party cookie blocks.
-    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-      window.history.replaceState(window.history.state, '', '/');
-    }
-    await signInWithRedirect(auth, googleProvider);
-    return null;
+    // Popup-first with graceful redirect fallback:
+    // With X-Frame-Options: SAMEORIGIN active, AuthRelay succeeds.
+    // Popup works cleanly on desktop and mobile browsers where allowed without losing session state.
+    return await signInWithPopup(auth, googleProvider);
   } catch (error: any) {
-    console.error('Google Redirect failed:', error);
+    if (
+      error?.code === 'auth/popup-blocked' ||
+      error?.code === 'auth/cancelled-popup-request' ||
+      error?.code === 'auth/popup-closed-by-user'
+    ) {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
+        window.history.replaceState(window.history.state, '', '/dashboard');
+      }
+      await signInWithRedirect(auth, googleProvider);
+      return null;
+    }
+    console.error('Google Auth failed:', error);
     throw error;
   }
 };

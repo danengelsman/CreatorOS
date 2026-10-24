@@ -29,6 +29,13 @@ function RouterWrapper() {
     }
   }, [auth.user, auth.isAuthLoading]);
 
+  // Invalidate router context so route guards re-evaluate whenever auth finishes loading or updates
+  useEffect(() => {
+    if (!auth.isAuthLoading) {
+      router.invalidate();
+    }
+  }, [auth.user, auth.isAuthLoading]);
+
   // Handle auth expired event
   useEffect(() => {
     const handleAuthExpired = () => {
