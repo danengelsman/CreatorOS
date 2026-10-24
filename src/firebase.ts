@@ -74,6 +74,9 @@ export const loginWithGoogle = async () => {
   try {
     // Redirect-first approach: most reliable for Vercel/Incognito/Mobile
     // We bypass the popup entirely to avoid third-party cookie blocks.
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      window.history.replaceState(window.history.state, '', '/');
+    }
     await signInWithRedirect(auth, googleProvider);
     return null;
   } catch (error: any) {

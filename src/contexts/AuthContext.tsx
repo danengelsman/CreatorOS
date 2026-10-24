@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, onAuthStateChanged } from '@/firebase';
+import { auth, completeGoogleRedirect, onAuthStateChanged } from '@/firebase';
 import {
   doc,
   getDoc,
@@ -37,55 +37,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let isActive = true;
+    let unsubscribe: (() => void) | undefined;
+
     const safetyTimeout = setTimeout(() => {
       if (isActive) setIsAuthLoading(false);
-    }, 3500);
+    }, 5000);
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const initAuth = async () => {
       try {
-        if (!isActive) return;
-        if (firebaseUser) {
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          const userSnap = await getDoc(userRef);
-          if (!userSnap.exists()) {
-            setShowOnboarding(true);
-            await setDoc(userRef, {
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName,
-              photoURL: firebaseUser.photoURL,
-              accountProvider: firebaseUser.providerData[0]?.providerId || 'google',
-              createdAt: serverTimestamp(),
-              lastLogin: serverTimestamp(),
-              subscriptionTier: 'free',
-              accountStatus: 'active',
-            });
-          } else {
-            await setDoc(userRef, { lastLogin: serverTimestamp() }, { merge: true });
-          }
-          if (isActive) setUser(firebaseUser);
-        } else {
-          if (isActive) {
-            setUser(null);
-            setUserData(null);
-            setShowOnboarding(false);
-            setActiveTab('home');
-          }
-        }
-      } catch (error) {
-        console.error('Error during auth state change:', error);
-        if (isActive) setUser(firebaseUser);
-      } finally {
-        if (isActive) {
-          clearTimeout(safetyTimeout);
-          setIsAuthLoading(false);
-        }
+        await completeGoogleRedirect();
+      } catch (err) {
+        console.warn('Google redirect check completed:', err);
       }
-    });
+
+      if (!isActive) return;
+
+      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        try {
+          if (!isActive) return;
+          if (firebaseUser) {
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            const userSnap = await getDoc(userRef);
+            if (!userSnap.exists()) {
+              setShowOnboarding(true);
+              await setDoc(userRef, {
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName,
+                photoURL: firebaseUser.photoURL,
+                accountProvider: firebaseUser.providerData[0]?.providerId || 'google',
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp(),
+                subscriptionTier: 'free',
+                accountStatus: 'active',
+              });
+            } else {
+              await setDoc(userRef, { lastLogin: serverTimestamp() }, { merge: true });
+            }
+            if (isActive) setUser(firebaseUser);
+          } else {
+            if (isActive) {
+              setUser(null);
+              setUserData(null);
+              setShowOnboarding(false);
+              setActiveTab('home');
+            }
+          }
+        } catch (error) {
+          console.error('Error during auth state change:', error);
+          if (isActive) setUser(firebaseUser);
+        } finally {
+          if (isActive) {
+            clearTimeout(safetyTimeout);
+            setIsAuthLoading(false);
+          }
+        }
+      });
+    };
+
+    void initAuth();
 
     return () => {
       isActive = false;
       clearTimeout(safetyTimeout);
-      unsubscribe();
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 
