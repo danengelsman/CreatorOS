@@ -44,8 +44,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, 15000);
 
     const initAuth = async () => {
+      let redirectUser: any = null;
       try {
-        await completeGoogleRedirect();
+        const redirectResult = await completeGoogleRedirect();
+        if (redirectResult?.user) {
+          redirectUser = redirectResult.user;
+          if (isActive) setUser(redirectUser);
+        }
       } catch (err) {
         console.warn('Google redirect check completed:', err);
       }
@@ -55,16 +60,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         try {
           if (!isActive) return;
-          if (firebaseUser) {
-            const userRef = doc(db, 'users', firebaseUser.uid);
+          const currentUser = firebaseUser || redirectUser;
+          if (currentUser) {
+            const userRef = doc(db, 'users', currentUser.uid);
             const userSnap = await getDoc(userRef);
             if (!userSnap.exists()) {
               setShowOnboarding(true);
               await setDoc(userRef, {
-                email: firebaseUser.email,
-                displayName: firebaseUser.displayName,
-                photoURL: firebaseUser.photoURL,
-                accountProvider: firebaseUser.providerData[0]?.providerId || 'google',
+                email: currentUser.email,
+                displayName: currentUser.displayName,
+                photoURL: currentUser.photoURL,
+                accountProvider: currentUser.providerData?.[0]?.providerId || 'google',
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
                 subscriptionTier: 'free',
@@ -73,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
               await setDoc(userRef, { lastLogin: serverTimestamp() }, { merge: true });
             }
-            if (isActive) setUser(firebaseUser);
+            if (isActive) setUser(currentUser);
           } else {
             if (isActive) {
               setUser(null);
@@ -84,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (error) {
           console.error('Error during auth state change:', error);
-          if (isActive) setUser(firebaseUser);
+          if (isActive) setUser(firebaseUser || redirectUser);
         } finally {
           if (isActive) {
             clearTimeout(safetyTimeout);

@@ -73,9 +73,11 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
     setIsLoading(true);
     setError('');
     try {
-      await loginWithGoogle();
-      mintSessionCookie();
-      navigate?.('/dashboard');
+      const res = await loginWithGoogle();
+      if (res?.user) {
+        mintSessionCookie();
+        navigate?.('/dashboard');
+      }
     } catch (error: any) {
       console.error('Google Login failed:', error);
       setError(getFriendlyError(error));
