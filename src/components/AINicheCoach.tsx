@@ -5,7 +5,7 @@ import { apiFetch } from '../firebase';
 
 import { getFriendlyError } from '../lib/friendlyError';
 
-export default function AINicheCoach({ summary, brand }: { summary: any, brand: any }) {
+export default function AINicheCoach({ summary, brand }: { summary: any; brand: any }) {
   const [advice, setAdvice] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -16,9 +16,11 @@ export default function AINicheCoach({ summary, brand }: { summary: any, brand: 
     try {
       const followers = summary?.totalFollowers || 0;
       const engagement = summary?.engagementRate || 0;
-      const monetizationProgress = summary?.revenueStreams ? JSON.stringify(summary.revenueStreams) : "Ads: 10% to unlock, Affiliates: Planning, Sponsorships: 5% to unlock, Digital Products: Planning";
-      const brandNiche = brand?.name || "Content Creator";
-      
+      const monetizationProgress = summary?.revenueStreams
+        ? JSON.stringify(summary.revenueStreams)
+        : 'Ads: 10% to unlock, Affiliates: Planning, Sponsorships: 5% to unlock, Digital Products: Planning';
+      const brandNiche = brand?.name || 'Content Creator';
+
       const prompt = `You are the AI Niche Coach for a content creator. Analyze their current stats:
 Followers: ${followers}
 Engagement Rate: ${engagement}%
@@ -45,38 +47,38 @@ Return the response as JSON matching this schema:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gemini-3.8-flash",
+          model: 'gemini-3.8-flash',
           contents: prompt,
           config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
-              type: "OBJECT",
+              type: 'OBJECT',
               properties: {
-                overview: { type: "STRING" },
-                focusArea: { type: "STRING" },
+                overview: { type: 'STRING' },
+                focusArea: { type: 'STRING' },
                 actionSteps: {
-                  type: "ARRAY",
+                  type: 'ARRAY',
                   items: {
-                    type: "OBJECT",
+                    type: 'OBJECT',
                     properties: {
-                      title: { type: "STRING" },
-                      description: { type: "STRING" },
-                      timeRequired: { type: "STRING" }
+                      title: { type: 'STRING' },
+                      description: { type: 'STRING' },
+                      timeRequired: { type: 'STRING' },
                     },
-                    required: ["title", "description", "timeRequired"]
-                  }
+                    required: ['title', 'description', 'timeRequired'],
+                  },
                 },
-                expectedOutcome: { type: "STRING" }
+                expectedOutcome: { type: 'STRING' },
               },
-              required: ["overview", "focusArea", "actionSteps", "expectedOutcome"]
-            }
-          }
-        })
+              required: ['overview', 'focusArea', 'actionSteps', 'expectedOutcome'],
+            },
+          },
+        }),
       });
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || "Failed to generate coaching advice.");
+        throw new Error(err.error || 'Failed to generate coaching advice.');
       }
 
       const data = await response.json();
@@ -109,8 +111,12 @@ Return the response as JSON matching this schema:
             <Lightbulb size={24} weight="duotone" />
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-[var(--label-primary)]">AI Niche Coach</h2>
-            <p className="text-sm font-medium text-[var(--label-secondary)]">Personalized Monetization Strategy</p>
+            <h2 className="text-xl font-bold tracking-tight text-[var(--label-primary)]">
+              AI Niche Coach
+            </h2>
+            <p className="text-sm font-medium text-[var(--label-secondary)]">
+              Personalized Monetization Strategy
+            </p>
           </div>
         </div>
         <button
@@ -136,19 +142,25 @@ Return the response as JSON matching this schema:
       {isLoading && !advice && (
         <div className="flex flex-col items-center justify-center py-12 space-y-4 z-10 relative">
           <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-[15px] font-medium text-[var(--label-secondary)]">Analyzing metrics and identifying monetization levers...</p>
+          <p className="text-[15px] font-medium text-[var(--label-secondary)]">
+            Analyzing metrics and identifying monetization levers...
+          </p>
         </div>
       )}
 
       {!isLoading && advice && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6 z-10 relative"
         >
           <div className="bg-[var(--bg-primary)]/80 backdrop-blur-md border border-[var(--separator)] p-5 rounded-2xl">
-            <h3 className="text-[12px] font-bold uppercase tracking-wider text-indigo-500 mb-2">This Week's Assessment</h3>
-            <p className="text-[15px] leading-relaxed text-[var(--label-primary)]">{advice.overview}</p>
+            <h3 className="text-[12px] font-bold uppercase tracking-wider text-indigo-500 mb-2">
+              This Week's Assessment
+            </h3>
+            <p className="text-[15px] leading-relaxed text-[var(--label-primary)]">
+              {advice.overview}
+            </p>
           </div>
 
           <div>
@@ -158,7 +170,10 @@ Return the response as JSON matching this schema:
             </div>
             <div className="space-y-3">
               {advice.actionSteps.map((step: any, idx: number) => (
-                <div key={idx} className="bg-[var(--bg-primary)] border border-[var(--separator)] p-4 rounded-2xl flex gap-4 hover:border-indigo-500/50 transition-colors">
+                <div
+                  key={idx}
+                  className="bg-[var(--bg-primary)] border border-[var(--separator)] p-4 rounded-2xl flex gap-4 hover:border-indigo-500/50 transition-colors"
+                >
                   <div className="flex-shrink-0 mt-0.5">
                     <div className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold text-xs">
                       {idx + 1}
@@ -166,12 +181,16 @@ Return the response as JSON matching this schema:
                   </div>
                   <div className="flex-1 space-y-1">
                     <div className="flex justify-between items-start gap-2">
-                      <h4 className="font-bold text-[15px] text-[var(--label-primary)]">{step.title}</h4>
+                      <h4 className="font-bold text-[15px] text-[var(--label-primary)]">
+                        {step.title}
+                      </h4>
                       <span className="text-[11px] font-bold px-2 py-1 bg-[var(--bg-secondary)] rounded-md text-[var(--label-secondary)] whitespace-nowrap">
                         {step.timeRequired}
                       </span>
                     </div>
-                    <p className="text-[14px] text-[var(--label-secondary)] leading-relaxed">{step.description}</p>
+                    <p className="text-[14px] text-[var(--label-secondary)] leading-relaxed">
+                      {step.description}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -181,8 +200,12 @@ Return the response as JSON matching this schema:
           <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/5 border border-green-500/20 p-5 rounded-2xl flex items-start gap-3">
             <Lightning size={24} weight="duotone" className="text-green-500 flex-shrink-0" />
             <div>
-              <h3 className="text-[13px] font-bold text-green-500 uppercase tracking-wider mb-1">Expected Outcome</h3>
-              <p className="text-[15px] font-medium text-[var(--label-primary)]">{advice.expectedOutcome}</p>
+              <h3 className="text-[13px] font-bold text-green-500 uppercase tracking-wider mb-1">
+                Expected Outcome
+              </h3>
+              <p className="text-[15px] font-medium text-[var(--label-primary)]">
+                {advice.expectedOutcome}
+              </p>
             </div>
           </div>
         </motion.div>

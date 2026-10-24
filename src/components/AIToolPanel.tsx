@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  CircleNotch as Loader2, 
-  Sparkle as Sparkles, 
-  ArrowsClockwise as RefreshCw, 
+import {
+  CircleNotch as Loader2,
+  Sparkle as Sparkles,
+  ArrowsClockwise as RefreshCw,
   CheckCircle as CheckCircle2,
   TrendUp,
   Plus,
@@ -52,12 +52,12 @@ export default function AIToolPanel({
   videoHistory,
   onSelectVideo,
   isScoring,
-  scoreData
+  scoreData,
 }: AIToolPanelProps) {
   const [isAnalyzingSuggestions, setIsAnalyzingSuggestions] = useState(false);
   const [suggestionsData, setSuggestionsData] = useState<any>(null);
   const [activeSuggestionTab, setActiveSuggestionTab] = useState<'trending' | 'angles'>('trending');
-  
+
   const [showContextSettings, setShowContextSettings] = useState(false);
   const [contentTone, setContentTone] = useState('Professional');
   const [contentAudience, setContentAudience] = useState('');
@@ -83,15 +83,15 @@ export default function AIToolPanel({
 
   const handleOptimizeSearch = async () => {
     if (!body) {
-      showToast("Please add some content first to optimize.");
+      showToast('Please add some content first to optimize.');
       return;
     }
     setIsPolishing(true);
-    showToast("Generating optimized search terms...");
+    showToast('Generating optimized search terms...');
     try {
       const terms = await optimizeSearchTerms(body, contentTone, contentAudience, contentGoal);
-      setBody(prev => `${prev}\n\nSearch Optimization:\n${terms}`);
-      showToast("Search terms appended to content");
+      setBody((prev) => `${prev}\n\nSearch Optimization:\n${terms}`);
+      showToast('Search terms appended to content');
     } catch (error: any) {
       console.error('Optimization failed:', error);
       showToast(getFriendlyError(error));
@@ -105,7 +105,7 @@ export default function AIToolPanel({
       {/* AI Score Feedback & Skeletons */}
       <AnimatePresence mode="wait">
         {isScoring ? (
-          <motion.section 
+          <motion.section
             key="loading-score"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -133,22 +133,29 @@ export default function AIToolPanel({
               ))}
             </div>
           </motion.section>
-        ) : scoreData && (
-          <motion.section 
-            key="score-data"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-2"
-          >
-            <span className="ios-label">AI Intelligence Score</span>
-            <div className="bg-[var(--bg-tertiary)] ios-card overflow-hidden divide-y divide-[var(--separator)]">
+        ) : (
+          scoreData && (
+            <motion.section
+              key="score-data"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-2"
+            >
+              <span className="ios-label">AI Intelligence Score</span>
+              <div className="bg-[var(--bg-tertiary)] ios-card overflow-hidden divide-y divide-[var(--separator)]">
                 <div className="p-6 flex flex-col items-center">
-                  <div className="font-serif text-[48px] font-semibold tracking-[-0.015em] leading-none mb-1">{scoreData.score}</div>
-                  <div className={cn(
-                    "text-[13px] font-bold uppercase",
-                    scoreData.score > 70 ? "text-[var(--system-green)]" : "text-[var(--system-orange)]"
-                  )}>
-                    {scoreData.score > 70 ? "High Fidelity" : "Needs Refinement"}
+                  <div className="font-serif text-[48px] font-semibold tracking-[-0.015em] leading-none mb-1">
+                    {scoreData.score}
+                  </div>
+                  <div
+                    className={cn(
+                      'text-[13px] font-bold uppercase',
+                      scoreData.score > 70
+                        ? 'text-[var(--system-green)]'
+                        : 'text-[var(--system-orange)]',
+                    )}
+                  >
+                    {scoreData.score > 70 ? 'High Fidelity' : 'Needs Refinement'}
                   </div>
                 </div>
                 <div className="p-5 bg-[var(--bg-secondary)]/30">
@@ -156,12 +163,17 @@ export default function AIToolPanel({
                 </div>
                 {scoreData.suggestions.map((s: string, i: number) => (
                   <div key={i} className="p-4 flex items-center gap-3">
-                    <CheckCircle2 size={18} strokeWidth={1.5} className="text-[var(--system-green)] shrink-0" />
+                    <CheckCircle2
+                      size={18}
+                      strokeWidth={1.5}
+                      className="text-[var(--system-green)] shrink-0"
+                    />
                     <span className="text-[15px] font-medium">{s}</span>
                   </div>
                 ))}
-            </div>
-          </motion.section>
+              </div>
+            </motion.section>
+          )
         )}
       </AnimatePresence>
 
@@ -178,9 +190,12 @@ export default function AIToolPanel({
                 <Sparkles size={24} />
               </div>
               <div className="space-y-1.5">
-                <p className="text-[14px] font-bold text-[var(--label-primary)]">Analyze Performance DNA</p>
+                <p className="text-[14px] font-bold text-[var(--label-primary)]">
+                  Analyze Performance DNA
+                </p>
                 <p className="text-[12px] text-[var(--label-secondary)] leading-relaxed font-medium">
-                  We'll inspect your previous {allProjects.length} projects to find high-performing niches and generate trending topics & unique custom angles.
+                  We'll inspect your previous {allProjects.length} projects to find high-performing
+                  niches and generate trending topics & unique custom angles.
                 </p>
               </div>
               <button
@@ -197,12 +212,12 @@ export default function AIToolPanel({
                 <motion.div
                   animate={{
                     scale: [1, 1.3, 1],
-                    opacity: [0.5, 0.1, 0.5]
+                    opacity: [0.5, 0.1, 0.5],
                   }}
                   transition={{
                     duration: 2,
                     repeat: Infinity,
-                    ease: "easeInOut"
+                    ease: 'easeInOut',
                   }}
                   className="absolute inset-0 rounded-full bg-[var(--accent)]/20"
                 />
@@ -211,8 +226,12 @@ export default function AIToolPanel({
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-[14px] font-bold text-[var(--label-primary)] animate-pulse">Running smart analysis...</p>
-                <p className="text-[11px] text-[var(--label-tertiary)] font-semibold">Matching brand vector with social footprint</p>
+                <p className="text-[14px] font-bold text-[var(--label-primary)] animate-pulse">
+                  Running smart analysis...
+                </p>
+                <p className="text-[11px] text-[var(--label-tertiary)] font-semibold">
+                  Matching brand vector with social footprint
+                </p>
               </div>
             </div>
           ) : (
@@ -227,10 +246,10 @@ export default function AIToolPanel({
                 <button
                   onClick={() => setActiveSuggestionTab('trending')}
                   className={cn(
-                    "flex-1 py-1.5 rounded-lg text-[12px] font-bold transition-all cursor-pointer",
+                    'flex-1 py-1.5 rounded-lg text-[12px] font-bold transition-all cursor-pointer',
                     activeSuggestionTab === 'trending'
-                      ? "bg-[var(--accent)] text-white shadow"
-                      : "text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
+                      ? 'bg-[var(--accent)] text-white shadow'
+                      : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)]',
                   )}
                 >
                   Trending Topics
@@ -238,71 +257,92 @@ export default function AIToolPanel({
                 <button
                   onClick={() => setActiveSuggestionTab('angles')}
                   className={cn(
-                    "flex-1 py-1.5 rounded-lg text-[12px] font-bold transition-all cursor-pointer",
+                    'flex-1 py-1.5 rounded-lg text-[12px] font-bold transition-all cursor-pointer',
                     activeSuggestionTab === 'angles'
-                      ? "bg-[var(--accent)] text-white shadow"
-                      : "text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
+                      ? 'bg-[var(--accent)] text-white shadow'
+                      : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)]',
                   )}
                 >
                   New Angles
                 </button>
               </div>
               <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
-                {activeSuggestionTab === 'trending' ? (
-                  suggestionsData.trendingTopics?.map((t: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="bg-[var(--bg-secondary)] border border-[var(--separator)] p-3.5 rounded-xl hover:border-[var(--accent)]/50 transition-all space-y-2 group"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="space-y-1">
-                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)]">
-                            {t.platform}
-                          </span>
-                          <h4 className="font-bold text-[14px] text-[var(--label-primary)] leading-tight mt-1">{t.topic}</h4>
+                {activeSuggestionTab === 'trending'
+                  ? suggestionsData.trendingTopics?.map((t: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="bg-[var(--bg-secondary)] border border-[var(--separator)] p-3.5 rounded-xl hover:border-[var(--accent)]/50 transition-all space-y-2 group"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)]">
+                              {t.platform}
+                            </span>
+                            <h4 className="font-bold text-[14px] text-[var(--label-primary)] leading-tight mt-1">
+                              {t.topic}
+                            </h4>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setTitle(t.topic);
+                              setBody(
+                                `${t.angle}\n\n[Topic Context / Target Justification]:\n${t.justification}`,
+                              );
+                              showToast(`Loaded "${t.topic}" into editor`);
+                            }}
+                            className="p-1.5 rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--accent)] hover:text-white transition-colors border border-[var(--separator)] shadow-sm shrink-0 cursor-pointer"
+                            title="Adopt Topic"
+                          >
+                            <Plus size={14} />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => {
-                            setTitle(t.topic);
-                            setBody(`${t.angle}\n\n[Topic Context / Target Justification]:\n${t.justification}`);
-                            showToast(`Loaded "${t.topic}" into editor`);
-                          }}
-                          className="p-1.5 rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--accent)] hover:text-white transition-colors border border-[var(--separator)] shadow-sm shrink-0 cursor-pointer"
-                          title="Adopt Topic"
-                        >
-                          <Plus size={14} />
-                        </button>
+                        <p className="text-[12px] text-[var(--label-secondary)] leading-relaxed">
+                          <span className="font-semibold text-[var(--label-primary)]">Angle:</span>{' '}
+                          {t.angle}
+                        </p>
+                        <p className="text-[11px] text-[var(--label-tertiary)] italic">
+                          {t.justification}
+                        </p>
                       </div>
-                      <p className="text-[12px] text-[var(--label-secondary)] leading-relaxed"><span className="font-semibold text-[var(--label-primary)]">Angle:</span> {t.angle}</p>
-                      <p className="text-[11px] text-[var(--label-tertiary)] italic">{t.justification}</p>
-                    </div>
-                  ))
-                ) : (
-                  suggestionsData.newAngles?.map((t: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="bg-[var(--bg-secondary)] border border-[var(--separator)] p-3.5 rounded-xl hover:border-[var(--accent)]/50 transition-all space-y-2 group"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-bold text-[14px] text-[var(--label-primary)] leading-tight">{t.hook}</h4>
-                        <button
-                          onClick={() => {
-                            setBody(prev => (prev ? prev + '\n\n' + t.script_outline : t.script_outline));
-                            showToast(`Loaded angle into editor`);
-                          }}
-                          className="p-1.5 rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--accent)] hover:text-white transition-colors border border-[var(--separator)] shadow-sm shrink-0 cursor-pointer"
-                          title="Adopt Angle"
-                        >
-                          <Plus size={14} />
-                        </button>
+                    ))
+                  : suggestionsData.newAngles?.map((t: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="bg-[var(--bg-secondary)] border border-[var(--separator)] p-3.5 rounded-xl hover:border-[var(--accent)]/50 transition-all space-y-2 group"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-bold text-[14px] text-[var(--label-primary)] leading-tight">
+                            {t.hook}
+                          </h4>
+                          <button
+                            onClick={() => {
+                              setBody((prev) =>
+                                prev ? prev + '\n\n' + t.script_outline : t.script_outline,
+                              );
+                              showToast(`Loaded angle into editor`);
+                            }}
+                            className="p-1.5 rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--accent)] hover:text-white transition-colors border border-[var(--separator)] shadow-sm shrink-0 cursor-pointer"
+                            title="Adopt Angle"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                        <p className="text-[12px] text-[var(--label-secondary)] leading-relaxed mt-1">
+                          <span className="font-semibold text-[var(--label-primary)]">
+                            Why it works:
+                          </span>{' '}
+                          {t.psychology}
+                        </p>
+                        <div className="text-[11px] text-[var(--label-tertiary)] font-medium mt-2 p-2 bg-[var(--bg-primary)] rounded-md border border-[var(--separator)] whitespace-pre-wrap">
+                          {t.script_outline}
+                        </div>
                       </div>
-                      <p className="text-[12px] text-[var(--label-secondary)] leading-relaxed mt-1"><span className="font-semibold text-[var(--label-primary)]">Why it works:</span> {t.psychology}</p>
-                      <div className="text-[11px] text-[var(--label-tertiary)] font-medium mt-2 p-2 bg-[var(--bg-primary)] rounded-md border border-[var(--separator)] whitespace-pre-wrap">{t.script_outline}</div>
-                    </div>
-                  ))
-                )}
+                    ))}
                 <div className="pt-2 text-center">
-                  <button onClick={handleGenerateSuggestions} className="text-[12px] font-bold text-[var(--accent)] hover:underline cursor-pointer">
+                  <button
+                    onClick={handleGenerateSuggestions}
+                    className="text-[12px] font-bold text-[var(--accent)] hover:underline cursor-pointer"
+                  >
                     Re-Analyze Performance
                   </button>
                 </div>
@@ -315,20 +355,41 @@ export default function AIToolPanel({
       <section>
         <span className="ios-label">Context & Search Settings</span>
         <div className="bg-[var(--bg-tertiary)] ios-card overflow-hidden divide-y divide-[var(--separator)]">
-          <div onClick={() => setShowContextSettings(!showContextSettings)} className="p-4 flex items-center justify-between active:bg-[var(--separator)] transition-colors cursor-pointer">
+          <div
+            onClick={() => setShowContextSettings(!showContextSettings)}
+            className="p-4 flex items-center justify-between active:bg-[var(--separator)] transition-colors cursor-pointer"
+          >
             <div className="flex items-center gap-3">
               <Settings size={20} strokeWidth={1.5} className="text-[var(--label-secondary)]" />
               <span className="font-semibold">Content Context</span>
             </div>
-            <ChevronRight size={18} strokeWidth={1.5} className={cn("text-[var(--label-tertiary)] transition-transform", showContextSettings && "rotate-90")} />
+            <ChevronRight
+              size={18}
+              strokeWidth={1.5}
+              className={cn(
+                'text-[var(--label-tertiary)] transition-transform',
+                showContextSettings && 'rotate-90',
+              )}
+            />
           </div>
           <AnimatePresence>
             {showContextSettings && (
-              <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden bg-[var(--bg-secondary)]/50">
+              <motion.div
+                initial={{ height: 0 }}
+                animate={{ height: 'auto' }}
+                exit={{ height: 0 }}
+                className="overflow-hidden bg-[var(--bg-secondary)]/50"
+              >
                 <div className="p-4 space-y-4">
                   <div>
-                    <label className="text-[12px] font-semibold text-[var(--label-secondary)] mb-1 block">Tone of Voice</label>
-                    <select value={contentTone} onChange={e => setContentTone(e.target.value)} className="w-full bg-[var(--bg-primary)] border border-[var(--separator)] rounded-lg p-2 text-[13px] outline-none">
+                    <label className="text-[12px] font-semibold text-[var(--label-secondary)] mb-1 block">
+                      Tone of Voice
+                    </label>
+                    <select
+                      value={contentTone}
+                      onChange={(e) => setContentTone(e.target.value)}
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--separator)] rounded-lg p-2 text-[13px] outline-none"
+                    >
                       <option>Professional</option>
                       <option>Casual</option>
                       <option>Humorous</option>
@@ -337,12 +398,26 @@ export default function AIToolPanel({
                     </select>
                   </div>
                   <div>
-                    <label className="text-[12px] font-semibold text-[var(--label-secondary)] mb-1 block">Target Audience</label>
-                    <input type="text" value={contentAudience} onChange={e => setContentAudience(e.target.value)} placeholder="e.g. Gen Z marketers" className="w-full bg-[var(--bg-primary)] border border-[var(--separator)] rounded-lg p-2 text-[13px] outline-none" />
+                    <label className="text-[12px] font-semibold text-[var(--label-secondary)] mb-1 block">
+                      Target Audience
+                    </label>
+                    <input
+                      type="text"
+                      value={contentAudience}
+                      onChange={(e) => setContentAudience(e.target.value)}
+                      placeholder="e.g. Gen Z marketers"
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--separator)] rounded-lg p-2 text-[13px] outline-none"
+                    />
                   </div>
                   <div>
-                    <label className="text-[12px] font-semibold text-[var(--label-secondary)] mb-1 block">Primary Goal</label>
-                    <select value={contentGoal} onChange={e => setContentGoal(e.target.value)} className="w-full bg-[var(--bg-primary)] border border-[var(--separator)] rounded-lg p-2 text-[13px] outline-none">
+                    <label className="text-[12px] font-semibold text-[var(--label-secondary)] mb-1 block">
+                      Primary Goal
+                    </label>
+                    <select
+                      value={contentGoal}
+                      onChange={(e) => setContentGoal(e.target.value)}
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--separator)] rounded-lg p-2 text-[13px] outline-none"
+                    >
                       <option>Engagement</option>
                       <option>Conversion & Sales</option>
                       <option>Education</option>
@@ -353,14 +428,24 @@ export default function AIToolPanel({
               </motion.div>
             )}
           </AnimatePresence>
-          <div onClick={handleOptimizeSearch} className="p-4 flex items-center justify-between active:bg-[var(--separator)] transition-colors cursor-pointer">
+          <div
+            onClick={handleOptimizeSearch}
+            className="p-4 flex items-center justify-between active:bg-[var(--separator)] transition-colors cursor-pointer"
+          >
             <div className="flex items-center gap-3">
               <Search size={20} strokeWidth={1.5} className="text-[var(--label-secondary)]" />
               <span className="font-semibold">Optimize Search</span>
             </div>
-            {isPolishing ? <Loader2 size={18} className="animate-spin text-[var(--label-tertiary)]" /> : <ChevronRight size={18} strokeWidth={1.5} className="text-[var(--label-tertiary)]" />}
+            {isPolishing ? (
+              <Loader2 size={18} className="animate-spin text-[var(--label-tertiary)]" />
+            ) : (
+              <ChevronRight size={18} strokeWidth={1.5} className="text-[var(--label-tertiary)]" />
+            )}
           </div>
-          <div onClick={() => setActiveTab('brand')} className="p-4 flex items-center justify-between active:bg-[var(--separator)] transition-colors cursor-pointer">
+          <div
+            onClick={() => setActiveTab('brand')}
+            className="p-4 flex items-center justify-between active:bg-[var(--separator)] transition-colors cursor-pointer"
+          >
             <div className="flex items-center gap-3">
               <BrandIcon size={20} strokeWidth={1.5} className="text-[var(--label-secondary)]" />
               <span className="font-semibold">Global Brand Profile</span>
@@ -373,10 +458,24 @@ export default function AIToolPanel({
       <section>
         <span className="ios-label">Distribution</span>
         <div className="bg-[var(--bg-tertiary)] ios-card overflow-hidden divide-y divide-[var(--separator)]">
-          {PLATFORMS.map(p => (
-            <div key={p.id} onClick={() => onFormat(p.id, p.label, false)} className={cn("p-4 flex items-center justify-between active:bg-[var(--separator)] cursor-pointer transition-colors", p.id === platform ? "bg-[var(--bg-primary)] text-[var(--accent)]" : "text-[var(--label-primary)]")}>
+          {PLATFORMS.map((p) => (
+            <div
+              key={p.id}
+              onClick={() => onFormat(p.id, p.label, false)}
+              className={cn(
+                'p-4 flex items-center justify-between active:bg-[var(--separator)] cursor-pointer transition-colors',
+                p.id === platform
+                  ? 'bg-[var(--bg-primary)] text-[var(--accent)]'
+                  : 'text-[var(--label-primary)]',
+              )}
+            >
               <div className="flex items-center gap-3">
-                <div className={cn("flex items-center justify-center w-[22px] h-[22px] text-xl", p.id !== platform && "text-[var(--label-secondary)]")}>
+                <div
+                  className={cn(
+                    'flex items-center justify-center w-[22px] h-[22px] text-xl',
+                    p.id !== platform && 'text-[var(--label-secondary)]',
+                  )}
+                >
                   {p.icon}
                 </div>
                 <span className="font-semibold">{p.distributionLabel}</span>
@@ -384,7 +483,11 @@ export default function AIToolPanel({
               {p.id === platform ? (
                 <div className="w-2 h-2 rounded-full bg-[var(--accent)] mr-2" />
               ) : (
-                <ChevronRight size={18} strokeWidth={1.5} className="text-[var(--label-tertiary)]" />
+                <ChevronRight
+                  size={18}
+                  strokeWidth={1.5}
+                  className="text-[var(--label-tertiary)]"
+                />
               )}
             </div>
           ))}
@@ -399,8 +502,12 @@ export default function AIToolPanel({
               No videos generated yet.
             </div>
           ) : (
-            videoHistory.map(item => (
-              <div key={item.id} onClick={() => onSelectVideo(item)} className="p-3 flex items-center gap-3 hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer group">
+            videoHistory.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => onSelectVideo(item)}
+                className="p-3 flex items-center gap-3 hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer group"
+              >
                 <div className="relative w-10 h-14 rounded bg-black/10 shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
                   <video src={item.url || undefined} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/35 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -409,9 +516,19 @@ export default function AIToolPanel({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-semibold truncate">{item.title}</p>
-                  <p className="text-[11px] text-[var(--label-tertiary)] truncate">{new Date(item.createdAt?.toDate?.() || Date.now()).toLocaleDateString()}</p>
+                  <p className="text-[11px] text-[var(--label-tertiary)] truncate">
+                    {new Date(item.createdAt?.toDate?.() || Date.now()).toLocaleDateString()}
+                  </p>
                 </div>
-                <a href={item.url} download onClick={(e) => e.stopPropagation()} target="_blank" rel="noopener noreferrer" className="p-2 bg-[var(--bg-primary)] rounded-full text-[var(--accent)] hover:scale-110 active:scale-95 transition-transform shrink-0 shadow-sm border border-[var(--separator)]" title="Download">
+                <a
+                  href={item.url}
+                  download
+                  onClick={(e) => e.stopPropagation()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 bg-[var(--bg-primary)] rounded-full text-[var(--accent)] hover:scale-110 active:scale-95 transition-transform shrink-0 shadow-sm border border-[var(--separator)]"
+                  title="Download"
+                >
                   <Download size={16} weight="bold" />
                 </a>
               </div>

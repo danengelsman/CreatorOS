@@ -15,8 +15,9 @@ try {
   console.error('Security bootstrap: failed to read Firebase config:', error);
 }
 
-const securityApp = admin.apps.find((app) => app?.name === 'creatoros-security')
-  ?? admin.initializeApp({ projectId }, 'creatoros-security');
+const securityApp =
+  admin.apps.find((app) => app?.name === 'creatoros-security') ??
+  admin.initializeApp({ projectId }, 'creatoros-security');
 const securityAuth = admin.auth(securityApp);
 
 const WINDOW_MS = 60_000;
@@ -55,9 +56,11 @@ function isAllowedGeminiUri(value: unknown) {
     const url = new URL(value);
     if (url.protocol !== 'https:') return false;
     const hostname = url.hostname.toLowerCase();
-    return hostname === 'generativelanguage.googleapis.com'
-      || hostname.endsWith('.googleapis.com')
-      || hostname.endsWith('.googleusercontent.com');
+    return (
+      hostname === 'generativelanguage.googleapis.com' ||
+      hostname.endsWith('.googleapis.com') ||
+      hostname.endsWith('.googleusercontent.com')
+    );
   } catch {
     return false;
   }
@@ -91,7 +94,12 @@ async function protectGeminiRoute(req: any, res: any, next: any) {
 
     if (route === '/api/gemini/generate') {
       const requestedModel = req.body?.model;
-      const allowedModels = new Set(['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash']);
+      const allowedModels = new Set([
+        'gemini-3.8-flash',
+        'gemini-3.6-flash',
+        'gemini-3.1-flash-lite',
+        'gemini-2.5-flash',
+      ]);
       if (requestedModel && !allowedModels.has(requestedModel)) {
         return res.status(400).json({ error: 'Unsupported Gemini model.' });
       }
@@ -121,7 +129,9 @@ function protectGeminiRegistration() {
   const originalPost = express.application.post;
   express.application.post = function patchedPost(pathOrPaths: any, ...handlers: any[]) {
     const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
-    const hasGeminiRoute = paths.some((value) => typeof value === 'string' && limits[value] !== undefined);
+    const hasGeminiRoute = paths.some(
+      (value) => typeof value === 'string' && limits[value] !== undefined,
+    );
     if (hasGeminiRoute) {
       return originalPost.call(this, pathOrPaths, protectGeminiRoute, ...handlers);
     }

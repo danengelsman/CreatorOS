@@ -7,8 +7,10 @@ const app = initializeApp(config);
 const db = getFirestore(app, config.firestoreDatabaseId);
 
 const bigData = 'a'.repeat(500 * 1024); // 500KB
-setDoc(doc(db, 'test', 'big'), { data: bigData }).then(() => {
-  console.log('Firestore save success');
-}).catch(e => {
-  console.error('Firestore save failed:', e.message);
-});
+setDoc(doc(db, 'test', 'big'), { data: bigData })
+  .then(() => {
+    console.log('Firestore save success');
+  })
+  .catch((e) => {
+    console.error('Firestore save failed:', e.message);
+  });

@@ -456,17 +456,17 @@ tokens, F2.x Firestore convergence — see `PROJECT_STATE.md`). What remains:
 
 ## Tech Stack Summary
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 19, Vite, TypeScript, Tailwind CSS, Motion (framer-motion) |
-| Backend | Node.js, Express, TypeScript |
-| Auth | Firebase Authentication (Client + Admin SDK) |
-| Database | Firebase Firestore (client SDK + admin SDK — single source of truth) |
-| AI | Google GenAI SDK (Gemini 3.8-flash, 3.1-flash-lite) |
-| OAuth | Google OAuth2, TikTok OAuth |
-| Deployment | Vercel (serverless functions) |
-| Icons | Phosphor Icons, Lucide React |
-| Charts | Recharts |
+| Layer      | Technology                                                           |
+| ---------- | -------------------------------------------------------------------- |
+| Frontend   | React 19, Vite, TypeScript, Tailwind CSS, Motion (framer-motion)     |
+| Backend    | Node.js, Express, TypeScript                                         |
+| Auth       | Firebase Authentication (Client + Admin SDK)                         |
+| Database   | Firebase Firestore (client SDK + admin SDK — single source of truth) |
+| AI         | Google GenAI SDK (Gemini 3.8-flash, 3.1-flash-lite)                  |
+| OAuth      | Google OAuth2, TikTok OAuth                                          |
+| Deployment | Vercel (serverless functions)                                        |
+| Icons      | Phosphor Icons, Lucide React                                         |
+| Charts     | Recharts                                                             |
 
 ## File Structure
 

@@ -73,7 +73,8 @@ function integrationCol() {
 
 function rowFromDoc(id: string, data: any): IntegrationRecord {
   return {
-    platform: typeof data?.platform === 'string' ? data.platform : id.slice(id.lastIndexOf('_') + 1),
+    platform:
+      typeof data?.platform === 'string' ? data.platform : id.slice(id.lastIndexOf('_') + 1),
     access_token: typeof data?.access_token === 'string' ? data.access_token : null,
     refresh_token: typeof data?.refresh_token === 'string' ? data.refresh_token : null,
     expiry_date: typeof data?.expiry_date === 'number' ? data.expiry_date : null,
@@ -85,28 +86,36 @@ function rowFromDoc(id: string, data: any): IntegrationRecord {
 /** Insert-or-update a connected account (tokens must already be encrypted). */
 export async function upsertIntegration(input: IntegrationInput): Promise<void> {
   const ref = integrationCol().doc(integrationDocId(input.uid, input.platform));
-  await ref.set({
-    uid: input.uid,
-    platform: input.platform,
-    access_token: input.access_token ?? null,
-    refresh_token: input.refresh_token ?? null,
-    expiry_date: typeof input.expiry_date === 'number' ? input.expiry_date : null,
-    profile_data: input.profile_data ?? null,
-    updated_at: new Date().toISOString(),
-  }, { merge: true });
+  await ref.set(
+    {
+      uid: input.uid,
+      platform: input.platform,
+      access_token: input.access_token ?? null,
+      refresh_token: input.refresh_token ?? null,
+      expiry_date: typeof input.expiry_date === 'number' ? input.expiry_date : null,
+      profile_data: input.profile_data ?? null,
+      updated_at: new Date().toISOString(),
+    },
+    { merge: true },
+  );
 }
 
 /** Patch selected fields (used by the F1.4 lazy legacy-token upgrade). */
 export async function updateIntegrationFields(
   uid: string,
   platform: string,
-  patch: Partial<Pick<IntegrationRecord, 'access_token' | 'refresh_token' | 'expiry_date' | 'profile_data'>>
+  patch: Partial<
+    Pick<IntegrationRecord, 'access_token' | 'refresh_token' | 'expiry_date' | 'profile_data'>
+  >,
 ): Promise<void> {
   const ref = integrationCol().doc(integrationDocId(uid, platform));
   await ref.set({ ...patch, updated_at: new Date().toISOString() }, { merge: true });
 }
 
-export async function getIntegration(uid: string, platform: string): Promise<IntegrationRecord | null> {
+export async function getIntegration(
+  uid: string,
+  platform: string,
+): Promise<IntegrationRecord | null> {
   const snap = await integrationCol().doc(integrationDocId(uid, platform)).get();
   if (!snap.exists) return null;
   return rowFromDoc(snap.id, snap.data());

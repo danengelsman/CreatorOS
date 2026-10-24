@@ -4,11 +4,7 @@
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "module": "ESNext",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
@@ -16,12 +12,19 @@
     "allowJs": true,
     "jsx": "react-jsx",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./src/*"]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    "strictNullChecks": true
   },
-  "exclude": ["dist", "node_modules", ".svelte-kit", "build", "e2e", "playwright.config.ts", "scripts"]
+  "exclude": [
+    "dist",
+    "node_modules",
+    ".svelte-kit",
+    "build",
+    "e2e",
+    "playwright.config.ts",
+    "scripts"
+  ]
 }

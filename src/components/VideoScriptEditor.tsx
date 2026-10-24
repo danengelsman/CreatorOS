@@ -1,6 +1,15 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { VideoCamera, Clock, User, Sparkle, Image as ImageIcon, TextAa, ClockCounterClockwise, Lightning } from '@phosphor-icons/react';
+import {
+  VideoCamera,
+  Clock,
+  User,
+  Sparkle,
+  Image as ImageIcon,
+  TextAa,
+  ClockCounterClockwise,
+  Lightning,
+} from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 
 export interface VideoScriptEditorProps {
@@ -29,16 +38,26 @@ export interface VideoScriptEditorProps {
 
 export default function VideoScriptEditor({
   showSettings,
-  videoStyle, setVideoStyle,
-  videoAspect, setVideoAspect,
-  videoLength, setVideoLength,
-  avatarGender, setAvatarGender,
-  avatarClothing, setAvatarClothing,
-  backgroundStyle, setBackgroundStyle,
-  textOverlay, setTextOverlay,
-  ttsScript, setTtsScript,
-  editedPrompt, setEditedPrompt,
-  isPromptCustomized, setIsPromptCustomized
+  videoStyle,
+  setVideoStyle,
+  videoAspect,
+  setVideoAspect,
+  videoLength,
+  setVideoLength,
+  avatarGender,
+  setAvatarGender,
+  avatarClothing,
+  setAvatarClothing,
+  backgroundStyle,
+  setBackgroundStyle,
+  textOverlay,
+  setTextOverlay,
+  ttsScript,
+  setTtsScript,
+  editedPrompt,
+  setEditedPrompt,
+  isPromptCustomized,
+  setIsPromptCustomized,
 }: VideoScriptEditorProps) {
   return (
     <>
@@ -59,9 +78,39 @@ export default function VideoScriptEditor({
                       <VideoCamera size={16} /> Video Style
                     </label>
                     <div className="flex items-center bg-[var(--bg-secondary)] p-1 rounded-xl">
-                        <button onClick={() => setVideoStyle('faceless')} className={cn("flex-1 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all", videoStyle === 'faceless' ? "bg-[var(--bg-primary)] ios-elevated text-[var(--accent)]" : "text-[var(--label-secondary)] hover:text-[var(--label-primary)]")}>Faceless</button>
-                        <button onClick={() => setVideoStyle('avatar')} className={cn("flex-1 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all", videoStyle === 'avatar' ? "bg-[var(--bg-primary)] ios-elevated text-[var(--accent)]" : "text-[var(--label-secondary)] hover:text-[var(--label-primary)]")}>AI Avatar</button>
-                        <button onClick={() => setVideoStyle('upload')} className={cn("flex-1 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all", videoStyle === 'upload' ? "bg-[var(--bg-primary)] ios-elevated text-[var(--accent)]" : "text-[var(--label-secondary)] hover:text-[var(--label-primary)]")}>Upload</button>
+                      <button
+                        onClick={() => setVideoStyle('faceless')}
+                        className={cn(
+                          'flex-1 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all',
+                          videoStyle === 'faceless'
+                            ? 'bg-[var(--bg-primary)] ios-elevated text-[var(--accent)]'
+                            : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)]',
+                        )}
+                      >
+                        Faceless
+                      </button>
+                      <button
+                        onClick={() => setVideoStyle('avatar')}
+                        className={cn(
+                          'flex-1 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all',
+                          videoStyle === 'avatar'
+                            ? 'bg-[var(--bg-primary)] ios-elevated text-[var(--accent)]'
+                            : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)]',
+                        )}
+                      >
+                        AI Avatar
+                      </button>
+                      <button
+                        onClick={() => setVideoStyle('upload')}
+                        className={cn(
+                          'flex-1 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all',
+                          videoStyle === 'upload'
+                            ? 'bg-[var(--bg-primary)] ios-elevated text-[var(--accent)]'
+                            : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)]',
+                        )}
+                      >
+                        Upload
+                      </button>
                     </div>
                   </div>
 
@@ -70,12 +119,20 @@ export default function VideoScriptEditor({
                       <Clock size={16} /> Duration & Format
                     </label>
                     <div className="flex gap-2">
-                      <select value={videoLength} onChange={e => setVideoLength(e.target.value)} className="flex-1 bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none">
+                      <select
+                        value={videoLength}
+                        onChange={(e) => setVideoLength(e.target.value)}
+                        className="flex-1 bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none"
+                      >
                         <option>Short (5s)</option>
                         <option>Long (10s)</option>
                         <option>Extended (20s)</option>
                       </select>
-                      <select value={videoAspect} onChange={e => setVideoAspect(e.target.value as any)} className="w-24 bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none">
+                      <select
+                        value={videoAspect}
+                        onChange={(e) => setVideoAspect(e.target.value as any)}
+                        className="w-24 bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none"
+                      >
                         <option value="9:16">9:16</option>
                         <option value="16:9">16:9</option>
                       </select>
@@ -86,7 +143,13 @@ export default function VideoScriptEditor({
                     <label className="text-[13px] font-semibold text-[var(--label-secondary)] flex items-center gap-2">
                       <ImageIcon size={16} /> Environment / Background
                     </label>
-                    <input type="text" value={backgroundStyle} onChange={e => setBackgroundStyle(e.target.value)} className="w-full bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none placeholder:text-[var(--label-tertiary)]" placeholder="E.g., Modern office, Cyberpunk city..." />
+                    <input
+                      type="text"
+                      value={backgroundStyle}
+                      onChange={(e) => setBackgroundStyle(e.target.value)}
+                      className="w-full bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none placeholder:text-[var(--label-tertiary)]"
+                      placeholder="E.g., Modern office, Cyberpunk city..."
+                    />
                   </div>
                 </div>
 
@@ -94,13 +157,22 @@ export default function VideoScriptEditor({
                 <div className="space-y-4">
                   <AnimatePresence>
                     {videoStyle === 'avatar' && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4">
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-4"
+                      >
                         <div className="space-y-2">
                           <label className="text-[13px] font-semibold text-[var(--label-secondary)] flex items-center gap-2">
                             <User size={16} /> Avatar Properties
                           </label>
                           <div className="flex gap-2">
-                            <select value={avatarGender} onChange={e => setAvatarGender(e.target.value)} className="flex-1 bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none">
+                            <select
+                              value={avatarGender}
+                              onChange={(e) => setAvatarGender(e.target.value)}
+                              className="flex-1 bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none"
+                            >
                               <option>Female</option>
                               <option>Male</option>
                               <option>Non-binary</option>
@@ -109,7 +181,13 @@ export default function VideoScriptEditor({
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <input type="text" value={avatarClothing} onChange={e => setAvatarClothing(e.target.value)} className="w-full bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none placeholder:text-[var(--label-tertiary)]" placeholder="Clothing style (e.g., Casual, Suit)..." />
+                          <input
+                            type="text"
+                            value={avatarClothing}
+                            onChange={(e) => setAvatarClothing(e.target.value)}
+                            className="w-full bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none placeholder:text-[var(--label-tertiary)]"
+                            placeholder="Clothing style (e.g., Casual, Suit)..."
+                          />
                         </div>
                       </motion.div>
                     )}
@@ -119,7 +197,13 @@ export default function VideoScriptEditor({
                     <label className="text-[13px] font-semibold text-[var(--label-secondary)] flex items-center gap-2">
                       <TextAa size={16} /> Text Overlays / Subtitles
                     </label>
-                    <input type="text" value={textOverlay} onChange={e => setTextOverlay(e.target.value)} className="w-full bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none placeholder:text-[var(--label-tertiary)]" placeholder="Specify flying text or captions..." />
+                    <input
+                      type="text"
+                      value={textOverlay}
+                      onChange={(e) => setTextOverlay(e.target.value)}
+                      className="w-full bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-2 outline-none placeholder:text-[var(--label-tertiary)]"
+                      placeholder="Specify flying text or captions..."
+                    />
                   </div>
                 </div>
               </div>
@@ -128,12 +212,15 @@ export default function VideoScriptEditor({
                 <label className="text-[13px] font-semibold text-[var(--label-secondary)] flex items-center gap-2">
                   <Sparkle size={16} /> TTS Script / Voice Corrections
                 </label>
-                <p className="text-[11px] text-[var(--label-tertiary)] mb-2">Edit this script to fix any AI mispronunciations or add phonetic spelling before generating.</p>
-                <textarea 
-                  value={ttsScript} 
-                  onChange={e => setTtsScript(e.target.value)} 
-                  className="w-full h-24 bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-3 outline-none placeholder:text-[var(--label-tertiary)] resize-none" 
-                  placeholder="Enter the exact script you want spoken..." 
+                <p className="text-[11px] text-[var(--label-tertiary)] mb-2">
+                  Edit this script to fix any AI mispronunciations or add phonetic spelling before
+                  generating.
+                </p>
+                <textarea
+                  value={ttsScript}
+                  onChange={(e) => setTtsScript(e.target.value)}
+                  className="w-full h-24 bg-[var(--bg-secondary)] border-none rounded-xl text-[13px] font-medium p-3 outline-none placeholder:text-[var(--label-tertiary)] resize-none"
+                  placeholder="Enter the exact script you want spoken..."
                 />
               </div>
             </div>
@@ -166,9 +253,10 @@ export default function VideoScriptEditor({
               )}
             </div>
           </div>
-          
+
           <p className="text-[11px] text-[var(--label-tertiary)]">
-            Directly edit this prompt to refine precise imagery details, flow, setting descriptors, or specific cues.
+            Directly edit this prompt to refine precise imagery details, flow, setting descriptors,
+            or specific cues.
           </p>
           <textarea
             value={editedPrompt}
@@ -177,8 +265,10 @@ export default function VideoScriptEditor({
               setIsPromptCustomized(true);
             }}
             className={cn(
-              "w-full h-24 bg-[var(--bg-secondary)] border border-[var(--separator)] rounded-xl text-[13px] font-medium p-3 outline-none placeholder:text-[var(--label-tertiary)] resize-none transition-all",
-              isPromptCustomized ? "ring-2 ring-[var(--accent)]/40 border-transparent bg-[var(--bg-primary)] text-[var(--label-primary)]" : "focus:border-[var(--accent)]/50 text-[var(--label-secondary)]"
+              'w-full h-24 bg-[var(--bg-secondary)] border border-[var(--separator)] rounded-xl text-[13px] font-medium p-3 outline-none placeholder:text-[var(--label-tertiary)] resize-none transition-all',
+              isPromptCustomized
+                ? 'ring-2 ring-[var(--accent)]/40 border-transparent bg-[var(--bg-primary)] text-[var(--label-primary)]'
+                : 'focus:border-[var(--accent)]/50 text-[var(--label-secondary)]',
             )}
             placeholder="Enter custom visual directions and script parameters..."
           />

@@ -8,7 +8,19 @@ import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { getFriendlyError } from '../lib/friendlyError';
 
-export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSelectedIdea }: { brand: any, setBrand: any, user: any, setActiveTab: any, setSelectedIdea?: any }) {
+export default function VideoIdeas({
+  brand,
+  setBrand,
+  user,
+  setActiveTab,
+  setSelectedIdea,
+}: {
+  brand: any;
+  setBrand: any;
+  user: any;
+  setActiveTab: any;
+  setSelectedIdea?: any;
+}) {
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [, setErrorMsg] = useState('');
 
@@ -32,15 +44,23 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
   useEffect(() => {
     // Generate a default title when transcription updates and is currently empty
     if (transcription.trim() && !ideaTitle) {
-      const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const dateStr = new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
       setIdeaTitle(`Spontaneous Idea - ${dateStr}`);
     }
   }, [transcription]);
 
   const startRecording = () => {
-    const SpeechRecognition = typeof window !== 'undefined' ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) : null;
+    const SpeechRecognition =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
     if (!SpeechRecognition) {
-      showToast("Speech recognition is not supported in this browser.");
+      showToast('Speech recognition is not supported in this browser.');
       return;
     }
 
@@ -53,7 +73,7 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
       rec.onstart = () => {
         setIsRecording(true);
         setInterimTranscript('');
-        showToast("Recording started... speak your idea");
+        showToast('Recording started... speak your idea');
       };
 
       rec.onresult = (event: any) => {
@@ -67,7 +87,7 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
           }
         }
         if (final) {
-          setTranscription(prev => prev + (prev ? ' ' : '') + final);
+          setTranscription((prev) => prev + (prev ? ' ' : '') + final);
         }
         setInterimTranscript(interim);
       };
@@ -75,7 +95,7 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
       rec.onerror = (event: any) => {
         console.error('Speech recognition error:', event);
         if (event.error === 'not-allowed') {
-          showToast("Microphone access was denied.");
+          showToast('Microphone access was denied.');
         } else {
           showToast(`Microphone error: ${event.error}`);
         }
@@ -91,7 +111,7 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
       recognitionRef.current = rec;
     } catch (err: any) {
       console.error('Failed to start speech recognition:', err);
-      showToast("Failed to initialize microphone dictation.");
+      showToast('Failed to initialize microphone dictation.');
     }
   };
 
@@ -126,11 +146,11 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
           title: ideaTitle || 'Untitled Spontaneous Idea',
           body: transcription,
           platform: platform,
-          score: 0
+          score: 0,
         },
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      }).catch(err => handleFirestoreError(err, OperationType.CREATE, 'projects'));
+        updatedAt: serverTimestamp(),
+      }).catch((err) => handleFirestoreError(err, OperationType.CREATE, 'projects'));
 
       setSaveSuccess(true);
       showToast('Saved to your project drafts!');
@@ -150,17 +170,19 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
     if (!user || !brand) return;
     setIsGeneratingIdeas(true);
     setErrorMsg('');
-    
+
     try {
       const ideas = await generateContentIdeas(brand);
       const updatedBrand = { ...brand, content_ideas: [...ideas, ...(brand.content_ideas || [])] };
-      
+
       const brandRef = doc(db, 'projects', `brand_${user.uid}`);
       await updateDoc(brandRef, {
         data: updatedBrand,
-        updatedAt: serverTimestamp()
-      }).catch(err => handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`));
-      
+        updatedAt: serverTimestamp(),
+      }).catch((err) =>
+        handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`),
+      );
+
       setBrand(updatedBrand);
     } catch (error: any) {
       console.error(error);
@@ -176,14 +198,14 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
         <div className="w-20 h-20 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mb-6 shadow-inner">
           <Lightbulb size={32} className="text-[var(--label-tertiary)]" />
         </div>
-        <h2 className="font-serif text-[32px] font-semibold tracking-[-0.015em] mb-4">You need a Brand Kit first</h2>
+        <h2 className="font-serif text-[32px] font-semibold tracking-[-0.015em] mb-4">
+          You need a Brand Kit first
+        </h2>
         <p className="text-[17px] text-[var(--label-secondary)] mb-8 max-w-md">
-          To generate highly targeted video ideas, you'll need to define your channel's brand style and personality.
+          To generate highly targeted video ideas, you'll need to define your channel's brand style
+          and personality.
         </p>
-        <button 
-          onClick={() => setActiveTab('brand')}
-          className="ios-button ios-button-filled px-8"
-        >
+        <button onClick={() => setActiveTab('brand')} className="ios-button ios-button-filled px-8">
           Create Brand Kit
         </button>
       </div>
@@ -193,8 +215,12 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
   return (
     <div className="max-w-3xl mx-auto space-y-8 pb-20 pt-4 relative">
       <div className="flex flex-col gap-2">
-        <h1 className="font-serif text-[36px] font-semibold tracking-[-0.015em] text-[var(--label-primary)]">Video Ideas</h1>
-        <p className="text-[17px] text-[var(--label-secondary)]">Brainstorm concepts tailored to your brand's unique style.</p>
+        <h1 className="font-serif text-[36px] font-semibold tracking-[-0.015em] text-[var(--label-primary)]">
+          Video Ideas
+        </h1>
+        <p className="text-[17px] text-[var(--label-secondary)]">
+          Brainstorm concepts tailored to your brand's unique style.
+        </p>
       </div>
 
       {/* Spontaneous Voice Capture Card */}
@@ -204,8 +230,12 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
             <Mic className="text-[var(--accent)]" size={18} />
           </div>
           <div>
-            <h2 className="font-bold text-[17px] text-[var(--label-primary)]">Record Spontaneous Idea</h2>
-            <p className="text-[13px] text-[var(--label-secondary)] font-medium">Speak your thoughts. We'll transcribe them into an editable draft project.</p>
+            <h2 className="font-bold text-[17px] text-[var(--label-primary)]">
+              Record Spontaneous Idea
+            </h2>
+            <p className="text-[13px] text-[var(--label-secondary)] font-medium">
+              Speak your thoughts. We'll transcribe them into an editable draft project.
+            </p>
           </div>
         </div>
 
@@ -232,12 +262,12 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
                 <motion.div
                   animate={{
                     scale: [1, 1.4, 1],
-                    opacity: [0.4, 0, 0.4]
+                    opacity: [0.4, 0, 0.4],
                   }}
                   transition={{
                     duration: 1.5,
                     repeat: Infinity,
-                    ease: "easeInOut"
+                    ease: 'easeInOut',
                   }}
                   className="absolute inset-0 rounded-full bg-red-500/25"
                 />
@@ -255,7 +285,9 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
                   <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                   Recording spontaneous idea...
                 </p>
-                <p className="text-[12px] text-[var(--label-tertiary)] font-medium">Click the stop button when done dictating</p>
+                <p className="text-[12px] text-[var(--label-tertiary)] font-medium">
+                  Click the stop button when done dictating
+                </p>
               </div>
 
               {/* Real-time sound wave visualizer */}
@@ -264,12 +296,12 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
                   <motion.div
                     key={i}
                     animate={{
-                      height: [8, 22, 8]
+                      height: [8, 22, 8],
                     }}
                     transition={{
                       duration: 0.4 + i * 0.08,
                       repeat: Infinity,
-                      ease: "easeInOut"
+                      ease: 'easeInOut',
                     }}
                     className="w-1 rounded bg-[var(--accent)]"
                   />
@@ -282,7 +314,9 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
                   {transcription}
                   <span className="text-[var(--accent)]"> {interimTranscript}</span>
                   {!transcription && !interimTranscript && (
-                    <span className="text-[var(--label-tertiary)] italic font-medium">Start speaking to dictate...</span>
+                    <span className="text-[var(--label-tertiary)] italic font-medium">
+                      Start speaking to dictate...
+                    </span>
                   )}
                 </p>
               </div>
@@ -294,7 +328,9 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
               <div className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-2 space-y-1.5">
-                    <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider">Draft Title</label>
+                    <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider">
+                      Draft Title
+                    </label>
                     <input
                       type="text"
                       value={ideaTitle}
@@ -304,7 +340,9 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider">Target Platform</label>
+                    <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider">
+                      Target Platform
+                    </label>
                     <select
                       value={platform}
                       onChange={(e) => setPlatform(e.target.value)}
@@ -319,7 +357,9 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider">Transcribed Audio Content (Editable)</label>
+                  <label className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider">
+                    Transcribed Audio Content (Editable)
+                  </label>
                   <textarea
                     value={transcription}
                     onChange={(e) => setTranscription(e.target.value)}
@@ -374,15 +414,15 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
             </a>
           )}
         </div>
-        
+
         {brand.content_ideas ? (
           <div className="space-y-4">
             {brand.content_ideas.map((idea: any, i: number) => (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
-                key={i} 
+                key={i}
                 onClick={() => {
                   if (setSelectedIdea) {
                     setSelectedIdea(idea);
@@ -396,7 +436,9 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
                     <Lightbulb size={24} className="text-[var(--accent)]" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-[19px] mb-2 leading-tight tracking-tight">{idea.title}</h3>
+                    <h3 className="font-semibold text-[19px] mb-2 leading-tight tracking-tight">
+                      {idea.title}
+                    </h3>
                     <div className="inline-block px-3 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium text-[13px] rounded-lg mb-3">
                       Hook: "{idea.hook}"
                     </div>
@@ -412,7 +454,7 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
                 onClick={handleGenerateIdeas}
                 className="flex items-center gap-2 text-[14px] font-semibold text-[var(--label-secondary)] hover:text-[var(--label-primary)] transition-colors cursor-pointer"
               >
-                <RefreshCw size={16} className={cn(isGeneratingIdeas && "animate-spin")} />
+                <RefreshCw size={16} className={cn(isGeneratingIdeas && 'animate-spin')} />
                 Generate Fresh Ideas
               </a>
             </div>
@@ -422,9 +464,12 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
             <div className="w-20 h-20 bg-[var(--bg-secondary)] rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-[var(--separator)]">
               <Lightbulb size={32} className="text-[var(--accent)]" />
             </div>
-            <h3 className="font-serif text-[24px] font-semibold tracking-[-0.01em] mb-2">Ready to Brainstorm?</h3>
+            <h3 className="font-serif text-[24px] font-semibold tracking-[-0.01em] mb-2">
+              Ready to Brainstorm?
+            </h3>
             <p className="text-[15px] text-[var(--label-secondary)] max-w-sm mx-auto mb-8 font-medium leading-relaxed">
-              We'll use your brand kit to generate 5 to 10 tailored video concepts that match your channel's unique style and personality.
+              We'll use your brand kit to generate 5 to 10 tailored video concepts that match your
+              channel's unique style and personality.
             </p>
             <button
               onClick={handleGenerateIdeas}
@@ -449,7 +494,7 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
 
       <AnimatePresence>
         {saveSuccess && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -462,7 +507,7 @@ export default function VideoIdeas({ brand, setBrand, user, setActiveTab, setSel
           </motion.div>
         )}
         {toastMessage && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}

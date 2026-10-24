@@ -1,25 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  ArrowRight, 
-  Check, 
-   
-  Globe, 
+import {
+  ArrowRight,
+  Check,
+  Globe,
   GithubLogo,
-   
-   
-  List as Menu, 
-  X, 
-  CaretRight as ChevronRight, 
-  TrendUp as TrendingUp, 
-   
-  Palette, 
-   
+  List as Menu,
+  X,
+  CaretRight as ChevronRight,
+  TrendUp as TrendingUp,
+  Palette,
   Sparkle,
   ChatCircleText,
   Clock,
-  
-  
   Plus,
   Envelope,
   Code,
@@ -27,128 +20,180 @@ import {
   ChartLineUp,
   Drop,
   PaintBrush,
-  GraduationCap
+  GraduationCap,
 } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import BrandIcon from './BrandIcon';
+import SignalScanner from './SignalScanner';
 
 // Sandbox presets for the interactive Brand Kit planner
 const SANDBOX_PRESETS: Record<string, Record<string, any>> = {
   cooking: {
     calm: {
-      name: "The Slow Apron",
-      tagline: "Mindful cooking from scratch with natural ingredients.",
-      colors: { primary: "#7F9F7F", secondary: "#D2B48C", accent: "#E9967A", background: "#F5F5EC" },
-      fontHeading: "Playfair Display",
-      fontBody: "Inter",
+      name: 'The Slow Apron',
+      tagline: 'Mindful cooking from scratch with natural ingredients.',
+      colors: {
+        primary: '#7F9F7F',
+        secondary: '#D2B48C',
+        accent: '#E9967A',
+        background: '#F5F5EC',
+      },
+      fontHeading: 'Playfair Display',
+      fontBody: 'Inter',
       hook: "In a world that never stops rushing, let's take ten minutes to watch fresh butter melt, bread rise, and food slowly cook to golden perfection.",
-      catchphrase: "Eat slowly, live deeply. Until next time in the kitchen.",
-      vibeDesc: "Soft lighting, gentle cooking sounds, beautiful wooden plates, and natural ingredients."
+      catchphrase: 'Eat slowly, live deeply. Until next time in the kitchen.',
+      vibeDesc:
+        'Soft lighting, gentle cooking sounds, beautiful wooden plates, and natural ingredients.',
     },
     bold: {
-      name: "WOK & ROLL",
-      tagline: "High-heat, high-energy Asian street food recipes.",
-      colors: { primary: "#FF4500", secondary: "#1A1A1A", accent: "#FFD700", background: "#1C1917" },
-      fontHeading: "Space Grotesk",
-      fontBody: "Fira Code",
-      hook: "Turn up your stove to the highest heat! Today we are making a classic street-style stir fry in just four minutes.",
-      catchphrase: "Keep cooking, stay active! See you next time!",
-      vibeDesc: "Fast-paced video cuts, steaming hot pans, bright colorful titles, and high-energy music."
+      name: 'WOK & ROLL',
+      tagline: 'High-heat, high-energy Asian street food recipes.',
+      colors: {
+        primary: '#FF4500',
+        secondary: '#1A1A1A',
+        accent: '#FFD700',
+        background: '#1C1917',
+      },
+      fontHeading: 'Space Grotesk',
+      fontBody: 'Fira Code',
+      hook: 'Turn up your stove to the highest heat! Today we are making a classic street-style stir fry in just four minutes.',
+      catchphrase: 'Keep cooking, stay active! See you next time!',
+      vibeDesc:
+        'Fast-paced video cuts, steaming hot pans, bright colorful titles, and high-energy music.',
     },
     educational: {
-      name: "Culinary Science",
-      tagline: "Discovering how cooking really works.",
-      colors: { primary: "#007AFF", secondary: "#8E8E93", accent: "#FF9500", background: "#FFFFFF" },
-      fontHeading: "Outfit",
-      fontBody: "Inter",
-      hook: "Did you know that adding a pinch of salt to onions actually helps them cook more evenly? Today we are learning the science of cooking heat.",
-      catchphrase: "Keep learning, and enjoy your food!",
-      vibeDesc: "Bright clean lighting, simple diagrams, exact measurements, and side-by-side comparisons."
-    }
+      name: 'Culinary Science',
+      tagline: 'Discovering how cooking really works.',
+      colors: {
+        primary: '#007AFF',
+        secondary: '#8E8E93',
+        accent: '#FF9500',
+        background: '#FFFFFF',
+      },
+      fontHeading: 'Outfit',
+      fontBody: 'Inter',
+      hook: 'Did you know that adding a pinch of salt to onions actually helps them cook more evenly? Today we are learning the science of cooking heat.',
+      catchphrase: 'Keep learning, and enjoy your food!',
+      vibeDesc:
+        'Bright clean lighting, simple diagrams, exact measurements, and side-by-side comparisons.',
+    },
   },
   tech: {
     calm: {
-      name: "Cozy Coding",
-      tagline: "Quiet coding sessions and cozy workspace designs.",
-      colors: { primary: "#4A5568", secondary: "#EDF2F7", accent: "#805AD5", background: "#F7FAFC" },
-      fontHeading: "Inter",
-      fontBody: "JetBrains Mono",
+      name: 'Cozy Coding',
+      tagline: 'Quiet coding sessions and cozy workspace designs.',
+      colors: {
+        primary: '#4A5568',
+        secondary: '#EDF2F7',
+        accent: '#805AD5',
+        background: '#F7FAFC',
+      },
+      fontHeading: 'Inter',
+      fontBody: 'JetBrains Mono',
       hook: "The rain is tapping gently on the window. Let's make a warm drink and write some clean, simple code together.",
-      catchphrase: "Happy coding!",
-      vibeDesc: "Relaxing background music, warm desk lighting, quiet keyboard typing, and dark screen themes."
+      catchphrase: 'Happy coding!',
+      vibeDesc:
+        'Relaxing background music, warm desk lighting, quiet keyboard typing, and dark screen themes.',
     },
     bold: {
-      name: "CYBER CORE",
-      tagline: "Latest technology, software tips, and smart AI tools.",
-      colors: { primary: "#00FF66", secondary: "#0A0A0C", accent: "#00E5FF", background: "#0D0D11" },
-      fontHeading: "Space Grotesk",
-      fontBody: "Fira Code",
-      hook: "A brand new AI model just launched! We are building a smart assistant that improves your code in under three seconds.",
-      catchphrase: "Build faster. Create more. See you next time!",
-      vibeDesc: "Futuristic screen graphics, glowing neon colors, digital dashboards, and engaging transitions."
+      name: 'CYBER CORE',
+      tagline: 'Latest technology, software tips, and smart AI tools.',
+      colors: {
+        primary: '#00FF66',
+        secondary: '#0A0A0C',
+        accent: '#00E5FF',
+        background: '#0D0D11',
+      },
+      fontHeading: 'Space Grotesk',
+      fontBody: 'Fira Code',
+      hook: 'A brand new AI model just launched! We are building a smart assistant that improves your code in under three seconds.',
+      catchphrase: 'Build faster. Create more. See you next time!',
+      vibeDesc:
+        'Futuristic screen graphics, glowing neon colors, digital dashboards, and engaging transitions.',
     },
     educational: {
-      name: "Byte Sized",
-      tagline: "Computer science made incredibly simple.",
-      colors: { primary: "#34C759", secondary: "#F2F2F7", accent: "#007AFF", background: "#FFFFFF" },
-      fontHeading: "Outfit",
-      fontBody: "Inter",
-      hook: "How does computer memory actually work? Think of your computer memory as a hotel, where each file gets its own room key card.",
-      catchphrase: "Explaining technology, one step at a time.",
-      vibeDesc: "Clear whiteboard drawings, color-coded highlights, and simple examples."
-    }
+      name: 'Byte Sized',
+      tagline: 'Computer science made incredibly simple.',
+      colors: {
+        primary: '#34C759',
+        secondary: '#F2F2F7',
+        accent: '#007AFF',
+        background: '#FFFFFF',
+      },
+      fontHeading: 'Outfit',
+      fontBody: 'Inter',
+      hook: 'How does computer memory actually work? Think of your computer memory as a hotel, where each file gets its own room key card.',
+      catchphrase: 'Explaining technology, one step at a time.',
+      vibeDesc: 'Clear whiteboard drawings, color-coded highlights, and simple examples.',
+    },
   },
   finance: {
     calm: {
-      name: "The Steady Investor",
-      tagline: "Simple, low-stress investing for everyday people.",
-      colors: { primary: "#2E7D32", secondary: "#F1F8E9", accent: "#7CB342", background: "#FAFAFA" },
-      fontHeading: "Playfair Display",
-      fontBody: "Inter",
+      name: 'The Steady Investor',
+      tagline: 'Simple, low-stress investing for everyday people.',
+      colors: {
+        primary: '#2E7D32',
+        secondary: '#F1F8E9',
+        accent: '#7CB342',
+        background: '#FAFAFA',
+      },
+      fontHeading: 'Playfair Display',
+      fontBody: 'Inter',
       hook: "You don't need to trade complex stocks to build your savings. Let's look at how a simple index fund grows over thirty years.",
-      catchphrase: "Start small, stay consistent. Take care.",
-      vibeDesc: "Warm friendly backgrounds, simple line charts, and clean handwritten notes."
+      catchphrase: 'Start small, stay consistent. Take care.',
+      vibeDesc: 'Warm friendly backgrounds, simple line charts, and clean handwritten notes.',
     },
     bold: {
-      name: "ALPHA VENTURES",
-      tagline: "Company analysis and global market trends.",
-      colors: { primary: "#FF3B30", secondary: "#1C1C1E", accent: "#5856D6", background: "#0B0B0C" },
-      fontHeading: "Space Grotesk",
-      fontBody: "Fira Code",
+      name: 'ALPHA VENTURES',
+      tagline: 'Company analysis and global market trends.',
+      colors: {
+        primary: '#FF3B30',
+        secondary: '#1C1C1E',
+        accent: '#5856D6',
+        background: '#0B0B0C',
+      },
+      fontHeading: 'Space Grotesk',
+      fontBody: 'Fira Code',
       hook: "Three small energy companies are quietly growing very fast. Let's look at their financial reports before everyone else does.",
-      catchphrase: "Protect your savings, grow your future.",
-      vibeDesc: "Professional charts, clean financial spreadsheets, and clear red and green accents."
+      catchphrase: 'Protect your savings, grow your future.',
+      vibeDesc:
+        'Professional charts, clean financial spreadsheets, and clear red and green accents.',
     },
     educational: {
-      name: "Finance Academy",
-      tagline: "Building solid personal financial foundations.",
-      colors: { primary: "#10B981", secondary: "#F3F4F6", accent: "#3B82F6", background: "#FFFFFF" },
-      fontHeading: "Outfit",
-      fontBody: "Inter",
+      name: 'Finance Academy',
+      tagline: 'Building solid personal financial foundations.',
+      colors: {
+        primary: '#10B981',
+        secondary: '#F3F4F6',
+        accent: '#3B82F6',
+        background: '#FFFFFF',
+      },
+      fontHeading: 'Outfit',
+      fontBody: 'Inter',
       hook: "Many people spend money on things that actually cost them money over time. Let's break down how to make your money work for you.",
-      catchphrase: "Take control of your money, take control of your future.",
-      vibeDesc: "Clear animated charts, helpful percentage highlights, and real-life examples."
-    }
-  }
+      catchphrase: 'Take control of your money, take control of your future.',
+      vibeDesc: 'Clear animated charts, helpful percentage highlights, and real-life examples.',
+    },
+  },
 };
 
 const FAQS = [
   {
-    q: "Do I need any design or coding experience to use CreatorOS?",
-    a: "Absolutely not! CreatorOS is designed with simplicity in mind. Our AI Design Assistant automatically picks matching colors, selects beautiful fonts, and organizes your entire brand theme so you can focus 100% on making your videos."
+    q: 'Do I need any design or coding experience to use CreatorOS?',
+    a: 'Absolutely not! CreatorOS is designed with simplicity in mind. Our AI Design Assistant automatically picks matching colors, selects beautiful fonts, and organizes your entire brand theme so you can focus 100% on making your videos.',
   },
   {
-    q: "How does the AI Video Intro Maker work?",
-    a: "It looks at your selected topic, style, and who your videos are for. Then, it uses simple, proven patterns (like starting with an interesting question or a bold statement) to help you write video openings that catch people's attention immediately."
+    q: 'How does the AI Video Intro Maker work?',
+    a: "It looks at your selected topic, style, and who your videos are for. Then, it uses simple, proven patterns (like starting with an interesting question or a bold statement) to help you write video openings that catch people's attention immediately.",
   },
   {
-    q: "What is the 30-Day Growth Challenge?",
-    a: "It's an interactive guide built right into the app. It walks you through simple daily steps—from choosing your main topic on Day 1, to writing video intros on Day 7, to building a consistent publishing routine by Day 30."
+    q: 'What is the 30-Day Growth Challenge?',
+    a: "It's an interactive guide built right into the app. It walks you through simple daily steps—from choosing your main topic on Day 1, to writing video intros on Day 7, to building a consistent publishing routine by Day 30.",
   },
   {
-    q: "Can I cancel my plan at any time?",
-    a: "There is nothing to cancel right now: CreatorOS is completely free during early access and has no subscription. If paid plans are ever introduced, that will be announced clearly before anything changes — and any early-access decision you make will be yours."
-  }
+    q: 'Can I cancel my plan at any time?',
+    a: 'There is nothing to cancel right now: CreatorOS is completely free during early access and has no subscription. If paid plans are ever introduced, that will be announced clearly before anything changes — and any early-access decision you make will be yours.',
+  },
 ];
 
 interface LandingPageProps {
@@ -157,19 +202,19 @@ interface LandingPageProps {
 
 export default function LandingPage({ navigate }: LandingPageProps) {
   // A/B test state for headline (50/50 split)
-  const [headlineVariant] = useState<'A' | 'B'>(() => Math.random() > 0.5 ? 'B' : 'A');
+  const [headlineVariant] = useState<'A' | 'B'>(() => (Math.random() > 0.5 ? 'B' : 'A'));
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+
   // Interactive Sandbox state
   const [selectedNiche, setSelectedNiche] = useState('tech');
   const [selectedVibe, setSelectedVibe] = useState('calm');
   const [isGeneratingSandbox, setIsGeneratingSandbox] = useState(false);
-  
+
   // FAQ state
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(0);
-  
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
@@ -201,9 +246,12 @@ export default function LandingPage({ navigate }: LandingPageProps) {
   }, []);
 
   const handleSignIn = () => {
-    navigate('/login');
+    if (navigate) {
+      navigate('/login');
+    } else {
+      window.location.href = '/login';
+    }
   };
-
 
   // Trigger a brief simulated loader when presets change in the sandbox
   const handleSandboxChange = (niche: string, vibe: string) => {
@@ -221,12 +269,14 @@ export default function LandingPage({ navigate }: LandingPageProps) {
   return (
     <div className="bg-[var(--bg-primary)] text-[var(--label-primary)] font-sans selection:bg-[var(--accent)] selection:text-white overflow-x-hidden">
       {/* Sticky Top Navigation */}
-      <nav className={cn(
-        "fixed top-0 left-0 right-0 z-[100] transition-all duration-300 px-6 h-16 flex items-center",
-        isScrolled 
-          ? "bg-[var(--bg-primary)]/70 backdrop-blur-2xl border-b border-[var(--separator)] shadow-sm saturate-150" 
-          : "bg-transparent border-b border-transparent"
-      )}>
+      <nav
+        className={cn(
+          'fixed top-0 left-0 right-0 z-[100] transition-all duration-300 px-6 h-16 flex items-center',
+          isScrolled
+            ? 'bg-[var(--bg-primary)]/70 backdrop-blur-2xl border-b border-[var(--separator)] shadow-sm saturate-150'
+            : 'bg-transparent border-b border-transparent',
+        )}
+      >
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate?.('/')}>
             <div className="p-1.5 bg-[var(--accent)]/10 rounded-lg text-[var(--accent)]">
@@ -237,29 +287,44 @@ export default function LandingPage({ navigate }: LandingPageProps) {
 
           {/* Desktop Links */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-[14px] font-semibold text-[var(--label-secondary)] hover:text-[var(--accent)] transition-colors">Features</a>
-            <a href="#sandbox" className="text-[14px] font-semibold text-[var(--label-secondary)] hover:text-[var(--accent)] transition-colors">Style Planner</a>
-            <a href="#pricing" className="text-[14px] font-semibold text-[var(--label-secondary)] hover:text-[var(--accent)] transition-colors">Pricing</a>
-            <button 
+            <a
+              href="#features"
+              className="text-[14px] font-semibold text-[var(--label-secondary)] hover:text-[var(--accent)] transition-colors"
+            >
+              Features
+            </a>
+            <a
+              href="#sandbox"
+              className="text-[14px] font-semibold text-[var(--label-secondary)] hover:text-[var(--accent)] transition-colors"
+            >
+              Style Planner
+            </a>
+            <a
+              href="#pricing"
+              className="text-[14px] font-semibold text-[var(--label-secondary)] hover:text-[var(--accent)] transition-colors"
+            >
+              Pricing
+            </a>
+            <button
               onClick={() => navigate?.('/roadmap')}
               className="text-[14px] font-semibold text-[var(--label-secondary)] hover:text-[var(--accent)] transition-colors text-left"
             >
               Public Roadmap
             </button>
-            <button 
+            <button
               onClick={() => navigate?.('/help')}
               className="text-[14px] font-semibold text-[var(--label-secondary)] hover:text-[var(--accent)] transition-colors text-left"
             >
               Help Center
             </button>
             <div className="h-4 w-[1px] bg-[var(--separator)]" />
-            <button 
+            <button
               onClick={handleSignIn}
               className="text-[14px] font-bold text-[var(--accent)] hover:opacity-80 transition-opacity"
             >
               Sign In
             </button>
-            <button 
+            <button
               onClick={handleSignIn}
               className="ios-button ios-button-filled h-9 px-5 text-[13px] font-semibold"
             >
@@ -268,7 +333,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
           </div>
 
           {/* Mobile Menu Button */}
-          <div 
+          <div
             className="md:hidden p-2 text-[var(--label-secondary)] cursor-pointer hover:bg-[var(--separator)] rounded-xl transition-colors"
             role="button"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -290,35 +355,35 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               className="fixed inset-0 z-80 bg-black/40 backdrop-blur-md md:hidden"
             />
             <motion.div
-              initial={{ x: "100%" }}
+              initial={{ x: '100%' }}
               animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed top-0 right-0 bottom-0 w-[80%] max-w-[360px] z-[90] bg-[var(--bg-secondary)] border-l border-[var(--separator)] p-6 pt-24 flex flex-col gap-6 md:hidden shadow-2xl"
             >
               <div className="flex flex-col gap-4">
-                <a 
-                  href="#features" 
-                  onClick={() => setIsMobileMenuOpen(false)} 
+                <a
+                  href="#features"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="text-[18px] font-bold text-[var(--label-primary)] hover:text-[var(--accent)] p-2 rounded-xl hover:bg-[var(--bg-tertiary)] transition-colors"
                 >
                   Features
                 </a>
-                <a 
-                  href="#sandbox" 
-                  onClick={() => setIsMobileMenuOpen(false)} 
+                <a
+                  href="#sandbox"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="text-[18px] font-bold text-[var(--label-primary)] hover:text-[var(--accent)] p-2 rounded-xl hover:bg-[var(--bg-tertiary)] transition-colors"
                 >
                   Style Planner
                 </a>
-                <a 
-                  href="#pricing" 
-                  onClick={() => setIsMobileMenuOpen(false)} 
+                <a
+                  href="#pricing"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="text-[18px] font-bold text-[var(--label-primary)] hover:text-[var(--accent)] p-2 rounded-xl hover:bg-[var(--bg-tertiary)] transition-colors"
                 >
                   Pricing
                 </a>
-                <button 
+                <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
                     navigate?.('/roadmap');
@@ -327,7 +392,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                 >
                   Public Roadmap
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
                     navigate?.('/help');
@@ -339,7 +404,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               </div>
 
               <div className="mt-auto space-y-3">
-                <button 
+                <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
                     handleSignIn();
@@ -348,7 +413,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                 >
                   Sign In
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
                     handleSignIn();
@@ -370,7 +435,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
         <div className="absolute top-10 right-10 w-[300px] h-[300px] bg-[#5856D6] rounded-full filter blur-[120px] opacity-[0.06] pointer-events-none" />
 
         <div className="max-w-5xl mx-auto text-center space-y-8 relative z-10">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
@@ -383,7 +448,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
             Early Access · Under Active Development
           </motion.div>
 
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
@@ -392,26 +457,33 @@ export default function LandingPage({ navigate }: LandingPageProps) {
             {headlineVariant === 'A' ? (
               <>
                 Plan, write, and <br className="hidden sm:block" />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-amber-400 animate-gradient-x">grow your channel</span>.
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-amber-400 animate-gradient-x">
+                  grow your channel
+                </span>
+                .
               </>
             ) : (
               <>
                 The AI studio for <br className="hidden sm:block" />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-amber-400 animate-gradient-x">your next video</span>.
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-amber-400 animate-gradient-x">
+                  your next video
+                </span>
+                .
               </>
             )}
           </motion.h1>
 
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-[18px] sm:text-[21px] text-[var(--label-secondary)] font-medium max-w-3xl mx-auto leading-relaxed text-balance"
           >
-            An easy-to-use writing and planning assistant. Create a beautiful visual style, write videos that keep viewers interested, and build consistent habits with daily challenges.
+            An easy-to-use writing and planning assistant. Create a beautiful visual style, write
+            videos that keep viewers interested, and build consistent habits with daily challenges.
           </motion.p>
 
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
@@ -424,8 +496,8 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               Start Free — Early Access
               <ArrowRight size={18} weight="bold" className="ml-1" />
             </button>
-            <a 
-              href="#sandbox" 
+            <a
+              href="#sandbox"
               className="ios-button ios-button-gray w-full sm:w-auto h-14 px-10 text-[16px] font-semibold"
             >
               Try Live Planner
@@ -442,27 +514,46 @@ export default function LandingPage({ navigate }: LandingPageProps) {
             className="pt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto border-t border-[var(--separator)]/60 mt-16"
           >
             <div className="text-center">
-              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">8</span>
-              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">AI-Powered Tools</span>
+              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">
+                8
+              </span>
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">
+                AI-Powered Tools
+              </span>
             </div>
             <div className="text-center">
-              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">30 Days</span>
-              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">Guided Challenge</span>
+              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">
+                30 Days
+              </span>
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">
+                Guided Challenge
+              </span>
             </div>
             <div className="text-center">
-              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">$0</span>
-              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">During Early Access</span>
+              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">
+                $0
+              </span>
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">
+                During Early Access
+              </span>
             </div>
             <div className="text-center">
-              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">100%</span>
-              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">Your Content, Your Data</span>
+              <span className="block text-4xl sm:text-5xl font-extrabold tracking-[-0.05em] font-serif text-[var(--accent)]">
+                100%
+              </span>
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[var(--label-secondary)] mt-1 block">
+                Your Content, Your Data
+              </span>
             </div>
           </motion.div>
         </div>
       </section>
 
       {/* Interactive Style Planner Sandbox */}
-      <section id="sandbox" className="pt-[140px] pb-[100px] px-6 bg-[var(--bg-secondary)]/40 relative border-y border-[var(--separator)] overflow-hidden">
+      <section
+        id="sandbox"
+        className="pt-[140px] pb-[100px] px-6 bg-[var(--bg-secondary)]/40 relative border-y border-[var(--separator)] overflow-hidden"
+      >
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[var(--accent)] rounded-full filter blur-[200px] opacity-[0.08] pointer-events-none" />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
@@ -473,7 +564,8 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               Find your video style in seconds.
             </h2>
             <p className="text-[16px] sm:text-[18px] text-[var(--label-secondary)] font-medium leading-relaxed">
-              Try the interactive style planner! Choose a topic and a visual style to see how easily our design helper creates a beautiful color palette and theme.
+              Try the interactive style planner! Choose a topic and a visual style to see how easily
+              our design helper creates a beautiful color palette and theme.
             </p>
           </div>
 
@@ -487,21 +579,36 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                   </label>
                   <div className="grid grid-cols-1 gap-2.5">
                     {[
-                      { id: 'tech', label: 'Technology & Coding Tips', icon: <Code size={18} className="mr-2" /> },
-                      { id: 'cooking', label: 'Cooking & Delicious Recipes', icon: <CookingPot size={18} className="mr-2" /> },
-                      { id: 'finance', label: 'Personal Finance & Savings', icon: <ChartLineUp size={18} className="mr-2" /> }
-                    ].map(niche => (
+                      {
+                        id: 'tech',
+                        label: 'Technology & Coding Tips',
+                        icon: <Code size={18} className="mr-2" />,
+                      },
+                      {
+                        id: 'cooking',
+                        label: 'Cooking & Delicious Recipes',
+                        icon: <CookingPot size={18} className="mr-2" />,
+                      },
+                      {
+                        id: 'finance',
+                        label: 'Personal Finance & Savings',
+                        icon: <ChartLineUp size={18} className="mr-2" />,
+                      },
+                    ].map((niche) => (
                       <button
                         key={niche.id}
                         onClick={() => handleSandboxChange(niche.id, selectedVibe)}
                         className={cn(
-                          "w-full text-left px-5 py-4 rounded-2xl text-[15px] font-semibold border transition-all flex items-center justify-between",
+                          'w-full text-left px-5 py-4 rounded-2xl text-[15px] font-semibold border transition-all flex items-center justify-between',
                           selectedNiche === niche.id
-                            ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-md"
-                            : "bg-[var(--bg-secondary)] text-[var(--label-primary)] border-[var(--separator)] hover:bg-[var(--bg-secondary)]/80"
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
+                            : 'bg-[var(--bg-secondary)] text-[var(--label-primary)] border-[var(--separator)] hover:bg-[var(--bg-secondary)]/80',
                         )}
                       >
-                        <span className="flex items-center">{niche.icon}{niche.label}</span>
+                        <span className="flex items-center">
+                          {niche.icon}
+                          {niche.label}
+                        </span>
                         {selectedNiche === niche.id && <Check size={16} weight="bold" />}
                       </button>
                     ))}
@@ -514,18 +621,30 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                   </label>
                   <div className="flex flex-wrap gap-2.5">
                     {[
-                      { id: 'calm', label: 'Soft & Peaceful', icon: <Drop size={16} className="mr-1 inline" /> },
-                      { id: 'bold', label: 'Bright & Bold', icon: <PaintBrush size={16} className="mr-1 inline" /> },
-                      { id: 'educational', label: 'Simple & Educational', icon: <GraduationCap size={16} className="mr-1 inline" /> }
-                    ].map(vibe => (
+                      {
+                        id: 'calm',
+                        label: 'Soft & Peaceful',
+                        icon: <Drop size={16} className="mr-1 inline" />,
+                      },
+                      {
+                        id: 'bold',
+                        label: 'Bright & Bold',
+                        icon: <PaintBrush size={16} className="mr-1 inline" />,
+                      },
+                      {
+                        id: 'educational',
+                        label: 'Simple & Educational',
+                        icon: <GraduationCap size={16} className="mr-1 inline" />,
+                      },
+                    ].map((vibe) => (
                       <button
                         key={vibe.id}
                         onClick={() => handleSandboxChange(selectedNiche, vibe.id)}
                         className={cn(
-                          "px-5 py-3 rounded-xl text-[14px] font-semibold border transition-all flex-1 text-center whitespace-nowrap flex justify-center items-center",
+                          'px-5 py-3 rounded-xl text-[14px] font-semibold border transition-all flex-1 text-center whitespace-nowrap flex justify-center items-center',
                           selectedVibe === vibe.id
-                            ? "bg-[var(--label-primary)] text-[var(--bg-primary)] border-[var(--label-primary)]"
-                            : "bg-[var(--bg-secondary)] text-[var(--label-secondary)] border-[var(--separator)] hover:bg-[var(--bg-secondary)]/80"
+                            ? 'bg-[var(--label-primary)] text-[var(--bg-primary)] border-[var(--label-primary)]'
+                            : 'bg-[var(--bg-secondary)] text-[var(--label-secondary)] border-[var(--separator)] hover:bg-[var(--bg-secondary)]/80',
                         )}
                       >
                         {vibe.icon}
@@ -533,18 +652,27 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                       </button>
                     ))}
                   </div>
+                  <div className="mt-12 w-full">
+                    <SignalScanner />
+                  </div>
                 </div>
               </div>
 
               <div className="pt-6 border-t border-[var(--separator)]">
                 <div className="flex gap-4 items-start">
                   <div className="p-2.5 bg-yellow-500/10 text-yellow-500 rounded-xl">
-                    <Sparkle size={20} weight="fill" className="animate-spin" style={{ animationDuration: '6s' }} />
+                    <Sparkle
+                      size={20}
+                      weight="fill"
+                      className="animate-spin"
+                      style={{ animationDuration: '6s' }}
+                    />
                   </div>
                   <div>
                     <h4 className="text-sm font-bold">Create Your Own Styles</h4>
                     <p className="text-xs text-[var(--label-secondary)] leading-relaxed mt-1">
-                      The full version supports dozens of topics, custom color pickers, beautiful font pairings, and ready-to-use video writing templates.
+                      The full version supports dozens of topics, custom color pickers, beautiful
+                      font pairings, and ready-to-use video writing templates.
                     </p>
                   </div>
                 </div>
@@ -554,25 +682,26 @@ export default function LandingPage({ navigate }: LandingPageProps) {
             {/* Sandbox Live Mockup Card (Right) */}
             <div className="lg:col-span-7 flex flex-col justify-center">
               <div className="bg-[var(--bg-tertiary)] pt-14 p-6 sm:p-8 rounded-[32px] border border-[var(--separator)] shadow-xl relative overflow-hidden min-h-[500px] flex flex-col justify-between">
-                
                 {/* macOS Window Chrome Dots */}
                 <div className="absolute top-5 left-6 flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]" />
                   <div className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]" />
                   <div className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]" />
                 </div>
-                
+
                 {/* Loader overlay */}
                 <AnimatePresence>
                   {isGeneratingSandbox && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       className="absolute inset-0 bg-[var(--bg-tertiary)]/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center space-y-4"
                     >
                       <div className="w-10 h-10 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-[var(--label-secondary)]">Creating custom style...</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-[var(--label-secondary)]">
+                        Creating custom style...
+                      </span>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -584,7 +713,10 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                       <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] rounded-md">
                         Your Custom Style Guide
                       </span>
-                      <h3 className="text-2xl font-bold tracking-tight mt-1" style={{ fontFamily: currentPreset.fontHeading }}>
+                      <h3
+                        className="text-2xl font-bold tracking-tight mt-1"
+                        style={{ fontFamily: currentPreset.fontHeading }}
+                      >
                         {currentPreset.name}
                       </h3>
                       <p className="text-sm text-[var(--label-secondary)] font-medium">
@@ -596,11 +728,13 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                     <div className="flex gap-2 items-center">
                       {Object.entries(currentPreset.colors).map(([key, val]: [string, any]) => (
                         <div key={key} className="flex flex-col items-center gap-1">
-                          <div 
+                          <div
                             className="w-8 h-8 rounded-full border border-black/10 shadow-sm"
                             style={{ backgroundColor: val }}
                           />
-                          <span className="text-[9px] font-mono font-semibold uppercase text-[var(--label-tertiary)]">{val}</span>
+                          <span className="text-[9px] font-mono font-semibold uppercase text-[var(--label-tertiary)]">
+                            {val}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -609,23 +743,33 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                   {/* Channel specifics */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
                     <div className="space-y-1">
-                      <span className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider block">Recommended Video Style</span>
+                      <span className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider block">
+                        Recommended Video Style
+                      </span>
                       <p className="text-[13px] leading-relaxed font-semibold text-[var(--label-primary)]">
                         {currentPreset.vibeDesc}
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider block">Beautiful Fonts</span>
+                      <span className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider block">
+                        Beautiful Fonts
+                      </span>
                       <div className="flex gap-3 text-xs font-mono font-bold text-[var(--label-primary)]">
-                        <span className="px-2 py-1 bg-[var(--bg-secondary)] rounded-md border border-[var(--separator)]">Title: {currentPreset.fontHeading}</span>
-                        <span className="px-2 py-1 bg-[var(--bg-secondary)] rounded-md border border-[var(--separator)]">Body: {currentPreset.fontBody}</span>
+                        <span className="px-2 py-1 bg-[var(--bg-secondary)] rounded-md border border-[var(--separator)]">
+                          Title: {currentPreset.fontHeading}
+                        </span>
+                        <span className="px-2 py-1 bg-[var(--bg-secondary)] rounded-md border border-[var(--separator)]">
+                          Body: {currentPreset.fontBody}
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   {/* Curated Script Hook Template */}
                   <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--separator)] space-y-2 relative">
-                    <span className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest block">Your Engaging Video Intro</span>
+                    <span className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest block">
+                      Your Engaging Video Intro
+                    </span>
                     <p className="text-[14px] leading-relaxed font-medium italic text-[var(--label-primary)]">
                       "{currentPreset.hook}"
                     </p>
@@ -633,7 +777,9 @@ export default function LandingPage({ navigate }: LandingPageProps) {
 
                   {/* Community Signature Catchphrase */}
                   <div className="flex items-center gap-3 text-sm">
-                    <span className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider">Your Closing Words:</span>
+                    <span className="text-[11px] font-bold text-[var(--label-secondary)] uppercase tracking-wider">
+                      Your Closing Words:
+                    </span>
                     <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-full font-bold text-xs">
                       {currentPreset.catchphrase}
                     </span>
@@ -642,8 +788,10 @@ export default function LandingPage({ navigate }: LandingPageProps) {
 
                 {/* Action footer inside the card */}
                 <div className="pt-6 border-t border-[var(--separator)]/60 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <span className="text-xs text-[var(--label-secondary)] font-medium">Like this aesthetic? Save it permanently to your account.</span>
-                  <button 
+                  <span className="text-xs text-[var(--label-secondary)] font-medium">
+                    Like this aesthetic? Save it permanently to your account.
+                  </span>
+                  <button
                     onClick={handleSignIn}
                     className="ios-button ios-button-tinted w-full sm:w-auto h-10 px-5 text-[13px] font-bold flex items-center justify-center gap-1 whitespace-nowrap"
                   >
@@ -651,7 +799,6 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                     <ArrowRight size={14} weight="bold" />
                   </button>
                 </div>
-
               </div>
             </div>
           </div>
@@ -671,14 +818,20 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               Built to make video creation simple.
             </h2>
             <p className="text-[16px] sm:text-[18px] text-[var(--label-secondary)] font-medium leading-relaxed">
-              No more messy notes, confusing spreadsheets, or lost ideas. We bring your channel style, video drafts, and daily schedule into one simple, clean space.
+              No more messy notes, confusing spreadsheets, or lost ideas. We bring your channel
+              style, video drafts, and daily schedule into one simple, clean space.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            
             {/* Feature 1: Identity Architect */}
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group"
+            >
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Palette size={24} weight="duotone" />
@@ -686,17 +839,28 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                 <div className="space-y-2">
                   <h3 className="text-xl font-bold tracking-tight">Design Assistant</h3>
                   <p className="text-[15px] text-[var(--label-secondary)] leading-relaxed font-medium">
-                    Our design assistant guides you through three simple questions. Instantly get a beautiful color palette, matching fonts, a unique style description, and ideas for video intros.
+                    Our design assistant guides you through three simple questions. Instantly get a
+                    beautiful color palette, matching fonts, a unique style description, and ideas
+                    for video intros.
                   </p>
                 </div>
               </div>
-              <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={handleSignIn}>
+              <div
+                className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline"
+                onClick={handleSignIn}
+              >
                 Learn how it works <ChevronRight size={12} weight="bold" />
               </div>
             </motion.div>
 
             {/* Feature 2: Studio Workflow & Script Scoring */}
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group"
+            >
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Sparkle size={24} weight="duotone" />
@@ -704,17 +868,28 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                 <div className="space-y-2">
                   <h3 className="text-xl font-bold tracking-tight">Video Writer & Intro Builder</h3>
                   <p className="text-[15px] text-[var(--label-secondary)] leading-relaxed font-medium">
-                    Draft your videos in a clean, distraction-free space. Get helpful writing checklists, video length estimators, and feedback to ensure your intros are highly engaging.
+                    Draft your videos in a clean, distraction-free space. Get helpful writing
+                    checklists, video length estimators, and feedback to ensure your intros are
+                    highly engaging.
                   </p>
                 </div>
               </div>
-              <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={handleSignIn}>
+              <div
+                className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline"
+                onClick={handleSignIn}
+              >
                 View writing features <ChevronRight size={12} weight="bold" />
               </div>
             </motion.div>
 
             {/* Feature 3: Habit Tracking & 30-Day challenge */}
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group"
+            >
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Clock size={24} weight="duotone" />
@@ -722,17 +897,28 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                 <div className="space-y-2">
                   <h3 className="text-xl font-bold tracking-tight">30-Day Writing Habit</h3>
                   <p className="text-[15px] text-[var(--label-secondary)] leading-relaxed font-medium">
-                    Never run out of ideas with our friendly 30-day plan. Form consistent writing habits, track your daily progress, and stay motivated as you build your library of video drafts.
+                    Never run out of ideas with our friendly 30-day plan. Form consistent writing
+                    habits, track your daily progress, and stay motivated as you build your library
+                    of video drafts.
                   </p>
                 </div>
               </div>
-              <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={() => navigate?.('/roadmap')}>
+              <div
+                className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline"
+                onClick={() => navigate?.('/roadmap')}
+              >
                 Explore the challenge <ChevronRight size={12} weight="bold" />
               </div>
             </motion.div>
 
             {/* Feature 4: Centralized Creator Hub */}
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group"
+            >
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-sky-500/10 text-sky-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Globe size={24} weight="duotone" />
@@ -740,17 +926,28 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                 <div className="space-y-2">
                   <h3 className="text-xl font-bold tracking-tight">Video Publishing Calendar</h3>
                   <p className="text-[15px] text-[var(--label-secondary)] leading-relaxed font-medium">
-                    Ready to share? Plan and organize your publishing schedule across YouTube, TikTok, and Instagram, and keep track of all your upcoming posts in one simple calendar.
+                    Ready to share? Plan and organize your publishing schedule across YouTube,
+                    TikTok, and Instagram, and keep track of all your upcoming posts in one simple
+                    calendar.
                   </p>
                 </div>
               </div>
-              <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={handleSignIn}>
+              <div
+                className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline"
+                onClick={handleSignIn}
+              >
                 Learn about calendars <ChevronRight size={12} weight="bold" />
               </div>
             </motion.div>
 
             {/* Feature 5: Real-time Analytics Intelligence */}
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group"
+            >
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <TrendingUp size={24} weight="duotone" />
@@ -758,17 +955,28 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                 <div className="space-y-2">
                   <h3 className="text-xl font-bold tracking-tight">Simple Progress Charts</h3>
                   <p className="text-[15px] text-[var(--label-secondary)] leading-relaxed font-medium">
-                    See your progress over time with easy-to-read charts. Track how many videos you've written, check your average writing quality scores, and stay motivated with clear visual targets.
+                    See your progress over time with easy-to-read charts. Track how many videos
+                    you've written, check your average writing quality scores, and stay motivated
+                    with clear visual targets.
                   </p>
                 </div>
               </div>
-              <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={handleSignIn}>
+              <div
+                className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline"
+                onClick={handleSignIn}
+              >
                 View progress features <ChevronRight size={12} weight="bold" />
               </div>
             </motion.div>
 
             {/* Feature 6: Interactive Prompt Architect */}
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="ios-card bg-[var(--bg-tertiary)] p-8 flex flex-col justify-between border border-[var(--separator)] group"
+            >
               <div className="space-y-6">
                 <div className="w-12 h-12 rounded-2xl bg-[#5856D6]/10 text-[#5856D6] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <ChatCircleText size={24} weight="duotone" />
@@ -776,15 +984,18 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                 <div className="space-y-2">
                   <h3 className="text-xl font-bold tracking-tight">AI Writing Settings</h3>
                   <p className="text-[15px] text-[var(--label-secondary)] leading-relaxed font-medium">
-                    Customize how the AI assistant helps you write. Easily set your preferred video length, vocabulary style, and tone of voice with simple, friendly switches.
+                    Customize how the AI assistant helps you write. Easily set your preferred video
+                    length, vocabulary style, and tone of voice with simple, friendly switches.
                   </p>
                 </div>
               </div>
-              <div className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline" onClick={handleSignIn}>
+              <div
+                className="pt-6 border-t border-[var(--separator)]/60 mt-6 flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] cursor-pointer hover:underline"
+                onClick={handleSignIn}
+              >
                 Try writing settings <ChevronRight size={12} weight="bold" />
               </div>
             </motion.div>
-
           </div>
         </div>
       </section>
@@ -792,7 +1003,10 @@ export default function LandingPage({ navigate }: LandingPageProps) {
       {/* Pricing (F3.6): the fabricated three-tier grid ($23–$99/mo, "Save
           20%", "Most Popular Choice", "Try Pro for Free") was removed — no
           paid plans exist. Honest early-access pricing: free, explained. */}
-      <section id="pricing" className="pt-[140px] pb-[100px] px-6 border-t border-[var(--separator)] relative overflow-hidden">
+      <section
+        id="pricing"
+        className="pt-[140px] pb-[100px] px-6 border-t border-[var(--separator)] relative overflow-hidden"
+      >
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[500px] bg-[var(--accent)] rounded-[100%] filter blur-[150px] opacity-[0.08] pointer-events-none" />
         <div className="max-w-3xl mx-auto relative z-10">
           <div className="text-center max-w-2xl mx-auto mb-12 space-y-4">
@@ -803,20 +1017,24 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               Free while CreatorOS is in early access.
             </h2>
             <p className="text-[16px] sm:text-[18px] text-[var(--label-secondary)] font-medium leading-relaxed">
-              Every feature you see is included at no cost during early access. If paid plans are ever introduced, early users will be told first — before anything changes.
+              Every feature you see is included at no cost during early access. If paid plans are
+              ever introduced, early users will be told first — before anything changes.
             </p>
           </div>
 
           <div className="bg-[var(--bg-tertiary)] p-8 rounded-[32px] border border-[var(--separator)] shadow-sm space-y-6">
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-5xl font-serif font-bold">$0</span>
-              <span className="text-sm text-[var(--label-secondary)] font-bold uppercase tracking-wider">during early access</span>
+              <span className="text-sm text-[var(--label-secondary)] font-bold uppercase tracking-wider">
+                during early access
+              </span>
             </div>
             <div className="border-t border-[var(--separator)]/60 pt-6">
               <ul className="space-y-3.5 text-sm text-[var(--label-secondary)] font-medium">
                 <li className="flex items-center gap-2.5">
                   <Check size={16} weight="bold" className="text-emerald-500" />
-                  Everything included — AI writing tools, style planner, publishing calendar, and the 30-day challenge
+                  Everything included — AI writing tools, style planner, publishing calendar, and
+                  the 30-day challenge
                 </li>
                 <li className="flex items-center gap-2.5">
                   <Check size={16} weight="bold" className="text-emerald-500" />
@@ -858,7 +1076,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               const isExpanded = expandedFaqIndex === index;
               return (
                 <div key={index} className="flex flex-col">
-                  <button 
+                  <button
                     onClick={() => setExpandedFaqIndex(isExpanded ? null : index)}
                     className="w-full text-left p-6 flex items-center justify-between hover:bg-[var(--bg-secondary)]/40 transition-colors focus:outline-none"
                   >
@@ -867,7 +1085,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                     </span>
                     <motion.div
                       animate={{ rotate: isExpanded ? 45 : 0 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                       className="text-[var(--label-tertiary)] flex-shrink-0"
                     >
                       <Plus size={18} weight="bold" />
@@ -878,7 +1096,7 @@ export default function LandingPage({ navigate }: LandingPageProps) {
                     {isExpanded && (
                       <motion.div
                         initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
+                        animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                         className="overflow-hidden bg-[var(--bg-secondary)]/20"
@@ -908,9 +1126,12 @@ export default function LandingPage({ navigate }: LandingPageProps) {
               <div className="w-12 h-12 bg-[var(--accent)]/10 text-[var(--accent)] rounded-2xl flex items-center justify-center mx-auto">
                 <Envelope size={24} weight="duotone" />
               </div>
-              <h3 className="font-serif text-[32px] sm:text-[38px] font-extrabold tracking-[-0.03em] leading-[1.1]">Have a question?</h3>
+              <h3 className="font-serif text-[32px] sm:text-[38px] font-extrabold tracking-[-0.03em] leading-[1.1]">
+                Have a question?
+              </h3>
               <p className="text-[15px] text-[var(--label-secondary)] font-medium">
-                CreatorOS is built by one developer early in its journey. The honest answer beats a fake form: reach out directly and it will be read.
+                CreatorOS is built by one developer early in its journey. The honest answer beats a
+                fake form: reach out directly and it will be read.
               </p>
             </div>
 
@@ -939,82 +1160,116 @@ export default function LandingPage({ navigate }: LandingPageProps) {
       <footer className="py-20 px-6 border-t border-[var(--separator)] text-center sm:text-left bg-[var(--bg-tertiary)]">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
           <div className="space-y-4">
-            <div className="flex items-center gap-2 justify-center sm:justify-start cursor-pointer" onClick={() => navigate?.('/')}>
-               <div className="p-1.5 bg-[var(--accent)]/10 rounded-lg text-[var(--accent)]">
-                 <BrandIcon size={18} />
-               </div>
-               <span className="font-bold text-[19px] tracking-tight">CreatorOS</span>
+            <div
+              className="flex items-center gap-2 justify-center sm:justify-start cursor-pointer"
+              onClick={() => navigate?.('/')}
+            >
+              <div className="p-1.5 bg-[var(--accent)]/10 rounded-lg text-[var(--accent)]">
+                <BrandIcon size={18} />
+              </div>
+              <span className="font-bold text-[19px] tracking-tight">CreatorOS</span>
             </div>
             <p className="text-[14px] text-[var(--label-secondary)] font-medium leading-relaxed max-w-xs mx-auto sm:mx-0">
-              The simple writing and design workspace built to help you create beautiful content and grow your channel.
+              The simple writing and design workspace built to help you create beautiful content and
+              grow your channel.
             </p>
           </div>
-          
+
           <div className="space-y-4">
-            <span className="ios-label p-0 uppercase tracking-widest text-xs font-bold text-[var(--label-tertiary)]">Product</span>
+            <span className="ios-label p-0 uppercase tracking-widest text-xs font-bold text-[var(--label-tertiary)]">
+              Product
+            </span>
             <ul className="space-y-2.5 text-[14px] font-semibold text-[var(--label-secondary)]">
-               <li><a href="#features" className="hover:text-[var(--accent)] transition-colors">Features</a></li>
-               <li><a href="#pricing" className="hover:text-[var(--accent)] transition-colors">Pricing</a></li>
-               <li>
-                 <button onClick={() => navigate?.('/roadmap')} className="hover:text-[var(--accent)] transition-colors text-left font-semibold">
-                   30-Day challenge
-                 </button>
-               </li>
+              <li>
+                <a href="#features" className="hover:text-[var(--accent)] transition-colors">
+                  Features
+                </a>
+              </li>
+              <li>
+                <a href="#pricing" className="hover:text-[var(--accent)] transition-colors">
+                  Pricing
+                </a>
+              </li>
+              <li>
+                <button
+                  onClick={() => navigate?.('/roadmap')}
+                  className="hover:text-[var(--accent)] transition-colors text-left font-semibold"
+                >
+                  30-Day challenge
+                </button>
+              </li>
             </ul>
           </div>
 
           <div className="space-y-4">
-            <span className="ios-label p-0 uppercase tracking-widest text-xs font-bold text-[var(--label-tertiary)]">Company & Support</span>
+            <span className="ios-label p-0 uppercase tracking-widest text-xs font-bold text-[var(--label-tertiary)]">
+              Company & Support
+            </span>
             <ul className="space-y-2.5 text-[14px] font-semibold text-[var(--label-secondary)]">
-               <li>
-                 <button onClick={() => navigate?.('/privacy')} className="hover:text-[var(--accent)] transition-colors text-left font-semibold">
-                   Privacy Protection
-                 </button>
-               </li>
-               <li>
-                 <button onClick={() => navigate?.('/terms')} className="hover:text-[var(--accent)] transition-colors text-left font-semibold">
-                   Terms of Service
-                 </button>
-               </li>
-               <li>
-                 <button onClick={() => navigate?.('/help')} className="hover:text-[var(--accent)] transition-colors text-left font-semibold">
-                   Public Help Documentation
-                 </button>
-               </li>
+              <li>
+                <button
+                  onClick={() => navigate?.('/privacy')}
+                  className="hover:text-[var(--accent)] transition-colors text-left font-semibold"
+                >
+                  Privacy Protection
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => navigate?.('/terms')}
+                  className="hover:text-[var(--accent)] transition-colors text-left font-semibold"
+                >
+                  Terms of Service
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => navigate?.('/help')}
+                  className="hover:text-[var(--accent)] transition-colors text-left font-semibold"
+                >
+                  Public Help Documentation
+                </button>
+              </li>
             </ul>
           </div>
 
           <div className="space-y-4">
-            <span className="ios-label p-0 uppercase tracking-widest text-xs font-bold text-[var(--label-tertiary)]">Connect with us</span>
+            <span className="ios-label p-0 uppercase tracking-widest text-xs font-bold text-[var(--label-tertiary)]">
+              Connect with us
+            </span>
             <div className="flex items-center gap-3.5 justify-center sm:justify-start">
-               {[
-                 { icon: GithubLogo, href: "https://github.com/danengelsman/CreatorOS" }
-               ].map((social, i) => (
-                 <a 
-                   key={i} 
-                   href={social.href}
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--label-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 transition-all border border-[var(--separator)] shadow-sm"
-                 >
+              {[{ icon: GithubLogo, href: 'https://github.com/danengelsman/CreatorOS' }].map(
+                (social, i) => (
+                  <a
+                    key={i}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--label-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 transition-all border border-[var(--separator)] shadow-sm"
+                  >
                     <social.icon size={18} weight="bold" />
-                 </a>
-               ))}
+                  </a>
+                ),
+              )}
             </div>
-            <p className="text-[11px] text-[var(--label-tertiary)] font-semibold mt-2 block">Web-based — runs in any modern desktop or mobile browser</p>
+            <p className="text-[11px] text-[var(--label-tertiary)] font-semibold mt-2 block">
+              Web-based — runs in any modern desktop or mobile browser
+            </p>
           </div>
         </div>
-        
+
         <div className="max-w-7xl mx-auto pt-10 mt-10 border-t border-[var(--separator)] flex flex-col sm:flex-row items-center justify-between gap-4">
-           <p className="text-[13px] text-[var(--label-tertiary)] font-semibold">© 2026 CreatorOS. All rights reserved.</p>
-           <a
-             href="https://github.com/danengelsman/CreatorOS"
-             target="_blank"
-             rel="noopener noreferrer"
-             className="text-[13px] text-[var(--label-tertiary)] font-semibold flex items-center gap-1.5 underline hover:text-[var(--label-secondary)] transition-colors"
-           >
-             View source on GitHub
-           </a>
+          <p className="text-[13px] text-[var(--label-tertiary)] font-semibold">
+            © 2026 CreatorOS. All rights reserved.
+          </p>
+          <a
+            href="https://github.com/danengelsman/CreatorOS"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[13px] text-[var(--label-tertiary)] font-semibold flex items-center gap-1.5 underline hover:text-[var(--label-secondary)] transition-colors"
+          >
+            View source on GitHub
+          </a>
         </div>
       </footer>
     </div>

@@ -18,49 +18,49 @@ Engineering hygiene is a mixed bag: typecheck is verifiably clean and git is dis
 
 ## 2. Snapshot
 
-| Fact | Value |
-|---|---|
-| Stack | React 19 + Vite 6 + TS 5.8 + Tailwind 4 + motion; Express 5 + Gemini (`@google/genai`); Firebase Auth + Firestore; sqlite (better-sqlite3) server CRUD |
-| Frontend size | 61 files / 16,519 LOC under `src/`; 46 lazy-loaded views |
-| Repo | 102 tracked files, 51 commits, 2 authors (solo-ish), first commit 2026-08-08, last 2026-10-01 |
-| Activity phase | Deploy-debugging on Vercel (~8 commits on 2026-10-01 chasing serverless boot) |
-| Tests | 1 real e2e smoke flow (4 tests, 4 browser projects), 0 unit tests |
-| Secrets in repo | None (only Firebase *web* config + README placeholder) |
+| Fact            | Value                                                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Stack           | React 19 + Vite 6 + TS 5.8 + Tailwind 4 + motion; Express 5 + Gemini (`@google/genai`); Firebase Auth + Firestore; sqlite (better-sqlite3) server CRUD |
+| Frontend size   | 61 files / 16,519 LOC under `src/`; 46 lazy-loaded views                                                                                               |
+| Repo            | 102 tracked files, 51 commits, 2 authors (solo-ish), first commit 2026-08-08, last 2026-10-01                                                          |
+| Activity phase  | Deploy-debugging on Vercel (~8 commits on 2026-10-01 chasing serverless boot)                                                                          |
+| Tests           | 1 real e2e smoke flow (4 tests, 4 browser projects), 0 unit tests                                                                                      |
+| Secrets in repo | None (only Firebase _web_ config + README placeholder)                                                                                                 |
 
 ## 3. Scorecard
 
-| Dimension | Grade | One-line rationale |
-|---|---|---|
-| Core feature delivery (create tools) | **B+** | 8 Gemini-backed features genuinely implemented and wired |
-| Growth/community features | **D** | TikTok sync, Community, billing, Roadmap are stubs/fakes |
-| Security (dev path) | **B−** | Wrapper + rate limits exist; a few routes slip through |
-| Security (production path) | **F** | Vercel bundle bypasses all of it; OAuth state forgeable |
-| Data architecture | **D+** | Firestore vs sqlite split-brain; ephemeral writes on Vercel |
-| Type/build health | **A−** | `tsc --noEmit` clean; real code splitting; no client secrets |
-| Test & CI safety net | **D** | CI is an echo; lint ≠ eslint; no unit tests; e2e thin but real |
-| Repo hygiene | **B−** | Clean tree, honest history; 14 dead scripts, dual lockfiles, committed bundle |
+| Dimension                            | Grade  | One-line rationale                                                            |
+| ------------------------------------ | ------ | ----------------------------------------------------------------------------- |
+| Core feature delivery (create tools) | **B+** | 8 Gemini-backed features genuinely implemented and wired                      |
+| Growth/community features            | **D**  | TikTok sync, Community, billing, Roadmap are stubs/fakes                      |
+| Security (dev path)                  | **B−** | Wrapper + rate limits exist; a few routes slip through                        |
+| Security (production path)           | **F**  | Vercel bundle bypasses all of it; OAuth state forgeable                       |
+| Data architecture                    | **D+** | Firestore vs sqlite split-brain; ephemeral writes on Vercel                   |
+| Type/build health                    | **A−** | `tsc --noEmit` clean; real code splitting; no client secrets                  |
+| Test & CI safety net                 | **D**  | CI is an echo; lint ≠ eslint; no unit tests; e2e thin but real                |
+| Repo hygiene                         | **B−** | Clean tree, honest history; 14 dead scripts, dual lockfiles, committed bundle |
 
 ---
 
 ## 4. Feature completeness (README claim → reality)
 
-| Claimed | Status | Key evidence |
-|---|---|---|
-| Content Studio & Editor (AI polish, voiceover) | **Full** | `ContentStudio.tsx`, `ContentEditorView.tsx`, `AIToolPanel.tsx` → real `quickPolish/generateSpeech/transcribeAudio` |
-| Scene Planner ("Vertano") | **Full** | `ScenePlanner.tsx:33,122`; real prompt `services/gemini.ts:468` |
-| Retention Lab (First 5s, heatmaps) | **Full** | `RetentionHookLab.tsx:64,68`; JSON contract `gemini.ts:605-637` |
-| Video Studio (imagery, TTS, playback) | **Full** | `useVideoGeneration.ts:127-176` real polling loop + localforage |
-| Content Repurposer | **Full** | `ContentRepurposer.tsx:27` |
-| Branding Engine | **Full** | `BrandingEngine.tsx` → `generateBrandKit/generateBrandLogo` |
-| Video Ideas Pipeline | **Full** | `VideoIdeas.tsx` → `generateContentIdeas` |
-| Perfect Prompt Co-Pilot | **Full** | `PerfectPromptCopilot.tsx:176` |
-| First Dollar Dashboard | **Partial** | Real `/api/analytics/summary`, hardcoded fallbacks `FirstDollarDashboard.tsx:66-79` |
-| Dashboard & Reports (YT/TikTok sync) | **Partial** | YouTube real (OAuth + `channels.list`); **TikTok returns constants** (`api/_server.js:958,1001`) |
-| Roadmap | **Stub** | `Roadmap.tsx:6,51` static stages, `completedDays=[1]` |
-| Creator Hub & Community | **Partial + Stub** | Hub = real Firestore content calendar but nav-locked; Community = hardcoded leaderboard/feed, input has no handler |
-| Profile Management | **Partial** | Real OAuth linking; subscription is a static "Free Plan" label; **no billing code exists** |
-| Help Center | **Partial** | Static content; unauthored topics "coming soon" |
-| Firebase auth + Firestore sync | **Full** | Live `onSnapshot` across App/SupportHub |
+| Claimed                                        | Status             | Key evidence                                                                                                        |
+| ---------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Content Studio & Editor (AI polish, voiceover) | **Full**           | `ContentStudio.tsx`, `ContentEditorView.tsx`, `AIToolPanel.tsx` → real `quickPolish/generateSpeech/transcribeAudio` |
+| Scene Planner ("Vertano")                      | **Full**           | `ScenePlanner.tsx:33,122`; real prompt `services/gemini.ts:468`                                                     |
+| Retention Lab (First 5s, heatmaps)             | **Full**           | `RetentionHookLab.tsx:64,68`; JSON contract `gemini.ts:605-637`                                                     |
+| Video Studio (imagery, TTS, playback)          | **Full**           | `useVideoGeneration.ts:127-176` real polling loop + localforage                                                     |
+| Content Repurposer                             | **Full**           | `ContentRepurposer.tsx:27`                                                                                          |
+| Branding Engine                                | **Full**           | `BrandingEngine.tsx` → `generateBrandKit/generateBrandLogo`                                                         |
+| Video Ideas Pipeline                           | **Full**           | `VideoIdeas.tsx` → `generateContentIdeas`                                                                           |
+| Perfect Prompt Co-Pilot                        | **Full**           | `PerfectPromptCopilot.tsx:176`                                                                                      |
+| First Dollar Dashboard                         | **Partial**        | Real `/api/analytics/summary`, hardcoded fallbacks `FirstDollarDashboard.tsx:66-79`                                 |
+| Dashboard & Reports (YT/TikTok sync)           | **Partial**        | YouTube real (OAuth + `channels.list`); **TikTok returns constants** (`api/_server.js:958,1001`)                    |
+| Roadmap                                        | **Stub**           | `Roadmap.tsx:6,51` static stages, `completedDays=[1]`                                                               |
+| Creator Hub & Community                        | **Partial + Stub** | Hub = real Firestore content calendar but nav-locked; Community = hardcoded leaderboard/feed, input has no handler  |
+| Profile Management                             | **Partial**        | Real OAuth linking; subscription is a static "Free Plan" label; **no billing code exists**                          |
+| Help Center                                    | **Partial**        | Static content; unauthored topics "coming soon"                                                                     |
+| Firebase auth + Firestore sync                 | **Full**           | Live `onSnapshot` across App/SupportHub                                                                             |
 
 **Mock hotspots:** TikTok analytics (constants `1240/45000/8900`) · Community fiction (picsum avatars, "1,204 Active") · SupportHub "E2E test" is a scripted `setTimeout` log animation printing fake "PASS (0 security vulnerabilities)" · `Reports.tsx:22` dead `DEMO_PROJECTS` · `index.html` JSON-LD ships fabricated `aggregateRating 4.9 / 15,200 reviews` (SEO/legal exposure).
 
@@ -71,10 +71,12 @@ Engineering hygiene is a mixed bag: typecheck is verifiably clean and git is dis
 ## 5. Security & deployment
 
 **Topology:** three targets, one ships unprotected.
+
 - `security-entry.ts` (dev + `npm run build` → `dist/server.js`): monkey-patches `express.application.post` to wrap 5 paths with Firebase auth + rate limits, then imports `server.ts`.
 - `server.ts` direct (`build:server` → `api/_server.js` → Vercel via `vercel.json` rewrite): **wrapper never applied** — grep of `api/_server.js` for `protectGeminiRoute`/`consumeRateLimit`/`X-RateLimit`: **0 hits**.
 
 **Findings:**
+
 - **[Critical] Unauthenticated Gemini abuse in production.** Gemini routes declare no `authenticateUser` (`server.ts:235,266,310,671,703,737`); on Vercel anyone can burn `GEMINI_API_KEY` — no auth, no rate limit, no model allowlist, no payload cap. Even on the Node path, `generate-image` and `niche-sparks` are outside the wrapper's 5 guarded paths (`security-entry.ts:26-32`).
 - **[High] OAuth account-linking forgery.** Google/TikTok callbacks trust `state` as the userId with no session binding (`server.ts:767,774-777,846,853-855`); attacker can plant their platform tokens under any user. Tokens stored **plaintext** in sqlite `user_accounts` (`src/db.ts:88-97`).
 - **[High] Auth verification hinges on one env var.** Without `FIREBASE_SERVICE_ACCOUNT`, `verifyIdToken` can't certify and every token route 401s on Vercel (`server.ts:35-43`) — unverifiable from repo; must be confirmed in Vercel settings.
@@ -85,6 +87,7 @@ Engineering hygiene is a mixed bag: typecheck is verifiably clean and git is dis
 ## 6. Data layer — split-brain
 
 Four stacks present, one live per side:
+
 - **better-sqlite3** is the only server store (`server.ts:6` → `src/db.ts`; users/brands/content/analytics/streaks/accounts) — but at `/tmp/creator_os.db` on Vercel it is **ephemeral**: server-side writes silently vanish between invocations.
 - **pg + drizzle** (`src/db/index.ts`, `schema.ts`, `drizzle.config.ts`) — dead scaffolding, imported by nothing.
 - **firebase-admin** — token verification only. **Firebase client SDK** — the real client store, plus `server.ts:1095` reads Firestore via REST.
@@ -113,33 +116,29 @@ Firestore is fully modeled as the intended system of record (`firebase-blueprint
 
 ## 9. Ranked risk register
 
-| # | Severity | Risk | Fix direction |
-|---|---|---|---|
-| 1 | **Critical** | Vercel path ships `server.ts` without security wrapper → unauthenticated, unthrottled Gemini API abuse | Wrap at route level inside `server.ts` itself (belt-and-braces), not via entry monkey-patch; regenerate `api/_server.js` in Vercel build |
-| 2 | High | Server writes to ephemeral `/tmp` sqlite on Vercel → silent data loss; split-brain vs Firestore | Converge on Firestore for all persistence (admin SDK server-side) |
-| 3 | High | OAuth `state`=userId forgery → token planting under arbitrary accounts; plaintext tokens at rest | Signed, session-bound state; encrypt tokens at rest |
-| 4 | High | `FIREBASE_SERVICE_ACCOUNT` missing ⇒ all authed API routes 401 in production | Verify/set in Vercel env; fail fast at boot when absent |
-| 5 | Medium | Fabricated data shipped (fake ratings in JSON-LD, fake community, fake TikTok stats, fake "test PASS" log) | Remove or clearly label before any public launch |
-| 6 | Medium | No safety net: nominal CI, broken eslint, zero unit tests, vacuous e2e assertions | CI = typecheck + fixed eslint + build + smoke e2e |
-| 7 | Medium | Strict-off TS + 157 `any`s on AI payloads; divergent auth fetch helpers; alias mismatch | Enable strict incrementally; type AI contracts; unify on one authed fetch |
-| 8 | Low | Monolith views, root re-renders, ephemeral tab navigation, 14 dead scripts, dual lockfiles | Incremental refactor; router; purge scripts/scripts/archive; one lockfile |
+| #   | Severity     | Risk                                                                                                       | Fix direction                                                                                                                            |
+| --- | ------------ | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Critical** | Vercel path ships `server.ts` without security wrapper → unauthenticated, unthrottled Gemini API abuse     | Wrap at route level inside `server.ts` itself (belt-and-braces), not via entry monkey-patch; regenerate `api/_server.js` in Vercel build |
+| 2   | High         | Server writes to ephemeral `/tmp` sqlite on Vercel → silent data loss; split-brain vs Firestore            | Converge on Firestore for all persistence (admin SDK server-side)                                                                        |
+| 3   | High         | OAuth `state`=userId forgery → token planting under arbitrary accounts; plaintext tokens at rest           | Signed, session-bound state; encrypt tokens at rest                                                                                      |
+| 4   | High         | `FIREBASE_SERVICE_ACCOUNT` missing ⇒ all authed API routes 401 in production                               | Verify/set in Vercel env; fail fast at boot when absent                                                                                  |
+| 5   | Medium       | Fabricated data shipped (fake ratings in JSON-LD, fake community, fake TikTok stats, fake "test PASS" log) | Remove or clearly label before any public launch                                                                                         |
+| 6   | Medium       | No safety net: nominal CI, broken eslint, zero unit tests, vacuous e2e assertions                          | CI = typecheck + fixed eslint + build + smoke e2e                                                                                        |
+| 7   | Medium       | Strict-off TS + 157 `any`s on AI payloads; divergent auth fetch helpers; alias mismatch                    | Enable strict incrementally; type AI contracts; unify on one authed fetch                                                                |
+| 8   | Low          | Monolith views, root re-renders, ephemeral tab navigation, 14 dead scripts, dual lockfiles                 | Incremental refactor; router; purge scripts/scripts/archive; one lockfile                                                                |
 
 ## 10. Recommended action plan
 
 **P0 — before next production deploy (days)**
+
 1. Move Gemini auth + rate limiting into `server.ts` route declarations themselves (don't depend on entry-file wrapper); set `vercel.json` `buildCommand` to `npm run build && npm run build:server`.
 2. Confirm `FIREBASE_SERVICE_ACCOUNT` in Vercel env; add boot-time fail-fast.
 3. Fix OAuth callback `state` binding; stop storing platform tokens plaintext.
 4. Decide the persistence story: Firestore everywhere (recommended) or a real server DB — kill the `/tmp` sqlite path.
 
-**P1 — this month**
-5. Real CI: typecheck + working eslint (Node globals + TS parser + ignore `api/`, `dist/`) + build + Playwright smoke.
-6. Strip fabricated data (JSON-LD ratings, Community literals, fake TikTok metrics) or gate behind "demo data" labels.
-7. Enable TS `strict` incrementally; define zod/typed contracts for Gemini responses; unify `apiFetch`/`authorizedFetch`.
+**P1 — this month** 5. Real CI: typecheck + working eslint (Node globals + TS parser + ignore `api/`, `dist/`) + build + Playwright smoke. 6. Strip fabricated data (JSON-LD ratings, Community literals, fake TikTok metrics) or gate behind "demo data" labels. 7. Enable TS `strict` incrementally; define zod/typed contracts for Gemini responses; unify `apiFetch`/`authorizedFetch`.
 
-**P2 — quality of life**
-8. Introduce a router (URL-addressable tabs), split monolith views, memoize snapshot-driven re-renders.
-9. Purge/archive the 14 dead root scripts, drop `bun.lock` or `package-lock.json`, add Prettier, remove `/test` Firestore rule and `?debug` trace leak.
+**P2 — quality of life** 8. Introduce a router (URL-addressable tabs), split monolith views, memoize snapshot-driven re-renders. 9. Purge/archive the 14 dead root scripts, drop `bun.lock` or `package-lock.json`, add Prettier, remove `/test` Firestore rule and `?debug` trace leak.
 
 ---
 

@@ -22,19 +22,25 @@ interface ContentItem {
   platforms?: string[];
 }
 
-export default function CreatorHub({ projects = [], setActiveTab }: { projects: any[], setActiveTab?: (tab: string) => void }) {
+export default function CreatorHub({
+  projects = [],
+  setActiveTab,
+}: {
+  projects: any[];
+  setActiveTab?: (tab: string) => void;
+}) {
   const [view, setView] = useState<'grid' | 'calendar'>('grid');
   const [currentDate, setCurrentDate] = useState(new Date());
 
   // Format projects into our content structure
   const content: ContentItem[] = useMemo(() => {
-    return projects.map(p => ({
+    return projects.map((p) => ({
       id: p.id,
       title: p.name || 'Untitled Content',
       platform: p.data?.platform || 'multi',
       status: p.data?.status || 'draft',
       scheduledDate: p.createdAt?.toDate ? p.createdAt.toDate() : new Date(),
-      platforms: p.data?.platforms || [p.data?.platform].filter(Boolean)
+      platforms: p.data?.platforms || [p.data?.platform].filter(Boolean),
     }));
   }, [projects]);
 
@@ -44,7 +50,7 @@ export default function CreatorHub({ projects = [], setActiveTab }: { projects: 
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    const days = [];
+    const days: (Date | null)[] = [];
     const totalDays = daysInMonth(year, month);
     const startDay = firstDayOfMonth(year, month);
 
@@ -53,30 +59,36 @@ export default function CreatorHub({ projects = [], setActiveTab }: { projects: 
     return days;
   }, [currentDate]);
 
-  const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-  const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  const nextMonth = () =>
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  const prevMonth = () =>
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
       {/* iOS Segmented Control */}
       <div className="flex justify-center pt-4">
         <div className="inline-flex p-1 bg-[var(--bg-secondary)] rounded-[10px] w-full max-w-[400px]">
-          <div 
+          <div
             onClick={() => setView('grid')}
             role="button"
             className={cn(
-              "flex-1 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all",
-              view === 'grid' ? "bg-[var(--bg-tertiary)] ios-elevated shadow-sm" : "text-[var(--label-secondary)]"
+              'flex-1 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all',
+              view === 'grid'
+                ? 'bg-[var(--bg-tertiary)] ios-elevated shadow-sm'
+                : 'text-[var(--label-secondary)]',
             )}
           >
             Grid
           </div>
-          <div 
+          <div
             onClick={() => setView('calendar')}
             role="button"
             className={cn(
-              "flex-1 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all",
-              view === 'calendar' ? "bg-[var(--bg-tertiary)] ios-elevated shadow-sm" : "text-[var(--label-secondary)]"
+              'flex-1 py-1.5 rounded-[8px] text-[13px] font-semibold transition-all',
+              view === 'calendar'
+                ? 'bg-[var(--bg-tertiary)] ios-elevated shadow-sm'
+                : 'text-[var(--label-secondary)]',
             )}
           >
             Calendar
@@ -86,7 +98,7 @@ export default function CreatorHub({ projects = [], setActiveTab }: { projects: 
 
       <AnimatePresence mode="wait">
         {view === 'grid' ? (
-          <motion.div 
+          <motion.div
             key="grid"
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -96,13 +108,19 @@ export default function CreatorHub({ projects = [], setActiveTab }: { projects: 
             <section>
               <h4 className="ios-label">Active Drafts</h4>
               <div className="ios-card divide-y divide-[var(--separator)] overflow-hidden">
-                {content.length > 0 ? content.map((item) => (
-                  <ContentRow key={item.id} item={item} />
-                )) : (
-                  <div className="p-8 text-center text-[var(--label-secondary)]">No content found. Start a new project to see it here.</div>
+                {content.length > 0 ? (
+                  content.map((item) => <ContentRow key={item.id} item={item} />)
+                ) : (
+                  <div className="p-8 text-center text-[var(--label-secondary)]">
+                    No content found. Start a new project to see it here.
+                  </div>
                 )}
-                
-                <div role="button" onClick={() => setActiveTab?.('create')} className="w-full p-4 flex items-center gap-3 text-[var(--accent)] active:bg-[var(--separator)] transition-colors group cursor-pointer">
+
+                <div
+                  role="button"
+                  onClick={() => setActiveTab?.('create')}
+                  className="w-full p-4 flex items-center gap-3 text-[var(--accent)] active:bg-[var(--separator)] transition-colors group cursor-pointer"
+                >
                   <div className="w-8 h-8 rounded-full bg-[var(--accent)]/10 flex items-center justify-center">
                     <Plus size={18} strokeWidth={1.5} />
                   </div>
@@ -112,7 +130,7 @@ export default function CreatorHub({ projects = [], setActiveTab }: { projects: 
             </section>
           </motion.div>
         ) : (
-          <motion.div 
+          <motion.div
             key="calendar"
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -124,10 +142,18 @@ export default function CreatorHub({ projects = [], setActiveTab }: { projects: 
                 {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
               </h3>
               <div className="flex gap-2">
-                <div role="button" onClick={prevMonth} className="p-2 text-[var(--accent)] active:opacity-40 cursor-pointer">
+                <div
+                  role="button"
+                  onClick={prevMonth}
+                  className="p-2 text-[var(--accent)] active:opacity-40 cursor-pointer"
+                >
                   <ChevronLeft size={22} strokeWidth={1.5} />
                 </div>
-                <div role="button" onClick={nextMonth} className="p-2 text-[var(--accent)] active:opacity-40 cursor-pointer">
+                <div
+                  role="button"
+                  onClick={nextMonth}
+                  className="p-2 text-[var(--accent)] active:opacity-40 cursor-pointer"
+                >
                   <ChevronRight size={22} strokeWidth={1.5} />
                 </div>
               </div>
@@ -135,34 +161,45 @@ export default function CreatorHub({ projects = [], setActiveTab }: { projects: 
 
             <div className="grid grid-cols-7 gap-1">
               {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
-                <div key={i} className="text-center text-[11px] font-bold text-[var(--label-tertiary)] pb-4">
+                <div
+                  key={i}
+                  className="text-center text-[11px] font-bold text-[var(--label-tertiary)] pb-4"
+                >
                   {day}
                 </div>
               ))}
               {calendarDays.map((date, i) => (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   className={cn(
-                    "min-h-[60px] p-1 rounded-[8px] flex flex-col items-center gap-1",
-                    date ? "bg-[var(--bg-secondary)]/30" : "opacity-0"
+                    'min-h-[60px] p-1 rounded-[8px] flex flex-col items-center gap-1',
+                    date ? 'bg-[var(--bg-secondary)]/30' : 'opacity-0',
                   )}
                 >
                   {date && (
                     <>
-                      <div className={cn(
-                        "text-[12px] font-medium p-1 w-6 h-6 flex items-center justify-center rounded-full",
-                        date.toDateString() === new Date().toDateString() ? "bg-[var(--accent)] text-white" : "text-[var(--label-primary)]"
-                      )}>
+                      <div
+                        className={cn(
+                          'text-[12px] font-medium p-1 w-6 h-6 flex items-center justify-center rounded-full',
+                          date.toDateString() === new Date().toDateString()
+                            ? 'bg-[var(--accent)] text-white'
+                            : 'text-[var(--label-primary)]',
+                        )}
+                      >
                         {date.getDate()}
                       </div>
                       <div className="flex gap-0.5">
                         {content
-                          .filter(item => item.scheduledDate?.toDateString() === date.toDateString())
+                          .filter(
+                            (item) => item.scheduledDate?.toDateString() === date.toDateString(),
+                          )
                           .slice(0, 3)
-                          .map(item => (
-                            <div key={item.id} className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-                          ))
-                        }
+                          .map((item) => (
+                            <div
+                              key={item.id}
+                              className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"
+                            />
+                          ))}
                       </div>
                     </>
                   )}
@@ -178,29 +215,37 @@ export default function CreatorHub({ projects = [], setActiveTab }: { projects: 
 
 function ContentRow({ item }: { item: ContentItem }) {
   const isMulti = item.platform === 'multi' || (item.platforms && item.platforms.length > 1);
-  
+
   return (
     <div className="p-4 flex items-center justify-between active:bg-[var(--separator)] transition-colors cursor-pointer group">
       <div className="flex items-center gap-3 min-w-0">
-        <div className={cn(
-          "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold text-[10px]",
-          PLATFORM_COLORS[item.platform] || PLATFORM_COLORS.multi
-        )}>
-           {item.platform === 'tiktok' && 'T'}
-           {item.platform === 'instagram' && 'I'}
-           {item.platform === 'youtube' && 'Y'}
-           {isMulti && 'M'}
+        <div
+          className={cn(
+            'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold text-[10px]',
+            PLATFORM_COLORS[item.platform] || PLATFORM_COLORS.multi,
+          )}
+        >
+          {item.platform === 'tiktok' && 'T'}
+          {item.platform === 'instagram' && 'I'}
+          {item.platform === 'youtube' && 'Y'}
+          {isMulti && 'M'}
         </div>
         <div className="flex flex-col min-w-0">
           <span className="font-semibold text-[17px] truncate">{item.title}</span>
           <div className="flex items-center gap-2 text-[13px] text-[var(--label-secondary)]">
             <span className="capitalize">{item.status}</span>
             <span className="opacity-30">•</span>
-            <span>{item.scheduledDate?.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+            <span>
+              {item.scheduledDate?.toLocaleDateString([], { month: 'short', day: 'numeric' })}
+            </span>
           </div>
         </div>
       </div>
-      <ChevronRight size={18} strokeWidth={1.5} className="text-[var(--label-tertiary)] flex-shrink-0" />
+      <ChevronRight
+        size={18}
+        strokeWidth={1.5}
+        className="text-[var(--label-tertiary)] flex-shrink-0"
+      />
     </div>
   );
 }

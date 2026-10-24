@@ -19,9 +19,7 @@ function loadKey(): Buffer {
   }
   const buffer = decodeKey(raw);
   if (buffer.length !== 32) {
-    throw new Error(
-      `TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes (got ${buffer.length})`
-    );
+    throw new Error(`TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes (got ${buffer.length})`);
   }
   return buffer;
 }
@@ -32,9 +30,10 @@ function decodeKey(raw: string): Buffer {
   if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
     return Buffer.from(trimmed, 'hex');
   }
-  const b64 = trimmed.includes('-') || trimmed.includes('_')
-    ? trimmed.replace(/-/g, '+').replace(/_/g, '/')
-    : trimmed;
+  const b64 =
+    trimmed.includes('-') || trimmed.includes('_')
+      ? trimmed.replace(/-/g, '+').replace(/_/g, '/')
+      : trimmed;
   return Buffer.from(b64, 'base64');
 }
 
@@ -86,7 +85,7 @@ export function encryptToken(plaintext: string): string {
  */
 export function decryptToken(
   serialized: string | null | undefined,
-  legacy?: { update: (encrypted: string) => void }
+  legacy?: { update: (encrypted: string) => void },
 ): string | null {
   if (serialized === null || serialized === undefined || serialized === '') {
     return (serialized ?? null) as string | null;
@@ -108,11 +107,7 @@ export function decryptToken(
   try {
     const envelope = JSON.parse(serialized) as TokenEnvelope;
     const key = loadKey();
-    const decipher = crypto.createDecipheriv(
-      'aes-256-gcm',
-      key,
-      fromB64u(envelope.iv)
-    );
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, fromB64u(envelope.iv));
     decipher.setAuthTag(fromB64u(envelope.tag));
     const plaintext = Buffer.concat([
       decipher.update(fromB64u(envelope.ciphertext)),

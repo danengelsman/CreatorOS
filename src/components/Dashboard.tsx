@@ -14,6 +14,8 @@ import {
   Users,
 } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
+import { calculateOneLever } from '@/services/telemetry';
+import SignalCard from './SignalCard';
 import { cn } from '../lib/utils';
 import { authorizedFetch, db } from '../firebase';
 import DailyGoalTracker from './DailyGoalTracker';
@@ -35,6 +37,7 @@ export default function Dashboard({
   brand,
   setActiveTab,
   user,
+  userData,
   projects = [],
   isProjectsLoading = false,
   projectsLoadError = false,
@@ -43,6 +46,7 @@ export default function Dashboard({
   brand: any;
   setActiveTab: (tab: string) => void;
   user: any;
+  userData?: any;
   projects?: any[];
   isProjectsLoading?: boolean;
   projectsLoadError?: boolean;
@@ -55,6 +59,10 @@ export default function Dashboard({
   const [loadKey, setLoadKey] = useState(0);
   const [journey, setJourney] = useState<CreatorJourney | null>(null);
   const [isJourneyLoading, setIsJourneyLoading] = useState(true);
+  const signal = useMemo(
+    () => calculateOneLever(userData || {}, projects || []),
+    [userData, projects],
+  );
 
   useEffect(() => {
     if (!user?.uid) {
@@ -154,7 +162,7 @@ export default function Dashboard({
       return;
     if (
       journey?.activeProjectId === firstDraft.id &&
-      (!firstDraft.journeyDraftSavedAt || journey.activeMission === 'review_first_draft')
+      (!firstDraft.journeyDraftSavedAt || journey?.activeMission === 'review_first_draft')
     )
       return;
     void (async () => {
@@ -302,6 +310,7 @@ export default function Dashboard({
 
   return (
     <div className="relative isolate pb-20 pt-5 lg:pt-8">
+      {signal && <SignalCard signal={signal} />}
       {/* Ambient studio lighting */}
       <div
         aria-hidden="true"

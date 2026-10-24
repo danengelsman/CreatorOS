@@ -1,5 +1,14 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Play, Pause, SpeakerHigh, SpeakerSlash, FastForward, Rewind, CornersOut, CircleNotch } from '@phosphor-icons/react';
+import {
+  Play,
+  Pause,
+  SpeakerHigh,
+  SpeakerSlash,
+  FastForward,
+  Rewind,
+  CornersOut,
+  CircleNotch,
+} from '@phosphor-icons/react';
 
 import localforage from 'localforage';
 
@@ -31,7 +40,7 @@ export default function CustomVideoPlayer({ videoUrl }: CustomVideoPlayerProps) 
         setIsLoading(false);
         return;
       }
-      
+
       if (videoUrl.startsWith('local:')) {
         try {
           const blob = await localforage.getItem<Blob>(videoUrl);
@@ -136,15 +145,15 @@ export default function CustomVideoPlayer({ videoUrl }: CustomVideoPlayerProps) 
   };
 
   const formatTime = (time: number) => {
-    if (isNaN(time)) return "0:00";
+    if (isNaN(time)) return '0:00';
     const mins = Math.floor(time / 60);
     const secs = Math.floor(time % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className="relative w-full h-full group flex items-center justify-center bg-black overflow-hidden"
     >
       {!hasError ? (
@@ -160,7 +169,7 @@ export default function CustomVideoPlayer({ videoUrl }: CustomVideoPlayerProps) 
             onError={() => setHasError(true)}
             className="w-full h-full object-cover cursor-pointer"
           />
-          
+
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm z-10">
               <CircleNotch size={32} className="animate-spin text-white opacity-80" />
@@ -178,17 +187,18 @@ export default function CustomVideoPlayer({ videoUrl }: CustomVideoPlayerProps) 
 
           {/* Controls Bar */}
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent pt-12 pb-4 px-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            
             {/* Seek Bar */}
             <div className="flex items-center gap-2 w-full mb-3">
-              <span className="text-white text-xs font-mono w-10 text-right">{formatTime(currentTime)}</span>
+              <span className="text-white text-xs font-mono w-10 text-right">
+                {formatTime(currentTime)}
+              </span>
               <input
                 type="range"
                 min={0}
                 max={duration || 100}
                 value={currentTime}
                 onChange={handleSeek}
-                onClick={e => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
                 className="w-full h-1.5 bg-white/30 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full"
               />
               <span className="text-white/70 text-xs font-mono w-10">{formatTime(duration)}</span>
@@ -197,24 +207,46 @@ export default function CustomVideoPlayer({ videoUrl }: CustomVideoPlayerProps) 
             {/* Buttons */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <button onClick={togglePlay} className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none">
+                <button
+                  onClick={togglePlay}
+                  className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none"
+                >
                   {isPlaying ? <Pause size={24} weight="fill" /> : <Play size={24} weight="fill" />}
                 </button>
-                <button onClick={skipBack} className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none">
+                <button
+                  onClick={skipBack}
+                  className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none"
+                >
                   <Rewind size={20} weight="fill" />
                 </button>
-                <button onClick={skipForward} className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none">
+                <button
+                  onClick={skipForward}
+                  className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none"
+                >
                   <FastForward size={20} weight="fill" />
                 </button>
-                <button onClick={toggleMute} className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none">
-                  {isMuted ? <SpeakerSlash size={22} weight="fill" /> : <SpeakerHigh size={22} weight="fill" />}
+                <button
+                  onClick={toggleMute}
+                  className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none"
+                >
+                  {isMuted ? (
+                    <SpeakerSlash size={22} weight="fill" />
+                  ) : (
+                    <SpeakerHigh size={22} weight="fill" />
+                  )}
                 </button>
               </div>
               <div className="flex items-center gap-4">
-                <button onClick={changeSpeed} className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none text-xs font-bold font-mono">
+                <button
+                  onClick={changeSpeed}
+                  className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none text-xs font-bold font-mono"
+                >
                   {playbackSpeed}x
                 </button>
-                <button onClick={toggleFullscreen} className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none">
+                <button
+                  onClick={toggleFullscreen}
+                  className="text-white hover:text-[var(--accent)] active:scale-95 transition-all outline-none"
+                >
                   <CornersOut size={20} weight="bold" />
                 </button>
               </div>

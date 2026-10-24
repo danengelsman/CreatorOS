@@ -22,7 +22,7 @@ export function useVideoGeneration({
   brand,
   user,
   showToast,
-  onVideoSaved
+  onVideoSaved,
 }: UseVideoGenerationProps) {
   const [videoStyle, setVideoStyle] = useState<'faceless' | 'avatar' | 'upload'>('faceless');
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
@@ -36,8 +36,12 @@ export function useVideoGeneration({
   const [videoLength, setVideoLength] = useState('Short (5s)');
   const parseVideoSeconds = (s: string) => (s.includes('20') ? 20 : s.includes('10') ? 10 : 5);
   const [avatarGender, setAvatarGender] = useState(brand?.avatar?.gender || 'Female');
-  const [avatarClothing, setAvatarClothing] = useState(brand?.avatar?.clothing || 'Professional business attire');
-  const [backgroundStyle, setBackgroundStyle] = useState(brand?.avatar?.background || 'Modern office with soft lighting');
+  const [avatarClothing, setAvatarClothing] = useState(
+    brand?.avatar?.clothing || 'Professional business attire',
+  );
+  const [backgroundStyle, setBackgroundStyle] = useState(
+    brand?.avatar?.background || 'Modern office with soft lighting',
+  );
   const [textOverlay, setTextOverlay] = useState('');
   const [ttsScript, setTtsScript] = useState('');
 
@@ -48,13 +52,13 @@ export function useVideoGeneration({
     let promptStr = `Create a ${videoLength} ${videoStyle === 'avatar' ? 'AI Avatar led' : 'faceless'} promotional video targeting ${platform}. `;
     promptStr += `Title: ${title || 'Untitled'}. `;
     promptStr += `Visual style: ${brand?.visual_style || 'modern and clean'}. `;
-    
+
     if (videoStyle === 'avatar') {
       promptStr += `Subject details: A ${avatarGender} avatar wearing ${avatarClothing}. `;
     }
     if (backgroundStyle) promptStr += `Background: ${backgroundStyle}. `;
     if (textOverlay) promptStr += `Overlay text or subtitles should include: "${textOverlay}". `;
-    
+
     promptStr += `Narrative/Script: ${ttsScript || body}. `;
     promptStr += `Make it highly engaging.`;
     return promptStr;
@@ -76,7 +80,7 @@ export function useVideoGeneration({
     textOverlay,
     ttsScript,
     body,
-    isPromptCustomized
+    isPromptCustomized,
   ]);
 
   useEffect(() => {
@@ -90,8 +94,8 @@ export function useVideoGeneration({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-       setVideoUrl(URL.createObjectURL(file));
-       showToast("Video uploaded successfully");
+      setVideoUrl(URL.createObjectURL(file));
+      showToast('Video uploaded successfully');
     }
   };
 
@@ -101,7 +105,8 @@ export function useVideoGeneration({
       let finalUrl = url;
       if (blob) {
         setVideoGenerationProgress('Saving video locally...');
-        const videoId = 'local:' + Date.now().toString() + '_' + Math.random().toString(36).substring(7);
+        const videoId =
+          'local:' + Date.now().toString() + '_' + Math.random().toString(36).substring(7);
         await localforage.setItem(videoId, blob);
         finalUrl = videoId;
       }
@@ -110,7 +115,7 @@ export function useVideoGeneration({
         url: finalUrl,
         prompt: finalPrompt,
         title: title || 'Untitled Video',
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       });
       if (onVideoSaved) onVideoSaved();
     } catch (error) {
@@ -120,11 +125,11 @@ export function useVideoGeneration({
 
   const handleGenerateVideo = async () => {
     if (videoStyle === 'upload') {
-       fileInputRef.current?.click();
-       return;
+      fileInputRef.current?.click();
+      return;
     }
     if (!body && !ttsScript) {
-      showToast("Please write a script or narrative first.");
+      showToast('Please write a script or narrative first.');
       return;
     }
     setIsVideoGenerating(true);
@@ -132,7 +137,7 @@ export function useVideoGeneration({
     setVideoProgressPercent(2);
     setVideoElapsedSeconds(0);
     setVideoUrl(null);
-    
+
     const startedAt = Date.now();
     // Live elapsed counter for the UI.
     const elapsedTimer = setInterval(() => {
@@ -165,8 +170,10 @@ export function useVideoGeneration({
     // Google's video model (gemini-omni-flash) has ZERO free-tier allowance —
     // requests only work on a billed project. Detect that wall and say so
     // immediately instead of retrying for 8 minutes.
-    const TIER_LIMIT_RE = /rate limit.*free tier|credits are depleted|billing settings|quota exceeded/i;
-    const TIER_LIMIT_MSG = "Video generation requires a paid Gemini API tier. Add billing to your API key's project at aistudio.google.com to unlock it — text features still work on the free tier.";
+    const TIER_LIMIT_RE =
+      /rate limit.*free tier|credits are depleted|billing settings|quota exceeded/i;
+    const TIER_LIMIT_MSG =
+      "Video generation requires a paid Gemini API tier. Add billing to your API key's project at aistudio.google.com to unlock it — text features still work on the free tier.";
 
     const finalize = async (blob: Blob) => {
       setVideoGenerationProgress('Downloading finished video...');
@@ -175,7 +182,7 @@ export function useVideoGeneration({
       setVideoUrl(localUrl);
       await saveVideoToHistory(localUrl, promptStr, blob);
     };
-    
+
     try {
       let operation;
       try {
@@ -186,7 +193,7 @@ export function useVideoGeneration({
         }
         throw createErr;
       }
-      
+
       let done = false;
       const finalOp = operation;
       let status = operation;
@@ -195,12 +202,13 @@ export function useVideoGeneration({
       const MAX_POLL_FAILURES = 3;
       /** Hard ceiling — beyond this a render is effectively lost. */
       const MAX_TOTAL_WAIT_MS = 8 * 60_000;
-      const TIMEOUT_MSG = 'Video render timed out after 8 minutes. Try a shorter video or try again in a bit.';
-      
+      const TIMEOUT_MSG =
+        'Video render timed out after 8 minutes. Try a shorter video or try again in a bit.';
+
       while (!done) {
         if (!status.done) {
           updateProgress();
-          await new Promise(r => setTimeout(r, 5000));
+          await new Promise((r) => setTimeout(r, 5000));
           try {
             status = await getOperationStatus(finalOp);
             pollFailures = 0;
@@ -213,28 +221,32 @@ export function useVideoGeneration({
             if (TIER_LIMIT_RE.test(msg)) throw new Error(TIER_LIMIT_MSG);
             if (Date.now() - startedAt > MAX_TOTAL_WAIT_MS) throw new Error(TIMEOUT_MSG);
             if (pollFailures >= MAX_POLL_FAILURES) {
-              throw new Error('Lost contact with the render job after several retries. It may still finish and appear in your video history.');
+              throw new Error(
+                'Lost contact with the render job after several retries. It may still finish and appear in your video history.',
+              );
             }
-            setVideoGenerationProgress(`Connection hiccup — retrying (${pollFailures}/${MAX_POLL_FAILURES})...`);
+            setVideoGenerationProgress(
+              `Connection hiccup — retrying (${pollFailures}/${MAX_POLL_FAILURES})...`,
+            );
             continue;
           }
           if (Date.now() - startedAt > MAX_TOTAL_WAIT_MS) throw new Error(TIMEOUT_MSG);
         }
-        
+
         if (status.done) {
           done = true;
           if (status.error) {
-             throw new Error(getFriendlyError(status.error));
+            throw new Error(getFriendlyError(status.error));
           }
           if (status.data) {
             let videoBlob: Blob | undefined;
 
             if (status.data.startsWith('data:')) {
-               const res = await fetch(status.data);
-               videoBlob = await res.blob();
+              const res = await fetch(status.data);
+              videoBlob = await res.blob();
             } else if (status.data.startsWith('gs://') || status.data.startsWith('http')) {
-               const { fetchVideoDownloadResponse } = await import('../services/gemini');
-               videoBlob = await fetchVideoDownloadResponse(status.data);
+              const { fetchVideoDownloadResponse } = await import('../services/gemini');
+              videoBlob = await fetchVideoDownloadResponse(status.data);
             }
             if (videoBlob) await finalize(videoBlob);
           } else if (status.uri) {
@@ -260,23 +272,34 @@ export function useVideoGeneration({
   };
 
   return {
-    videoStyle, setVideoStyle,
+    videoStyle,
+    setVideoStyle,
     isVideoGenerating,
-    videoAspect, setVideoAspect,
+    videoAspect,
+    setVideoAspect,
     videoGenerationProgress,
     videoProgressPercent,
     videoElapsedSeconds,
-    videoUrl, setVideoUrl,
-    videoLength, setVideoLength,
-    avatarGender, setAvatarGender,
-    avatarClothing, setAvatarClothing,
-    backgroundStyle, setBackgroundStyle,
-    textOverlay, setTextOverlay,
-    ttsScript, setTtsScript,
-    editedPrompt, setEditedPrompt,
-    isPromptCustomized, setIsPromptCustomized,
+    videoUrl,
+    setVideoUrl,
+    videoLength,
+    setVideoLength,
+    avatarGender,
+    setAvatarGender,
+    avatarClothing,
+    setAvatarClothing,
+    backgroundStyle,
+    setBackgroundStyle,
+    textOverlay,
+    setTextOverlay,
+    ttsScript,
+    setTtsScript,
+    editedPrompt,
+    setEditedPrompt,
+    isPromptCustomized,
+    setIsPromptCustomized,
     handleGenerateVideo,
     handleFileUpload,
-    fileInputRef
+    fileInputRef,
   };
 }

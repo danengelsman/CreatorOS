@@ -75,6 +75,7 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
     try {
       await loginWithGoogle();
       mintSessionCookie();
+      navigate?.('/dashboard');
     } catch (error: any) {
       console.error('Google Login failed:', error);
       setError(getFriendlyError(error));
@@ -140,6 +141,7 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
           });
         }
         mintSessionCookie();
+        navigate?.('/dashboard');
       } else {
         await loginWithEmail(email, password);
         try {
@@ -152,6 +154,7 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
           /* storage unavailable (private mode) — remember-email just no-ops */
         }
         mintSessionCookie();
+        navigate?.('/dashboard');
       }
     } catch (err: any) {
       console.error('Auth failed:', err);

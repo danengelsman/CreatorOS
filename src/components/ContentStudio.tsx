@@ -1,12 +1,29 @@
-import { apiFetch } from "../firebase";
+import { apiFetch } from '../firebase';
 import React, { useState, useEffect } from 'react';
-import { CheckCircle as CheckCircle2, DownloadSimple as Download, Sparkle as Sparkles, Lightbulb, X, Lightning, Cards } from '@phosphor-icons/react';
+import {
+  CheckCircle as CheckCircle2,
+  DownloadSimple as Download,
+  Sparkle as Sparkles,
+  Lightbulb,
+  X,
+  Lightning,
+  Cards,
+} from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { scoreContent } from '../services/gemini';
 import { cn } from '../lib/utils';
 import { db, serverTimestamp } from '../firebase';
-import { doc, collection, addDoc, getDocs, query, where, orderBy, updateDoc } from 'firebase/firestore';
-import VideoStudio from "./VideoStudio";
+import {
+  doc,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  updateDoc,
+} from 'firebase/firestore';
+import VideoStudio from './VideoStudio';
 import CalendarView from './CalendarView';
 import CustomVideoPlayer from './CustomVideoPlayer';
 import ScenePlanner from './ScenePlanner';
@@ -20,11 +37,29 @@ import ViralTemplatesLibrary from './ViralTemplatesLibrary';
 import { recordJourneyEvent } from '../services/creatorJourney';
 import { getFriendlyError } from '../lib/friendlyError';
 
-export default function Create({ brand, setActiveTab, user, selectedIdea, setSelectedIdea, selectedProject }: { brand: any, setActiveTab: (tab: string) => void, user: any, selectedIdea?: any, setSelectedIdea?: any, selectedProject?: any }) {
-  const [studioTab, setStudioTab] = useState<'editor' | 'ideas' | 'templates' | 'retention' | 'planner' | 'calendar'>('editor');
+export default function Create({
+  brand,
+  setActiveTab,
+  user,
+  selectedIdea,
+  setSelectedIdea,
+  selectedProject,
+}: {
+  brand: any;
+  setActiveTab: (tab: string) => void;
+  user: any;
+  selectedIdea?: any;
+  setSelectedIdea?: any;
+  selectedProject?: any;
+}) {
+  const [studioTab, setStudioTab] = useState<
+    'editor' | 'ideas' | 'templates' | 'retention' | 'planner' | 'calendar'
+  >('editor');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(selectedProject?.id || null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(
+    selectedProject?.id || null,
+  );
   const [videoHistory, setVideoHistory] = useState<any[]>([]);
   const [allProjects, setAllProjects] = useState<any[]>([]);
   const [activePreviewVideo, setActivePreviewVideo] = useState<any>(null);
@@ -43,24 +78,26 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
       const q = query(
         collection(db, 'videos'),
         where('userId', '==', user.uid),
-        orderBy('createdAt', 'desc')
+        orderBy('createdAt', 'desc'),
       );
       const snapshot = await getDocs(q);
-      const docs = await Promise.all(snapshot.docs.map(async (doc) => {
-        const data = doc.data();
-        let url = data.url;
-        if (url && url.startsWith('local:')) {
-          try {
-            const blob = await localforage.getItem<Blob>(url);
-            if (blob) {
-              url = URL.createObjectURL(blob);
+      const docs = await Promise.all(
+        snapshot.docs.map(async (doc) => {
+          const data = doc.data();
+          let url = data.url;
+          if (url && url.startsWith('local:')) {
+            try {
+              const blob = await localforage.getItem<Blob>(url);
+              if (blob) {
+                url = URL.createObjectURL(blob);
+              }
+            } catch (e) {
+              console.error('Failed to load local video blob', e);
             }
-          } catch (e) {
-            console.error('Failed to load local video blob', e);
           }
-        }
-        return { id: doc.id, ...data, url };
-      }));
+          return { id: doc.id, ...data, url };
+        }),
+      );
       setVideoHistory(docs);
     } catch (error) {
       console.error('Failed to load video history', error);
@@ -70,14 +107,11 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
   const loadExistingProjects = async () => {
     if (!user) return;
     try {
-      const q = query(
-        collection(db, 'projects'),
-        where('userId', '==', user.uid)
-      );
+      const q = query(collection(db, 'projects'), where('userId', '==', user.uid));
       const snapshot = await getDocs(q);
       const docs = snapshot.docs
-        .filter(doc => doc.data().type === 'content')
-        .map(doc => ({ id: doc.id, ...doc.data() }));
+        .filter((doc) => doc.data().type === 'content')
+        .map((doc) => ({ id: doc.id, ...doc.data() }));
       setAllProjects(docs);
     } catch (error) {
       console.error('Failed to load existing projects', error);
@@ -91,7 +125,6 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
     }
   }, [user]);
 
-  
   const handleDownloadVideo = async (url: string, title: string) => {
     try {
       let blob: Blob;
@@ -106,7 +139,7 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
         if (!response.ok) throw new Error('Video not found');
         blob = await response.blob();
       }
-      
+
       const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
@@ -144,7 +177,6 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
     setTimeout(() => setToastMessage(''), 3000);
   };
 
-  
   const handleScore = async () => {
     if (!body || !brand) return;
     setIsScoring(true);
@@ -160,33 +192,24 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
     }
   };
 
-  
-  
-  
-
-  
-  
-    
-  
-  
-  
   const handlePublish = async () => {
     if (!user || !body) return;
     setIsSaving(true);
     try {
-      const firstDraftRevision = activeProjectId === selectedProject?.id
-        && selectedProject?.journeyStep === 'first_content'
-        && body.trim() !== (selectedProject.starterBody || selectedProject.data?.body || '').trim();
+      const firstDraftRevision =
+        activeProjectId === selectedProject?.id &&
+        selectedProject?.journeyStep === 'first_content' &&
+        body.trim() !== (selectedProject.starterBody || selectedProject.data?.body || '').trim();
       const changes = {
         name: title || 'Untitled Content',
         data: {
           title,
           body,
           platform,
-          score: scoreData?.score || 0
+          score: scoreData?.score || 0,
         },
         updatedAt: serverTimestamp(),
-        ...(firstDraftRevision ? { journeyDraftSavedAt: serverTimestamp() } : {})
+        ...(firstDraftRevision ? { journeyDraftSavedAt: serverTimestamp() } : {}),
       };
       if (activeProjectId) {
         await updateDoc(doc(db, 'projects', activeProjectId), changes);
@@ -203,19 +226,19 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
           userId: user.uid,
           type: 'content',
           status: 'Draft',
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
         });
         setActiveProjectId(projectRef.id);
       }
-      
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-      
+
       if (allProjects.length === 0) {
         setShowConfetti(true);
         setTimeout(() => setShowConfetti(false), 5000);
       }
-      
+
       loadExistingProjects();
     } catch (error) {
       console.error(error);
@@ -231,12 +254,14 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
           <Sparkles className="w-10 h-10 text-[var(--label-tertiary)]" strokeWidth={1.5} />
         </div>
         <div className="space-y-4">
-          <h2 className="font-serif text-[28px] font-semibold tracking-[-0.015em]">Identity Required</h2>
+          <h2 className="font-serif text-[28px] font-semibold tracking-[-0.015em]">
+            Identity Required
+          </h2>
           <p className="text-[var(--label-secondary)] text-[17px] font-medium leading-tight">
             Architect your brand identity before crafting world-class content with AI scoring.
           </p>
         </div>
-        <button 
+        <button
           onClick={() => setActiveTab('brand')}
           className="ios-button ios-button-filled w-full"
         >
@@ -245,7 +270,6 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
       </div>
     );
   }
-
 
   const handleFormat = async (targetPlatformId: string, label: string, isPro?: boolean) => {
     if (isPro) {
@@ -261,9 +285,9 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gemini-3.8-flash",
-          contents: `Rewrite the following content to be formatted specifically for ${label}. Adapt the tone, length, and style appropriately. Keep it high quality.\n\nContent:\n${body}`
-        })
+          model: 'gemini-3.8-flash',
+          contents: `Rewrite the following content to be formatted specifically for ${label}. Adapt the tone, length, and style appropriately. Keep it high quality.\n\nContent:\n${body}`,
+        }),
       });
       if (!response.ok) throw new Error('Format failed');
       const data = await response.json();
@@ -280,15 +304,14 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
   return (
     <div className="space-y-8 pb-20">
       <div className="flex flex-col md:flex-row md:items-center px-1 pt-4 pb-4 gap-4">
-        
         <div className="flex bg-[var(--bg-secondary)]/50 p-1.5 rounded-[24px] w-full max-w-[850px] shadow-inner border border-[var(--separator)]/30 backdrop-blur-md overflow-x-auto no-scrollbar">
           <button
             onClick={() => setStudioTab('editor')}
             className={cn(
-              "shrink-0 whitespace-nowrap px-6 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform",
-              studioTab === 'editor' 
-                ? "bg-[var(--accent)] text-white shadow-lg scale-[1.02]" 
-                : "text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]"
+              'shrink-0 whitespace-nowrap px-6 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform',
+              studioTab === 'editor'
+                ? 'bg-[var(--accent)] text-white shadow-lg scale-[1.02]'
+                : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]',
             )}
           >
             Editor
@@ -296,46 +319,58 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
           <button
             onClick={() => setStudioTab('ideas')}
             className={cn(
-              "shrink-0 whitespace-nowrap px-4 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform flex items-center justify-center gap-1",
-              studioTab === 'ideas' 
-                ? "bg-[var(--accent)] text-white shadow-lg scale-[1.02]" 
-                : "text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]"
+              'shrink-0 whitespace-nowrap px-4 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform flex items-center justify-center gap-1',
+              studioTab === 'ideas'
+                ? 'bg-[var(--accent)] text-white shadow-lg scale-[1.02]'
+                : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]',
             )}
           >
-            <Lightbulb size={15} weight="fill" className={studioTab === 'ideas' ? "text-amber-200" : "text-amber-400"} />
+            <Lightbulb
+              size={15}
+              weight="fill"
+              className={studioTab === 'ideas' ? 'text-amber-200' : 'text-amber-400'}
+            />
             <span>AI Ideas</span>
           </button>
           <button
             onClick={() => setStudioTab('templates')}
             className={cn(
-              "shrink-0 whitespace-nowrap px-4 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform flex items-center justify-center gap-1",
-              studioTab === 'templates' 
-                ? "bg-[var(--accent)] text-white shadow-lg scale-[1.02]" 
-                : "text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]"
+              'shrink-0 whitespace-nowrap px-4 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform flex items-center justify-center gap-1',
+              studioTab === 'templates'
+                ? 'bg-[var(--accent)] text-white shadow-lg scale-[1.02]'
+                : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]',
             )}
           >
-            <Cards size={15} weight="fill" className={studioTab === 'templates' ? "text-blue-200" : "text-blue-400"} />
+            <Cards
+              size={15}
+              weight="fill"
+              className={studioTab === 'templates' ? 'text-blue-200' : 'text-blue-400'}
+            />
             <span>Templates</span>
           </button>
           <button
             onClick={() => setStudioTab('retention')}
             className={cn(
-              "shrink-0 whitespace-nowrap px-4 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform flex items-center justify-center gap-1",
-              studioTab === 'retention' 
-                ? "bg-[var(--accent)] text-white shadow-lg scale-[1.02]" 
-                : "text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]"
+              'shrink-0 whitespace-nowrap px-4 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform flex items-center justify-center gap-1',
+              studioTab === 'retention'
+                ? 'bg-[var(--accent)] text-white shadow-lg scale-[1.02]'
+                : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]',
             )}
           >
-            <Lightning size={15} weight="fill" className={studioTab === 'retention' ? "text-amber-200" : "text-amber-400"} />
+            <Lightning
+              size={15}
+              weight="fill"
+              className={studioTab === 'retention' ? 'text-amber-200' : 'text-amber-400'}
+            />
             <span>Retention Lab</span>
           </button>
           <button
             onClick={() => setStudioTab('planner')}
             className={cn(
-              "shrink-0 whitespace-nowrap px-4 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform flex items-center justify-center gap-1",
-              studioTab === 'planner' 
-                ? "bg-[var(--accent)] text-white shadow-lg scale-[1.02]" 
-                : "text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]"
+              'shrink-0 whitespace-nowrap px-4 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform flex items-center justify-center gap-1',
+              studioTab === 'planner'
+                ? 'bg-[var(--accent)] text-white shadow-lg scale-[1.02]'
+                : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]',
             )}
           >
             <span>Scene Planner</span>
@@ -343,10 +378,10 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
           <button
             onClick={() => setStudioTab('calendar')}
             className={cn(
-              "shrink-0 whitespace-nowrap px-6 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform",
-              studioTab === 'calendar' 
-                ? "bg-[var(--accent)] text-white shadow-lg scale-[1.02]" 
-                : "text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]"
+              'shrink-0 whitespace-nowrap px-6 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform',
+              studioTab === 'calendar'
+                ? 'bg-[var(--accent)] text-white shadow-lg scale-[1.02]'
+                : 'text-[var(--label-secondary)] hover:text-[var(--label-primary)] hover:bg-[var(--bg-secondary)]',
             )}
           >
             Calendar
@@ -357,21 +392,25 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
       {studioTab === 'calendar' ? (
         <CalendarView user={user} setActiveTab={setActiveTab} />
       ) : studioTab === 'ideas' ? (
-        <ContentIdeaGenerator 
-          brand={brand} 
+        <ContentIdeaGenerator
+          brand={brand}
           onSelectIdea={(idea) => {
             setTitle(idea.title);
             setBody(`Hook: ${idea.hook}\n\nConcept: ${idea.description}`);
             setStudioTab('editor');
-          }} 
+          }}
         />
       ) : studioTab === 'templates' ? (
-        <ViralTemplatesLibrary 
-          brand={brand} 
+        <ViralTemplatesLibrary
+          brand={brand}
           onSelectTemplate={(template) => {
             setTitle(template.title);
             setBody(`Hook: ${template.hook}\n\nScript: ${template.body}`);
-            if (template.platform === 'TikTok' || template.platform === 'YouTube Shorts' || template.platform === 'Instagram') {
+            if (
+              template.platform === 'TikTok' ||
+              template.platform === 'YouTube Shorts' ||
+              template.platform === 'Instagram'
+            ) {
               setPlatform('youtube');
             } else if (template.platform === 'Twitter') {
               setPlatform('x');
@@ -379,7 +418,7 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
               setPlatform('linkedin');
             }
             setStudioTab('editor');
-          }} 
+          }}
         />
       ) : studioTab === 'retention' ? (
         <RetentionHookLab
@@ -393,68 +432,73 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
           onSendToScenePlanner={() => setStudioTab('planner')}
         />
       ) : studioTab === 'planner' ? (
-        <ScenePlanner initialScript={body} initialTitle={title} showToast={showToast} brand={brand} />
-      ) : (
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        <div className="lg:col-span-8 space-y-6">
-                    <ContentEditorView
-            title={title}
-            setTitle={setTitle}
-            body={body}
-            setBody={setBody}
-            platform={platform}
-            setPlatform={setPlatform}
-            brand={brand}
-            showToast={showToast}
-            setStudioTab={setStudioTab}
-            isSaving={isSaving}
-            onPublish={handlePublish}
-            isScoring={isScoring}
-            onScore={handleScore}
-            isPolishing={isPolishing}
-            setIsPolishing={setIsPolishing}
-            onFormat={handleFormat}
-          />
-
-          {/* Gemini Video Studio */}
-          <VideoStudio 
-             body={body}
-             title={title}
-             platform={platform}
-             brand={brand}
-             showToast={showToast}
-             user={user}
-             onVideoSaved={loadVideoHistory}
-          />
-
-          {/* Create Settings / Tools */}
-         
-        <AIToolPanel 
-          brand={brand}
-          allProjects={allProjects}
-          body={body}
-          setBody={setBody}
-          setTitle={setTitle}
+        <ScenePlanner
+          initialScript={body}
+          initialTitle={title}
           showToast={showToast}
-          setIsPolishing={setIsPolishing}
-          isPolishing={isPolishing}
-          platform={platform}
-          onFormat={handleFormat}
-          setActiveTab={setActiveTab}
-          videoHistory={videoHistory}
-          onSelectVideo={setActivePreviewVideo}
-          isScoring={isScoring}
-          scoreData={scoreData}
+          brand={brand}
         />
-</div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div className="lg:col-span-8 space-y-6">
+            <ContentEditorView
+              title={title}
+              setTitle={setTitle}
+              body={body}
+              setBody={setBody}
+              platform={platform}
+              setPlatform={setPlatform}
+              brand={brand}
+              showToast={showToast}
+              setStudioTab={setStudioTab}
+              isSaving={isSaving}
+              onPublish={handlePublish}
+              isScoring={isScoring}
+              onScore={handleScore}
+              isPolishing={isPolishing}
+              setIsPolishing={setIsPolishing}
+              onFormat={handleFormat}
+            />
+
+            {/* Gemini Video Studio */}
+            <VideoStudio
+              body={body}
+              title={title}
+              platform={platform}
+              brand={brand}
+              showToast={showToast}
+              user={user}
+              onVideoSaved={loadVideoHistory}
+            />
+
+            {/* Create Settings / Tools */}
+
+            <AIToolPanel
+              brand={brand}
+              allProjects={allProjects}
+              body={body}
+              setBody={setBody}
+              setTitle={setTitle}
+              showToast={showToast}
+              setIsPolishing={setIsPolishing}
+              isPolishing={isPolishing}
+              platform={platform}
+              onFormat={handleFormat}
+              setActiveTab={setActiveTab}
+              videoHistory={videoHistory}
+              onSelectVideo={setActivePreviewVideo}
+              isScoring={isScoring}
+              scoreData={scoreData}
+            />
+          </div>
+        </div>
       )}
 
       {showConfetti && <Confetti count={150} />}
 
       <AnimatePresence>
         {saveSuccess && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -467,7 +511,7 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
           </motion.div>
         )}
         {toastMessage && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -491,7 +535,7 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ type: "spring", duration: 0.4 }}
+              transition={{ type: 'spring', duration: 0.4 }}
               className="bg-[var(--bg-tertiary)] rounded-2xl overflow-hidden w-full max-w-md shadow-2xl border border-[var(--separator)]/50 flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
@@ -503,7 +547,10 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
                   </h3>
                   {activePreviewVideo.createdAt && (
                     <p className="text-[11px] text-[var(--label-tertiary)] font-medium">
-                      Generated {new Date(activePreviewVideo.createdAt?.toDate?.() || Date.now()).toLocaleDateString()}
+                      Generated{' '}
+                      {new Date(
+                        activePreviewVideo.createdAt?.toDate?.() || Date.now(),
+                      ).toLocaleDateString()}
                     </p>
                   )}
                 </div>
@@ -535,7 +582,9 @@ export default function Create({ brand, setActiveTab, user, selectedIdea, setSel
               {/* Interactive buttons */}
               <div className="p-4 border-t border-[var(--separator)]/65 flex items-center justify-end gap-3 bg-[var(--bg-secondary)]/30">
                 <button
-                  onClick={() => handleDownloadVideo(activePreviewVideo.url, activePreviewVideo.title)}
+                  onClick={() =>
+                    handleDownloadVideo(activePreviewVideo.url, activePreviewVideo.title)
+                  }
                   className="ios-button ios-button-tinted flex items-center gap-2 text-[13px] font-bold px-4 py-2 cursor-pointer"
                 >
                   <Download size={15} weight="bold" />

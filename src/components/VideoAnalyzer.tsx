@@ -1,6 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'motion/react';
-import { VideoCamera, Sparkle, Target, ListChecks, FileVideo, UploadSimple, WarningCircle, CheckCircle } from '@phosphor-icons/react';
+import {
+  VideoCamera,
+  Sparkle,
+  Target,
+  ListChecks,
+  FileVideo,
+  UploadSimple,
+  WarningCircle,
+  CheckCircle,
+} from '@phosphor-icons/react';
 import { analyzeVideo } from '../services/gemini';
 import Markdown from 'react-markdown';
 import { getFriendlyError } from '../lib/friendlyError';
@@ -8,7 +17,9 @@ import { getFriendlyError } from '../lib/friendlyError';
 export default function VideoAnalyzer() {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [analysisType, setAnalysisType] = useState<'summary' | 'flashcards' | 'marketing'>('summary');
+  const [analysisType, setAnalysisType] = useState<'summary' | 'flashcards' | 'marketing'>(
+    'summary',
+  );
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -89,16 +100,30 @@ export default function VideoAnalyzer() {
             <h3 className="font-bold text-[16px] mb-4 text-[var(--label-primary)] flex items-center gap-2">
               <Target size={18} className="text-[var(--accent)]" /> Analysis Output
             </h3>
-            
+
             <div className="space-y-3">
               <button
                 onClick={() => setAnalysisType('summary')}
                 className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${analysisType === 'summary' ? 'bg-[var(--accent)] border-[var(--accent)] shadow-md shadow-[#007AFF20]' : 'border-[var(--separator)] hover:bg-[var(--bg-tertiary)] bg-[var(--bg-primary)]'}`}
               >
-                <ListChecks size={20} className={analysisType === 'summary' ? 'text-white' : 'text-[var(--label-secondary)]'} weight={analysisType === 'summary' ? 'fill' : 'regular'} />
+                <ListChecks
+                  size={20}
+                  className={
+                    analysisType === 'summary' ? 'text-white' : 'text-[var(--label-secondary)]'
+                  }
+                  weight={analysisType === 'summary' ? 'fill' : 'regular'}
+                />
                 <div>
-                  <div className={`font-semibold text-[14px] ${analysisType === 'summary' ? 'text-white' : 'text-[var(--label-primary)]'}`}>Executive Summary</div>
-                  <div className={`text-[12px] mt-0.5 ${analysisType === 'summary' ? 'text-white/80' : 'text-[var(--label-secondary)]'}`}>Key takeaways and chapter breakdown</div>
+                  <div
+                    className={`font-semibold text-[14px] ${analysisType === 'summary' ? 'text-white' : 'text-[var(--label-primary)]'}`}
+                  >
+                    Executive Summary
+                  </div>
+                  <div
+                    className={`text-[12px] mt-0.5 ${analysisType === 'summary' ? 'text-white/80' : 'text-[var(--label-secondary)]'}`}
+                  >
+                    Key takeaways and chapter breakdown
+                  </div>
                 </div>
               </button>
 
@@ -106,10 +131,24 @@ export default function VideoAnalyzer() {
                 onClick={() => setAnalysisType('flashcards')}
                 className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${analysisType === 'flashcards' ? 'bg-[var(--accent)] border-[var(--accent)] shadow-md shadow-[#007AFF20]' : 'border-[var(--separator)] hover:bg-[var(--bg-tertiary)] bg-[var(--bg-primary)]'}`}
               >
-                <Sparkle size={20} className={analysisType === 'flashcards' ? 'text-white' : 'text-[var(--label-secondary)]'} weight={analysisType === 'flashcards' ? 'fill' : 'regular'} />
+                <Sparkle
+                  size={20}
+                  className={
+                    analysisType === 'flashcards' ? 'text-white' : 'text-[var(--label-secondary)]'
+                  }
+                  weight={analysisType === 'flashcards' ? 'fill' : 'regular'}
+                />
                 <div>
-                  <div className={`font-semibold text-[14px] ${analysisType === 'flashcards' ? 'text-white' : 'text-[var(--label-primary)]'}`}>Flashcards</div>
-                  <div className={`text-[12px] mt-0.5 ${analysisType === 'flashcards' ? 'text-white/80' : 'text-[var(--label-secondary)]'}`}>Q&A style study guide</div>
+                  <div
+                    className={`font-semibold text-[14px] ${analysisType === 'flashcards' ? 'text-white' : 'text-[var(--label-primary)]'}`}
+                  >
+                    Flashcards
+                  </div>
+                  <div
+                    className={`text-[12px] mt-0.5 ${analysisType === 'flashcards' ? 'text-white/80' : 'text-[var(--label-secondary)]'}`}
+                  >
+                    Q&A style study guide
+                  </div>
                 </div>
               </button>
 
@@ -117,10 +156,24 @@ export default function VideoAnalyzer() {
                 onClick={() => setAnalysisType('marketing')}
                 className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${analysisType === 'marketing' ? 'bg-[var(--accent)] border-[var(--accent)] shadow-md shadow-[#007AFF20]' : 'border-[var(--separator)] hover:bg-[var(--bg-tertiary)] bg-[var(--bg-primary)]'}`}
               >
-                <FileVideo size={20} className={analysisType === 'marketing' ? 'text-white' : 'text-[var(--label-secondary)]'} weight={analysisType === 'marketing' ? 'fill' : 'regular'} />
+                <FileVideo
+                  size={20}
+                  className={
+                    analysisType === 'marketing' ? 'text-white' : 'text-[var(--label-secondary)]'
+                  }
+                  weight={analysisType === 'marketing' ? 'fill' : 'regular'}
+                />
                 <div>
-                  <div className={`font-semibold text-[14px] ${analysisType === 'marketing' ? 'text-white' : 'text-[var(--label-primary)]'}`}>Marketing Highlights</div>
-                  <div className={`text-[12px] mt-0.5 ${analysisType === 'marketing' ? 'text-white/80' : 'text-[var(--label-secondary)]'}`}>Short-form hook angles and viral quotes</div>
+                  <div
+                    className={`font-semibold text-[14px] ${analysisType === 'marketing' ? 'text-white' : 'text-[var(--label-primary)]'}`}
+                  >
+                    Marketing Highlights
+                  </div>
+                  <div
+                    className={`text-[12px] mt-0.5 ${analysisType === 'marketing' ? 'text-white/80' : 'text-[var(--label-secondary)]'}`}
+                  >
+                    Short-form hook angles and viral quotes
+                  </div>
                 </div>
               </button>
             </div>
@@ -129,7 +182,7 @@ export default function VideoAnalyzer() {
 
         <div className="lg:col-span-2">
           {!file && !result ? (
-            <div 
+            <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
@@ -138,75 +191,95 @@ export default function VideoAnalyzer() {
                 ${isDragging ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--separator)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)]'}`}
             >
               <div className="w-16 h-16 rounded-full bg-[var(--bg-primary)] border border-[var(--separator)] flex items-center justify-center mb-4 shadow-sm">
-                <UploadSimple size={28} className="text-[var(--label-secondary)]" weight="regular" />
+                <UploadSimple
+                  size={28}
+                  className="text-[var(--label-secondary)]"
+                  weight="regular"
+                />
               </div>
-              <h3 className="font-bold text-[18px] text-[var(--label-primary)] mb-2">Upload Video Content</h3>
+              <h3 className="font-bold text-[18px] text-[var(--label-primary)] mb-2">
+                Upload Video Content
+              </h3>
               <p className="text-[14px] text-[var(--label-secondary)] max-w-sm mb-6">
-                Drag and drop a video file here, or click to browse. Max size 1GB. MP4, MOV, or WEBM format.
+                Drag and drop a video file here, or click to browse. Max size 1GB. MP4, MOV, or WEBM
+                format.
               </p>
-              <input 
-                type="file" 
+              <input
+                type="file"
                 ref={fileInputRef}
-                className="hidden" 
+                className="hidden"
                 accept="video/*"
                 onChange={handleFileSelect}
               />
             </div>
           ) : isAnalyzing ? (
             <div className="ios-card bg-[var(--bg-secondary)] border border-[var(--separator)] h-[400px] flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-               <motion.div 
-                 animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} 
-                 transition={{ repeat: Infinity, duration: 2 }}
-                 className="absolute inset-0 bg-gradient-to-tr from-[var(--accent)]/10 to-transparent pointer-events-none"
-               />
-               <Sparkle size={48} className="text-[var(--accent)] mb-4 animate-pulse" weight="fill" />
-               <h3 className="font-bold text-[20px] text-[var(--label-primary)] mb-2">Analyzing Video</h3>
-               <p className="text-[14px] text-[var(--label-secondary)] max-w-sm">
-                 Gemini is watching your video. It may take a minute for longer content...
-               </p>
+              <motion.div
+                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+                className="absolute inset-0 bg-gradient-to-tr from-[var(--accent)]/10 to-transparent pointer-events-none"
+              />
+              <Sparkle
+                size={48}
+                className="text-[var(--accent)] mb-4 animate-pulse"
+                weight="fill"
+              />
+              <h3 className="font-bold text-[20px] text-[var(--label-primary)] mb-2">
+                Analyzing Video
+              </h3>
+              <p className="text-[14px] text-[var(--label-secondary)] max-w-sm">
+                Gemini is watching your video. It may take a minute for longer content...
+              </p>
             </div>
           ) : result ? (
-             <div className="ios-card bg-[var(--bg-secondary)] border border-[var(--separator)] flex flex-col min-h-[400px]">
-               <div className="p-4 border-b border-[var(--separator)] flex items-center justify-between bg-[var(--bg-tertiary)]">
-                 <div className="flex items-center gap-3">
-                   <div className="w-8 h-8 rounded bg-[var(--system-green)]/10 text-[var(--system-green)] flex items-center justify-center">
-                     <CheckCircle size={18} weight="fill" />
-                   </div>
-                   <div>
-                     <div className="font-bold text-[14px]">{file?.name}</div>
-                     <div className="text-[12px] text-[var(--label-secondary)] capitalize">{analysisType} Generated</div>
-                   </div>
-                 </div>
-                 <button 
-                   onClick={() => { setFile(null); setResult(null); }}
-                   className="text-[12px] font-bold text-[var(--accent)] hover:underline"
-                 >
-                   Analyze Another
-                 </button>
-               </div>
-               <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
-                 <div className="markdown-body">
-                   <Markdown>{result}</Markdown>
-                 </div>
-               </div>
-             </div>
+            <div className="ios-card bg-[var(--bg-secondary)] border border-[var(--separator)] flex flex-col min-h-[400px]">
+              <div className="p-4 border-b border-[var(--separator)] flex items-center justify-between bg-[var(--bg-tertiary)]">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded bg-[var(--system-green)]/10 text-[var(--system-green)] flex items-center justify-center">
+                    <CheckCircle size={18} weight="fill" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-[14px]">{file?.name}</div>
+                    <div className="text-[12px] text-[var(--label-secondary)] capitalize">
+                      {analysisType} Generated
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setFile(null);
+                    setResult(null);
+                  }}
+                  className="text-[12px] font-bold text-[var(--accent)] hover:underline"
+                >
+                  Analyze Another
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                <div className="markdown-body">
+                  <Markdown>{result}</Markdown>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="ios-card bg-[var(--bg-secondary)] border border-[var(--separator)] p-8 flex flex-col min-h-[400px] items-center justify-center text-center">
               <div className="w-16 h-16 rounded-full bg-[var(--bg-primary)] border border-[var(--separator)] flex items-center justify-center mb-6 shadow-sm">
                 <FileVideo size={28} className="text-[var(--accent)]" weight="fill" />
               </div>
-              <h3 className="font-bold text-[18px] text-[var(--label-primary)] mb-2">{file?.name}</h3>
+              <h3 className="font-bold text-[18px] text-[var(--label-primary)] mb-2">
+                {file?.name}
+              </h3>
               <p className="text-[14px] text-[var(--label-secondary)] mb-8">
                 Ready to extract {analysisType} from this video.
               </p>
               <div className="flex items-center gap-3">
-                <button 
+                <button
                   onClick={() => setFile(null)}
                   className="ios-button ios-button-tinted h-10 px-6 font-semibold"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={handleAnalyze}
                   className="ios-button ios-button-filled h-10 px-8 font-semibold flex items-center gap-2 shadow-lg shadow-[#007AFF33]"
                 >
@@ -218,9 +291,15 @@ export default function VideoAnalyzer() {
 
           {error && (
             <div className="mt-4 p-4 rounded-xl bg-[var(--system-red)]/10 border border-[var(--system-red)]/20 flex items-start gap-3">
-              <WarningCircle size={20} className="text-[var(--system-red)] shrink-0 mt-0.5" weight="fill" />
+              <WarningCircle
+                size={20}
+                className="text-[var(--system-red)] shrink-0 mt-0.5"
+                weight="fill"
+              />
               <div>
-                <div className="text-[14px] font-bold text-[var(--system-red)]">Analysis Failed</div>
+                <div className="text-[14px] font-bold text-[var(--system-red)]">
+                  Analysis Failed
+                </div>
                 <div className="text-[13px] text-[var(--system-red)]/80 mt-1">{error}</div>
               </div>
             </div>

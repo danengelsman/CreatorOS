@@ -18,18 +18,20 @@ const candidates = sourceArg
   ? [sourceArg]
   : [
       'C:/Windows/Web/Wallpaper/Windows/img19.jpg',
-      ...fs.existsSync('C:/Windows/Web/Wallpaper')
-        ? fs.readdirSync('C:/Windows/Web/Wallpaper', { recursive: true })
+      ...(fs.existsSync('C:/Windows/Web/Wallpaper')
+        ? fs
+            .readdirSync('C:/Windows/Web/Wallpaper', { recursive: true })
             .map((f) => `C:/Windows/Web/Wallpaper/${f}`)
             .filter((f) => f.toLowerCase().endsWith('.jpg'))
-        : [],
+        : []),
     ];
 const source = candidates.find((p) => fs.existsSync(p));
 if (!source) throw new Error(`No source JPEG found (tried: ${candidates.join(', ')})`);
 
 const localAppData = process.env.LOCALAPPDATA || '';
 const ffmpegCandidates = fs.existsSync(localAppData)
-  ? fs.readdirSync(path.join(localAppData, 'ms-playwright'))
+  ? fs
+      .readdirSync(path.join(localAppData, 'ms-playwright'))
       .filter((d) => d.startsWith('ffmpeg-'))
       .map((d) => path.join(localAppData, 'ms-playwright', d, 'ffmpeg-win64.exe'))
   : [];
@@ -41,10 +43,29 @@ fs.mkdirSync(path.dirname(out), { recursive: true });
 execFileSync(
   ffmpeg,
   [
-    '-f', 'image2pipe', '-c:v', 'mjpeg', '-r', '10', '-i', 'pipe:0',
-    '-y', '-loglevel', 'error', '-c:v', 'libvpx', '-auto-alt-ref', '0',
-    '-b:v', '100k', '-s', '128x128', '-r', '10', out,
+    '-f',
+    'image2pipe',
+    '-c:v',
+    'mjpeg',
+    '-r',
+    '10',
+    '-i',
+    'pipe:0',
+    '-y',
+    '-loglevel',
+    'error',
+    '-c:v',
+    'libvpx',
+    '-auto-alt-ref',
+    '0',
+    '-b:v',
+    '100k',
+    '-s',
+    '128x128',
+    '-r',
+    '10',
+    out,
   ],
-  { input: fs.readFileSync(source), stdio: ['pipe', 'ignore', 'inherit'] }
+  { input: fs.readFileSync(source), stdio: ['pipe', 'ignore', 'inherit'] },
 );
 console.log(`wrote ${out} (${fs.statSync(out).size} bytes) from ${source}`);
