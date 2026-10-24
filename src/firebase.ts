@@ -88,10 +88,14 @@ export const loginWithGoogle = async () => {
 export const completeGoogleRedirect = async () => {
   try {
     const redirectPromise = getRedirectResult(auth);
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
-    return await Promise.race([redirectPromise, timeoutPromise]);
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000));
+    const result = await Promise.race([redirectPromise, timeoutPromise]);
+    if (result?.user) {
+      console.log('Google redirect sign-in successful for:', result.user.email);
+    }
+    return result;
   } catch (error) {
-    console.warn('Redirect check finished or skipped:', error);
+    console.error('Redirect sign-in error:', error);
     return null;
   }
 };
