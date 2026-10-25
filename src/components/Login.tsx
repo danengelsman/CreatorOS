@@ -136,7 +136,7 @@ export default function Login({
       }
     } catch (error: any) {
       console.error('Google Login failed:', error);
-      setError(getFriendlyError(error));
+      setError(getFriendlyError(error, { isGoogle: true, view }));
     } finally {
       setIsLoading(false);
     }
@@ -248,7 +248,7 @@ export default function Login({
       }
     } catch (err: any) {
       console.error('Auth failed:', err);
-      setError(getFriendlyError(err));
+      setError(getFriendlyError(err, { view }));
     } finally {
       setIsLoading(false);
     }

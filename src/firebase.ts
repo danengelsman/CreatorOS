@@ -69,21 +69,35 @@ if (firestoreEmulatorHost) {
 }
 
 /**
- * Prefer the popup flow because it works reliably on third-party hosts such as
- * Vercel. If the browser blocks the popup, continue in the current tab instead
- * of surfacing Firebase's raw auth/popup-blocked error to the user.
+ * Mobile-aware Google sign-in:
+ * - On mobile browsers (especially iOS Safari), third-party storage restrictions
+ *   and ITP break popup postMessage communication (causing INVALID_IDP_RESPONSE).
+ *   Redirect-first is the official Firebase recommendation for mobile web.
+ * - On desktop, popup-first preserves app state, with a seamless redirect fallback
+ *   if popups are blocked or fail.
  */
 export const loginWithGoogle = async () => {
+  const isMobile =
+    typeof navigator !== 'undefined' &&
+    (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (typeof window !== 'undefined' && window.innerWidth <= 768));
+
+  if (isMobile) {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
+      window.history.replaceState(window.history.state, '', '/dashboard');
+    }
+    await signInWithRedirect(auth, googleProvider);
+    return null;
+  }
+
   try {
-    // Popup-first with graceful redirect fallback:
-    // With X-Frame-Options: SAMEORIGIN active, AuthRelay succeeds.
-    // Popup works cleanly on desktop and mobile browsers where allowed without losing session state.
     return await signInWithPopup(auth, googleProvider);
   } catch (error: any) {
     if (
       error?.code === 'auth/popup-blocked' ||
       error?.code === 'auth/cancelled-popup-request' ||
-      error?.code === 'auth/popup-closed-by-user'
+      error?.code === 'auth/popup-closed-by-user' ||
+      error?.code === 'auth/invalid-credential'
     ) {
       if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
         window.history.replaceState(window.history.state, '', '/dashboard');
