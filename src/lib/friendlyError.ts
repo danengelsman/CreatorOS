@@ -100,7 +100,10 @@ const AI_ERRORS: Record<string, string> = {
  * Convert any thrown error into a customer-friendly message.
  * Usage:  setError(getFriendlyError(err));
  */
-export function getFriendlyError(err: unknown): string {
+export function getFriendlyError(
+  err: unknown,
+  context?: { isGoogle?: boolean; view?: string },
+): string {
   if (!err) return 'Something went wrong. Please try again.';
 
   // Normalized shape
@@ -108,6 +111,15 @@ export function getFriendlyError(err: unknown): string {
 
   // 1) Firebase auth: error.code like "auth/invalid-credential"
   if (e.code && typeof e.code === 'string' && e.code.startsWith('auth/')) {
+    if (e.code === 'auth/invalid-credential') {
+      if (context?.isGoogle) {
+        return 'Google sign-in could not be completed. Please try again or use email sign-in.';
+      }
+      if (context?.view === 'register') {
+        return 'Could not register with these credentials. If you already have an account, try signing in.';
+      }
+      return "That email or password doesn't match an account. Double-check both and try again, or reset your password.";
+    }
     return AUTH_ERRORS[e.code] || 'Sign-in failed. Please check your details and try again.';
   }
 
