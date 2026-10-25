@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root';
 import { Route as IndexRouteImport } from './routes/index';
 import { Route as AuthRouteImport } from './routes/_auth';
 import { Route as LoginRouteImport } from './routes/login';
+import { Route as ResetPasswordRouteImport } from './routes/reset-password';
 import { Route as AuthAnalyzerRouteImport } from './routes/_auth.analyzer';
 import { Route as AuthBrandRouteImport } from './routes/_auth.brand';
 import { Route as AuthCommunityRouteImport } from './routes/_auth.community';
@@ -41,6 +42,11 @@ const AuthRoute = AuthRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any);
 const AuthAnalyzerRoute = AuthAnalyzerRouteImport.update({
@@ -127,6 +133,7 @@ const AuthSupportRoute = AuthSupportRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/login': typeof LoginRoute;
+  '/reset-password': typeof ResetPasswordRoute;
   '/analyzer': typeof AuthAnalyzerRoute;
   '/brand': typeof AuthBrandRoute;
   '/community': typeof AuthCommunityRoute;
@@ -147,6 +154,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/login': typeof LoginRoute;
+  '/reset-password': typeof ResetPasswordRoute;
   '/analyzer': typeof AuthAnalyzerRoute;
   '/brand': typeof AuthBrandRoute;
   '/community': typeof AuthCommunityRoute;
@@ -169,6 +177,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute;
   '/_auth': typeof AuthRouteWithChildren;
   '/login': typeof LoginRoute;
+  '/reset-password': typeof ResetPasswordRoute;
   '/_auth/analyzer': typeof AuthAnalyzerRoute;
   '/_auth/brand': typeof AuthBrandRoute;
   '/_auth/community': typeof AuthCommunityRoute;
@@ -191,6 +200,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/reset-password'
     | '/analyzer'
     | '/brand'
     | '/community'
@@ -211,6 +221,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/reset-password'
     | '/analyzer'
     | '/brand'
     | '/community'
@@ -232,6 +243,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_auth'
     | '/login'
+    | '/reset-password'
     | '/_auth/analyzer'
     | '/_auth/brand'
     | '/_auth/community'
@@ -254,6 +266,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   AuthRoute: typeof AuthRouteWithChildren;
   LoginRoute: typeof LoginRoute;
+  ResetPasswordRoute: typeof ResetPasswordRoute;
 }
 
 declare module '@tanstack/react-router' {
@@ -277,6 +290,13 @@ declare module '@tanstack/react-router' {
       path: '/login';
       fullPath: '/login';
       preLoaderRoute: typeof LoginRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/reset-password': {
+      id: '/reset-password';
+      path: '/reset-password';
+      fullPath: '/reset-password';
+      preLoaderRoute: typeof ResetPasswordRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/_auth/analyzer': {
@@ -438,6 +458,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

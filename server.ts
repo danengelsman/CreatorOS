@@ -324,7 +324,9 @@ async function startServer() {
       return (
         hostname === 'generativelanguage.googleapis.com' ||
         hostname.endsWith('.googleapis.com') ||
-        hostname.endsWith('.googleusercontent.com')
+        hostname.endsWith('.googleusercontent.com') ||
+        hostname === 'replicate.delivery' ||
+        hostname.endsWith('.replicate.delivery')
       );
     } catch {
       return false;
@@ -982,7 +984,13 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     }
   });
 
-  // --- Replicate (video provider with free credits; gemini-omni needs paid tier) ---
+  // --- Video Generation Providers ---
+  // Supports Google (Veo models e.g. veo-2.0-generate-001 or Gemini omni) and Replicate.
+  // Selection priority:
+  // 1. VIDEO_PROVIDER='google' | 'gemini' | 'replicate'
+  // 2. If GOOGLE_VIDEO_MODEL or GEMINI_VIDEO_MODEL is configured -> Google
+  // 3. Fallback: if REPLICATE_API_TOKEN is set -> Replicate
+  // 4. Default -> Google
   const REPLICATE_API = 'https://api.replicate.com/v1';
   const getReplicateToken = () => process.env.REPLICATE_API_TOKEN || '';
   const replicateHeaders = () => ({
@@ -994,10 +1002,19 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     try {
       const { prompt, aspectRatio, durationSeconds } = req.body;
 
-      // Preferred engine: Replicate (works on free credits). Model is
-      // env-configurable; default prunaai/p-video (1-20s clips, 720p, fast).
+      const requestedProvider = (process.env.VIDEO_PROVIDER || '').toLowerCase();
+      const hasGoogleModel = Boolean(
+        process.env.GOOGLE_VIDEO_MODEL || process.env.GEMINI_VIDEO_MODEL,
+      );
       const repToken = getReplicateToken();
-      if (repToken) {
+
+      const useGoogle =
+        requestedProvider === 'google' ||
+        requestedProvider === 'gemini' ||
+        (hasGoogleModel && requestedProvider !== 'replicate') ||
+        (!repToken && requestedProvider !== 'replicate');
+
+      if (!useGoogle && repToken) {
         const VIDEO_MODEL = process.env.REPLICATE_VIDEO_MODEL || 'prunaai/p-video';
         const seconds = Math.min(20, Math.max(1, Number(durationSeconds) || 5));
         // Input schemas differ per model — only send fields each model declares.
@@ -1034,15 +1051,55 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         });
       }
 
-      // Fallback engine: Gemini omni (requires paid tier; background job).
-      // background:true makes create() return as soon as the render job is
-      // registered instead of blocking for the whole multi-minute render.
-      // The client polls /api/gemini/video-status with the returned id.
-      const interaction = await (
-        await getAI()
-      ).interactions.create(
+      // --- Google Video Engine ---
+      // Uses whatever Google model is configured (GOOGLE_VIDEO_MODEL or GEMINI_VIDEO_MODEL),
+      // defaulting to Google's premier paid video model 'veo-2.0-generate-001'.
+      const googleModel =
+        process.env.GOOGLE_VIDEO_MODEL || process.env.GEMINI_VIDEO_MODEL || 'veo-2.0-generate-001';
+
+      const ai = await getAI();
+
+      // Veo models: use official generateVideos API with background LRO
+      if (googleModel.toLowerCase().includes('veo')) {
+        const seconds = Math.min(20, Math.max(5, Number(durationSeconds) || 5));
+        const operation = await ai.models.generateVideos({
+          model: googleModel,
+          prompt,
+          config: {
+            numberOfVideos: 1,
+            aspectRatio: aspectRatio === '9:16' ? '9:16' : '16:9',
+            durationSeconds: seconds,
+          },
+        });
+        recordQuota(req, '/api/gemini/generate-video', operation);
+
+        if (operation.done) {
+          const video = operation.response?.generatedVideos?.[0]?.video;
+          const data = video?.videoBytes
+            ? `data:${video.mimeType || 'video/mp4'};base64,${video.videoBytes}`
+            : video?.uri || null;
+          return res.json({
+            done: true,
+            provider: 'google',
+            model: googleModel,
+            data,
+          });
+        }
+
+        return res.json({
+          done: false,
+          provider: 'google',
+          model: googleModel,
+          operationName: `veo:${operation.name}`,
+          renderStatus: 'processing',
+          startedAt: new Date().toISOString(),
+        });
+      }
+
+      // Fallback engine: Gemini Interactions API (e.g. gemini-omni-flash-preview)
+      const interaction = await ai.interactions.create(
         {
-          model: 'gemini-omni-flash-preview',
+          model: googleModel,
           input: prompt,
           background: true,
           store: true, // required by the API for background interactions
@@ -1062,6 +1119,8 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       if (interaction.status === 'completed' && videoPart && (videoPart.data || videoPart.uri)) {
         return res.json({
           done: true,
+          provider: 'google',
+          model: googleModel,
           data: videoPart.data
             ? `data:${videoPart.mime_type || 'video/mp4'};base64,${videoPart.data}`
             : videoPart.uri,
@@ -1069,7 +1128,9 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       }
       res.json({
         done: false,
-        operationName: interaction.id,
+        provider: 'google',
+        model: googleModel,
+        operationName: `interaction:${interaction.id}`,
         renderStatus: interaction.status,
         startedAt: interaction.created || new Date().toISOString(),
       });
@@ -1083,7 +1144,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     try {
       const { operationName } = req.body;
 
-      // Replicate predictions: poll by id, parse real % from render logs.
+      // 1. Replicate predictions: poll by id, parse real % from render logs.
       if (typeof operationName === 'string' && operationName.startsWith('replicate:')) {
         const predId = operationName.slice('replicate:'.length);
         const r = await fetch(`${REPLICATE_API}/predictions/${predId}`, {
@@ -1124,7 +1185,58 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         });
       }
 
-      const interaction = await (await getAI()).interactions.get(operationName);
+      // 2. Google Veo operations: poll via ai.operations.getVideosOperation
+      if (
+        typeof operationName === 'string' &&
+        (operationName.startsWith('veo:') || operationName.startsWith('operations/'))
+      ) {
+        const rawOpName = operationName.startsWith('veo:')
+          ? operationName.slice('veo:'.length)
+          : operationName;
+        const ai = await getAI();
+        const op = await ai.operations.getVideosOperation({
+          operation: { name: rawOpName },
+        });
+        recordQuota(req, '/api/gemini/video-status', op);
+
+        const done = Boolean(op.done);
+        let data: string | null = null;
+        const renderStatus = done ? 'completed' : 'processing';
+        const progressPercentage = done ? 100 : null;
+
+        if (done) {
+          if (op.error) {
+            throw new Error(
+              typeof op.error === 'string'
+                ? op.error
+                : (op.error as any)?.message || `Veo render failed: ${JSON.stringify(op.error)}`,
+            );
+          }
+          const video = op.response?.generatedVideos?.[0]?.video;
+          if (video?.videoBytes) {
+            data = `data:${video.mimeType || 'video/mp4'};base64,${video.videoBytes}`;
+          } else if (video?.uri) {
+            data = video.uri;
+          }
+        }
+
+        return res.json({
+          done,
+          progressPercentage,
+          renderStatus,
+          provider: 'google',
+          startedAt: null,
+          updatedAt: new Date().toISOString(),
+          data,
+        });
+      }
+
+      // 3. Google Interactions API (legacy / omni-flash)
+      const rawInteractionId =
+        typeof operationName === 'string' && operationName.startsWith('interaction:')
+          ? operationName.slice('interaction:'.length)
+          : operationName;
+      const interaction = await (await getAI()).interactions.get(rawInteractionId);
       recordQuota(req, '/api/gemini/video-status', interaction);
 
       let done = false;
@@ -1155,6 +1267,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         done,
         progressPercentage,
         renderStatus,
+        provider: 'google',
         startedAt,
         updatedAt,
         data,

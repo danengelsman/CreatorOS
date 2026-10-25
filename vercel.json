@@ -26,6 +26,13 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/__/auth/action",
+      "destination": "/reset-password",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",

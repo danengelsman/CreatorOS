@@ -708,7 +708,7 @@ async function startServer() {
       const url = new URL(value);
       if (url.protocol !== "https:") return false;
       const hostname = url.hostname.toLowerCase();
-      return hostname === "generativelanguage.googleapis.com" || hostname.endsWith(".googleapis.com") || hostname.endsWith(".googleusercontent.com");
+      return hostname === "generativelanguage.googleapis.com" || hostname.endsWith(".googleapis.com") || hostname.endsWith(".googleusercontent.com") || hostname === "replicate.delivery" || hostname.endsWith(".replicate.delivery");
     } catch {
       return false;
     }
@@ -1259,8 +1259,13 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
   app.post("/api/gemini/generate-video", protectAIRoute, async (req, res) => {
     try {
       const { prompt, aspectRatio, durationSeconds } = req.body;
+      const requestedProvider = (process.env.VIDEO_PROVIDER || "").toLowerCase();
+      const hasGoogleModel = Boolean(
+        process.env.GOOGLE_VIDEO_MODEL || process.env.GEMINI_VIDEO_MODEL
+      );
       const repToken = getReplicateToken();
-      if (repToken) {
+      const useGoogle = requestedProvider === "google" || requestedProvider === "gemini" || hasGoogleModel && requestedProvider !== "replicate" || !repToken && requestedProvider !== "replicate";
+      if (!useGoogle && repToken) {
         const VIDEO_MODEL = process.env.REPLICATE_VIDEO_MODEL || "prunaai/p-video";
         const seconds = Math.min(20, Math.max(1, Number(durationSeconds) || 5));
         const input = VIDEO_MODEL.startsWith("prunaai/p-video") ? {
@@ -1293,9 +1298,42 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           startedAt: (/* @__PURE__ */ new Date()).toISOString()
         });
       }
-      const interaction = await (await getAI()).interactions.create(
+      const googleModel = process.env.GOOGLE_VIDEO_MODEL || process.env.GEMINI_VIDEO_MODEL || "veo-2.0-generate-001";
+      const ai = await getAI();
+      if (googleModel.toLowerCase().includes("veo")) {
+        const seconds = Math.min(20, Math.max(5, Number(durationSeconds) || 5));
+        const operation = await ai.models.generateVideos({
+          model: googleModel,
+          prompt,
+          config: {
+            numberOfVideos: 1,
+            aspectRatio: aspectRatio === "9:16" ? "9:16" : "16:9",
+            durationSeconds: seconds
+          }
+        });
+        recordQuota(req, "/api/gemini/generate-video", operation);
+        if (operation.done) {
+          const video = operation.response?.generatedVideos?.[0]?.video;
+          const data = video?.videoBytes ? `data:${video.mimeType || "video/mp4"};base64,${video.videoBytes}` : video?.uri || null;
+          return res.json({
+            done: true,
+            provider: "google",
+            model: googleModel,
+            data
+          });
+        }
+        return res.json({
+          done: false,
+          provider: "google",
+          model: googleModel,
+          operationName: `veo:${operation.name}`,
+          renderStatus: "processing",
+          startedAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+      }
+      const interaction = await ai.interactions.create(
         {
-          model: "gemini-omni-flash-preview",
+          model: googleModel,
           input: prompt,
           background: true,
           store: true,
@@ -1314,12 +1352,16 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
       if (interaction.status === "completed" && videoPart && (videoPart.data || videoPart.uri)) {
         return res.json({
           done: true,
+          provider: "google",
+          model: googleModel,
           data: videoPart.data ? `data:${videoPart.mime_type || "video/mp4"};base64,${videoPart.data}` : videoPart.uri
         });
       }
       res.json({
         done: false,
-        operationName: interaction.id,
+        provider: "google",
+        model: googleModel,
+        operationName: `interaction:${interaction.id}`,
         renderStatus: interaction.status,
         startedAt: interaction.created || (/* @__PURE__ */ new Date()).toISOString()
       });
@@ -1367,7 +1409,42 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
           data: data2
         });
       }
-      const interaction = await (await getAI()).interactions.get(operationName);
+      if (typeof operationName === "string" && (operationName.startsWith("veo:") || operationName.startsWith("operations/"))) {
+        const rawOpName = operationName.startsWith("veo:") ? operationName.slice("veo:".length) : operationName;
+        const ai = await getAI();
+        const op = await ai.operations.getVideosOperation({
+          operation: { name: rawOpName }
+        });
+        recordQuota(req, "/api/gemini/video-status", op);
+        const done2 = Boolean(op.done);
+        let data2 = null;
+        const renderStatus2 = done2 ? "completed" : "processing";
+        const progressPercentage2 = done2 ? 100 : null;
+        if (done2) {
+          if (op.error) {
+            throw new Error(
+              typeof op.error === "string" ? op.error : op.error?.message || `Veo render failed: ${JSON.stringify(op.error)}`
+            );
+          }
+          const video = op.response?.generatedVideos?.[0]?.video;
+          if (video?.videoBytes) {
+            data2 = `data:${video.mimeType || "video/mp4"};base64,${video.videoBytes}`;
+          } else if (video?.uri) {
+            data2 = video.uri;
+          }
+        }
+        return res.json({
+          done: done2,
+          progressPercentage: progressPercentage2,
+          renderStatus: renderStatus2,
+          provider: "google",
+          startedAt: null,
+          updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          data: data2
+        });
+      }
+      const rawInteractionId = typeof operationName === "string" && operationName.startsWith("interaction:") ? operationName.slice("interaction:".length) : operationName;
+      const interaction = await (await getAI()).interactions.get(rawInteractionId);
       recordQuota(req, "/api/gemini/video-status", interaction);
       let done = false;
       let data = null;
@@ -1391,6 +1468,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         done,
         progressPercentage,
         renderStatus,
+        provider: "google",
         startedAt,
         updatedAt,
         data
