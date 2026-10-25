@@ -9,6 +9,8 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   sendPasswordResetEmail,
+  verifyPasswordResetCode,
+  confirmPasswordReset,
   signOut,
   onAuthStateChanged,
   updateProfile,
@@ -127,7 +129,26 @@ export const sendVerificationEmail = (user: FirebaseUser) => sendEmailVerificati
  * auth/user-not-found (older configs) and show the SAME generic copy either
  * way. See Login.tsx.
  */
-export const sendResetEmail = (email: string) => sendPasswordResetEmail(auth, email);
+export const sendResetEmail = async (email: string) => {
+  try {
+    if (typeof window !== 'undefined' && window.location.origin) {
+      return await sendPasswordResetEmail(auth, email, {
+        url: `${window.location.origin}/reset-password`,
+        handleCodeInApp: true,
+      });
+    }
+  } catch (err: any) {
+    if (err?.code === 'auth/unauthorized-continue-uri') {
+      return await sendPasswordResetEmail(auth, email);
+    }
+    throw err;
+  }
+  return await sendPasswordResetEmail(auth, email);
+};
+
+export const verifyResetCode = (code: string) => verifyPasswordResetCode(auth, code);
+export const confirmResetPassword = (code: string, newPass: string) =>
+  confirmPasswordReset(auth, code, newPass);
 
 /**
  * Compresses a base64 image string to ensure it fits within Firestore's 1MB limit.

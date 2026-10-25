@@ -36,6 +36,9 @@ const AUTH_ERRORS: Record<string, string> = {
   'auth/admin-restricted-operation': 'This action is restricted. Contact support if you need help.',
   'auth/account-exists-with-different-credential':
     'An account already exists with this email but uses a different sign-in method. Try the other sign-in option.',
+  'auth/expired-action-code': 'This password reset link has expired. Please request a new link.',
+  'auth/invalid-action-code':
+    'This password reset link is invalid or has already been used. Please request a new link.',
   'auth/invalid-verification-code':
     'That verification code is incorrect. Please check and re-enter it.',
   'auth/missing-verification-code': 'Please enter the verification code.',

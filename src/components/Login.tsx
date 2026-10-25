@@ -5,6 +5,8 @@ import {
   registerWithEmail,
   sendResetEmail,
   sendVerificationEmail,
+  verifyResetCode,
+  confirmResetPassword as firebaseConfirmResetPassword,
 } from '../firebase';
 import { exchangeSessionCookie } from '../lib/apiClient';
 import { validatePassword } from '../lib/passwordPolicy';
@@ -16,6 +18,8 @@ import {
   ArrowRight,
   Sparkle as Sparkles,
   EnvelopeSimple as MailCheck,
+  Eye,
+  EyeSlash,
 } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 import BrandIcon from './BrandIcon';
@@ -31,7 +35,7 @@ const REMEMBER_EMAIL_KEY = 'creatoros:remember-email';
 const GENERIC_RESET_COPY =
   'If an account exists for that email, a password reset link is on its way. Check your inbox (and spam folder).';
 
-type AuthView = 'signin' | 'register' | 'reset';
+type AuthView = 'signin' | 'register' | 'reset' | 'new-password';
 
 function readRememberedEmail(): string {
   try {
@@ -41,13 +45,40 @@ function readRememberedEmail(): string {
   }
 }
 
-export default function Login({ navigate }: { navigate?: (path: string) => void }) {
+export default function Login({
+  navigate,
+  initialView,
+}: {
+  navigate?: (path: string) => void;
+  initialView?: AuthView;
+}) {
   const [isLoading, setIsLoading] = useState(false);
-  const [view, setView] = useState<AuthView>('signin');
+  const [oobCode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('oobCode') || '';
+    }
+    return '';
+  });
+  const [view, setView] = useState<AuthView>(() => {
+    if (initialView) return initialView;
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('oobCode') || params.get('mode') === 'resetPassword') {
+        return 'new-password';
+      }
+    }
+    return 'signin';
+  });
   const [email, setEmail] = useState(readRememberedEmail);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [rememberEmail, setRememberEmail] = useState(() => readRememberedEmail() !== '');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
 
@@ -57,7 +88,32 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
     setInfo('');
     setPassword('');
     setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setResetSuccess(false);
   };
+
+  React.useEffect(() => {
+    if (view === 'new-password') {
+      if (oobCode) {
+        setIsVerifyingCode(true);
+        setError('');
+        verifyResetCode(oobCode)
+          .then((verifiedEmail) => {
+            setResetEmail(verifiedEmail);
+          })
+          .catch((err: any) => {
+            console.error('Verify reset code failed:', err);
+            setError(getFriendlyError(err));
+          })
+          .finally(() => {
+            setIsVerifyingCode(false);
+          });
+      } else {
+        setError('No password reset code found. Please use the link sent to your email.');
+      }
+    }
+  }, [view, oobCode]);
 
   /**
    * Best-effort: mint the hardening session cookie (Phase A). The Bearer flow
@@ -88,8 +144,40 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
+    if (view !== 'new-password' && !email) {
       setError('Please enter your email address.');
+      return;
+    }
+
+    if (view === 'new-password') {
+      if (!oobCode) {
+        setError('Password reset code is missing. Please use the link sent to your email.');
+        return;
+      }
+      const policy = validatePassword(password);
+      if (!policy.valid) {
+        setError(policy.error || 'Please choose a stronger password.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords don't match. Re-enter both and try again.");
+        return;
+      }
+
+      setIsLoading(true);
+      setError('');
+      try {
+        await firebaseConfirmResetPassword(oobCode, password);
+        setResetSuccess(true);
+        setInfo(
+          'Your password has been reset successfully! You can now sign in with your new password.',
+        );
+      } catch (err: any) {
+        console.error('Password reset confirmation failed:', err);
+        setError(getFriendlyError(err));
+      } finally {
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -170,6 +258,12 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
     signin: { title: 'Welcome Back', subtitle: 'Sign in to access your workspace' },
     register: { title: 'Create an Account', subtitle: 'Sign up to build your brand' },
     reset: { title: 'Reset Your Password', subtitle: "We'll email you a secure reset link" },
+    'new-password': {
+      title: 'Set New Password',
+      subtitle: resetEmail
+        ? `Enter a new password for ${resetEmail}`
+        : 'Choose a strong password for your account',
+    },
   };
 
   return (
@@ -288,47 +382,99 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
                   <span>Back to Sign In</span>
                 </button>
               </div>
+            ) : view === 'new-password' && resetSuccess ? (
+              <div className="space-y-6 mb-6">
+                <button
+                  type="button"
+                  onClick={() => switchView('signin')}
+                  className="ios-button ios-button-filled w-full py-4 text-[17px]"
+                  data-testid="back-to-signin-after-reset"
+                >
+                  <span>Sign In with New Password</span>
+                </button>
+              </div>
+            ) : isVerifyingCode ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3 mb-6">
+                <Loader2 size={32} className="animate-spin text-[var(--accent)]" />
+                <p className="text-[14px] text-[var(--label-secondary)] font-medium">
+                  Verifying reset link...
+                </p>
+              </div>
             ) : (
               <>
                 <form onSubmit={handleEmailAuth} className="space-y-4 mb-6">
-                  <div>
-                    <input
-                      type="email"
-                      placeholder="Email Address"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="ios-input w-full px-4 py-3 bg-[var(--bg-secondary)]"
-                      disabled={isLoading}
-                      autoComplete="email"
-                      required
-                    />
-                  </div>
-                  {view !== 'reset' && (
+                  {view !== 'new-password' && (
                     <div>
                       <input
-                        type="password"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        type="email"
+                        placeholder="Email Address"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         className="ios-input w-full px-4 py-3 bg-[var(--bg-secondary)]"
                         disabled={isLoading}
-                        autoComplete={view === 'register' ? 'new-password' : 'current-password'}
+                        autoComplete="email"
                         required
                       />
                     </div>
                   )}
-                  {view === 'register' && (
-                    <div>
+                  {view !== 'reset' && (
+                    <div className="relative flex items-center">
                       <input
-                        type="password"
-                        placeholder="Confirm Password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="ios-input w-full px-4 py-3 bg-[var(--bg-secondary)]"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder={view === 'new-password' ? 'New Password' : 'Password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="ios-input w-full pl-4 pr-11 py-3 bg-[var(--bg-secondary)]"
                         disabled={isLoading}
-                        autoComplete="new-password"
+                        autoComplete={
+                          view === 'register' || view === 'new-password'
+                            ? 'new-password'
+                            : 'current-password'
+                        }
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute right-3 p-1 text-[var(--label-tertiary)] hover:text-[var(--label-primary)] transition-colors focus:outline-none"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? (
+                          <EyeSlash size={18} strokeWidth={1.5} />
+                        ) : (
+                          <Eye size={18} strokeWidth={1.5} />
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  {(view === 'register' || view === 'new-password') && (
+                    <div>
+                      <div className="relative flex items-center">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          placeholder={
+                            view === 'new-password' ? 'Confirm New Password' : 'Confirm Password'
+                          }
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="ios-input w-full pl-4 pr-11 py-3 bg-[var(--bg-secondary)]"
+                          disabled={isLoading}
+                          autoComplete="new-password"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword((prev) => !prev)}
+                          className="absolute right-3 p-1 text-[var(--label-tertiary)] hover:text-[var(--label-primary)] transition-colors focus:outline-none"
+                          aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showConfirmPassword ? (
+                            <EyeSlash size={18} strokeWidth={1.5} />
+                          ) : (
+                            <Eye size={18} strokeWidth={1.5} />
+                          )}
+                        </button>
+                      </div>
                       <p className="mt-2 text-[12px] text-[var(--label-tertiary)] text-left leading-relaxed">
                         At least 8 characters, and not a commonly used password.
                       </p>
@@ -336,7 +482,7 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
                   )}
                   <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || isVerifyingCode}
                     className="ios-button bg-[var(--label-primary)] text-[var(--bg-primary)] w-full py-4 text-[17px] group flex justify-center"
                   >
                     {isLoading ? (
@@ -347,7 +493,9 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
                           ? 'Sign Up'
                           : view === 'reset'
                             ? 'Send Reset Link'
-                            : 'Sign In'}
+                            : view === 'new-password'
+                              ? 'Update Password'
+                              : 'Sign In'}
                       </span>
                     )}
                   </button>
@@ -391,7 +539,7 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
               </>
             )}
 
-            {view === 'signin' && (
+            {(view === 'signin' || view === 'register') && (
               <>
                 <div className="flex items-center gap-4 mb-6">
                   <div className="flex-1 h-px bg-[var(--separator)]"></div>
@@ -434,16 +582,32 @@ export default function Login({ navigate }: { navigate?: (path: string) => void 
                 ? 'Already have an account?'
                 : view === 'reset'
                   ? 'Remembered it after all?'
-                  : "Don't have an account?"}{' '}
+                  : view === 'new-password'
+                    ? 'Already know your password?'
+                    : "Don't have an account?"}{' '}
               <button
                 type="button"
-                onClick={() => switchView(view === 'register' ? 'signin' : 'register')}
+                onClick={() =>
+                  switchView(view === 'register' || view === 'new-password' ? 'signin' : 'register')
+                }
                 className="text-[var(--accent)] font-semibold hover:underline"
                 data-testid="auth-view-toggle"
               >
-                {view === 'register' ? 'Sign In' : 'Sign Up'}
+                {view === 'register' || view === 'new-password' ? 'Sign In' : 'Sign Up'}
               </button>
             </div>
+
+            {view === 'new-password' && !resetSuccess && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => switchView('reset')}
+                  className="text-[13px] text-[var(--accent)] font-semibold hover:underline"
+                >
+                  Request a new reset link
+                </button>
+              </div>
+            )}
 
             <div className="mt-8 pt-8 border-t border-[var(--separator)]">
               <p className="text-[12px] text-[var(--label-tertiary)] leading-relaxed font-medium">
