@@ -5,7 +5,7 @@ import {
   Sparkle,
   Clock,
   Globe,
-  TrendingUp,
+  TrendUp as TrendingUp,
   ChatCircleText,
   CaretRight as ChevronRight,
 } from '@phosphor-icons/react';
