@@ -24,6 +24,7 @@ import {
 import { Link } from '@tanstack/react-router';
 import { logout } from '@/firebase';
 import VerificationBanner from '@/components/VerificationBanner';
+import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 
 const FEATURE_COMMUNITY = import.meta.env.VITE_FEATURE_COMMUNITY === 'true';
 
@@ -201,7 +202,15 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
         </AnimatePresence>
 
         <main className="flex-1 overflow-y-auto pt-[calc(env(safe-area-inset-top,0px)+64px)] pb-[calc(env(safe-area-inset-bottom,0px)+83px)] lg:pb-12 px-4 lg:px-10">
-          <div className="max-w-[1400px] mx-auto">{children}</div>
+          <div className="max-w-[1400px] mx-auto">
+            <RouteErrorBoundary
+              onGoHome={() => {
+                window.location.href = '/dashboard';
+              }}
+            >
+              {children}
+            </RouteErrorBoundary>
+          </div>
         </main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-[60] lg:hidden material-thick border-t border-[var(--separator)] px-2 pb-[env(safe-area-inset-bottom,4px)] pt-1 h-[calc(env(safe-area-inset-bottom,0px)+49px)]">
