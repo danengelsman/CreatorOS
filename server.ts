@@ -278,9 +278,14 @@ async function startServer() {
   const MAX_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024;
   const ALLOWED_GEMINI_MODELS = new Set([
     'gemini-3.8-flash',
+    'gemini-3.7-flash',
     'gemini-3.6-flash',
+    'gemini-3.5-flash',
     'gemini-3.1-flash-lite',
+    'gemini-3.1-pro-preview',
+    'gemini-flash-latest',
     'gemini-2.5-flash',
+    'gemini-2.5-pro',
   ]);
   const rateBuckets = new Map<string, { count: number; resetAt: number }>();
   const MAX_RATE_BUCKETS = 10_000;
