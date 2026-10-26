@@ -70,9 +70,6 @@ export default defineConfig(({ mode }) => {
               if (id.includes('recharts') || id.includes('lucide-react') || id.includes('motion')) {
                 return 'ui';
               }
-              if (id.includes('@google/genai')) {
-                return 'genai';
-              }
             }
           },
         },
