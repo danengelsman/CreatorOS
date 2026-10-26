@@ -96,10 +96,15 @@ Week 5 D7-A work landed here (file-based TanStack Router routes under `src/route
 - Local e2e note: no JDK on this machine — Firestore emulator can't run locally; e2e verified via CI only.
 - Dead code note: legacy `src/App.tsx` (old hand-rolled `activeTab` tab system) is no longer mounted by anything; candidate for deletion in a follow-up cleanup PR.
 
+## PR #20 merged — Phase 5 cleanup & Gemini model audit (2026-10-25, squash `f691f14`)
+
+- **Dead code deleted:** legacy `src/App.tsx` (790 LOC unmounted tab router) removed. Zero imports remained; router-native AppRoot is the sole entry.
+- **Gemini model audit completed:** live query via `@google/genai` against Google AI Studio API verified all available models. Updated `ALLOWED_GEMINI_MODELS` in `server.ts` to include verified models (`gemini-3.7-flash`, `gemini-3.5-flash`, `gemini-3.1-pro-preview`, `gemini-flash-latest`, `gemini-2.5-pro`). Server bundle `api/_server.js` regenerated and freshness check confirmed.
+- **CI results on PR #20:** all 4 checks passed (Typecheck/lint/build/artifact-gate, E2E smoke 19/19, Prettier check, Vercel preview).
+
 ## Next action
 
-1. EXECUTING Week 5 (Active) → Phase 5 frontend architecture: D7-A TanStack Router (URLs/deep links), D8-A Zustand slices, F5.4 CalendarView/LandingPage splits, F5.5 font/CSS hygiene — now safely PR-able with CI as the merge gate.
-2. Before more AI changes: **Gemini model audit** vs official Google docs (model IDs on main came from an unverified table).
-3. **Phase 1 Today journey merged** as PR #8 (`b1380fa`); Firestore rules deploy remains an explicit production step.
-4. DONE 2026-10-18: branch protection ON (PRs + CI checks, admins enforced). Auth Phase A (email/password, reset, 14d session cookies, sign-out-everywhere) MERGED + DEPLOYED (`cb6ca28`). Admin claim granted to Dan's explicitly selected Google account and verified by Admin SDK readback; browser token refresh still pending. Phase B (TOTP, passkeys, Apple) deferred until Identity Platform billing decision.
-5. **Firestore rules need explicit deployment** for `first_dollar_journeys`: until then production client reads/writes may be denied. Verify deployment project and obtain separate approval before deploying rules.
+1. EXECUTING Week 5 (Active) → Phase 5 frontend architecture: D8-A Zustand slices, F5.4 CalendarView/LandingPage splits, F5.5 font/CSS hygiene.
+2. DONE 2026-10-25: Gemini model audit verified vs live API; dead `src/App.tsx` deleted (PR #20 `f691f14`).
+3. Firestore rules deployed Oct 24 for `first_dollar_journeys`.
+4. Next Phase: Phase 6 launch readiness (Roadmap derivation, billing decision, staging env, launch gate).
