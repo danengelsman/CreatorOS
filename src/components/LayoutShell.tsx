@@ -82,6 +82,91 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
 
   return (
     <div className="flex h-screen bg-[var(--bg-primary)] text-[var(--label-primary)] font-sans overflow-hidden">
+      {/* Mobile / Quick drawer rendered first so when opened, its links receive focus and clicks */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 lg:bg-black/20 z-[60] backdrop-blur-sm lg:backdrop-blur-none"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+            <motion.nav
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="fixed top-[env(safe-area-inset-top,0px)] left-0 bottom-0 w-[280px] lg:top-[calc(env(safe-area-inset-top,0px)+60px)] lg:left-4 lg:bottom-auto lg:w-80 bg-[var(--bg-secondary)] ios-card shadow-2xl z-[65] max-h-[100dvh] lg:max-h-[80vh] overflow-y-auto custom-scrollbar border-r lg:border border-[var(--separator)]"
+            >
+              <div className="p-4 lg:p-2 space-y-6 lg:space-y-4">
+                <div className="flex lg:hidden items-center justify-between pb-2 border-b border-[var(--separator)]">
+                  <div className="flex items-center gap-2 text-[var(--accent)]">
+                    <Menu size={24} strokeWidth={1.5} />
+                    <span className="font-bold text-lg tracking-tight text-[var(--label-primary)]">
+                      Creator<span className="text-[var(--accent)]">OS</span>
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-2 text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                {NAV_GROUPS.map((group, groupIdx) => {
+                  const groupItems = group.items
+                    .map((id) => NAV_ITEMS.find((item) => item.id === id))
+                    .filter((item): item is (typeof NAV_ITEMS)[number] => Boolean(item));
+                  if (groupItems.length === 0) return null;
+
+                  return (
+                    <div key={groupIdx} className="space-y-1">
+                      {group.title !== 'Main' && (
+                        <h4 className="px-4 py-2 text-[12px] font-bold tracking-wider text-[var(--label-tertiary)] uppercase">
+                          {group.title}
+                        </h4>
+                      )}
+                      {groupItems.map((item) => (
+                        <Link
+                          key={item.id}
+                          to={item.path as any}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group text-[var(--label-secondary)] hover:bg-[var(--separator)]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <item.icon size={20} className="flex-shrink-0" />
+                            <span className="font-semibold text-[15px]">{item.label}</span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  );
+                })}
+
+                <div className="my-4 border-t border-[var(--separator)]" />
+                <button
+                  onClick={async () => {
+                    try {
+                      await logout();
+                    } catch (err) {
+                      console.error('Logout failed:', err);
+                    }
+                    window.location.href = '/login';
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-[var(--system-red)] hover:bg-[var(--separator)] transition-colors rounded-xl mb-8 lg:mb-0"
+                >
+                  <LogOut size={20} />
+                  <span className="text-[15px] font-semibold">Logout</span>
+                </button>
+              </div>
+            </motion.nav>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Persistent Desktop Sidebar matching 3D Mockup */}
       <aside className="hidden lg:flex flex-col w-64 bg-[#0c0c12] border-r border-white/10 shrink-0 h-screen select-none z-30">
         {/* Brand Wordmark & Hexagon Icon */}
@@ -227,90 +312,6 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
 
         {/* Phase A — soft email-verification nudge (never a hard block). */}
         <VerificationBanner user={user} />
-
-        <AnimatePresence>
-          {isMobileMenuOpen && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/40 lg:bg-black/20 z-[60] backdrop-blur-sm lg:backdrop-blur-none"
-                onClick={() => setIsMobileMenuOpen(false)}
-              />
-              <motion.nav
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                className="fixed top-[env(safe-area-inset-top,0px)] left-0 bottom-0 w-[280px] lg:top-[calc(env(safe-area-inset-top,0px)+60px)] lg:left-4 lg:bottom-auto lg:w-80 bg-[var(--bg-secondary)] ios-card shadow-2xl z-[65] max-h-[100dvh] lg:max-h-[80vh] overflow-y-auto custom-scrollbar border-r lg:border border-[var(--separator)]"
-              >
-                <div className="p-4 lg:p-2 space-y-6 lg:space-y-4">
-                  <div className="flex lg:hidden items-center justify-between pb-2 border-b border-[var(--separator)]">
-                    <div className="flex items-center gap-2 text-[var(--accent)]">
-                      <Menu size={24} strokeWidth={1.5} />
-                      <span className="font-bold text-lg tracking-tight text-[var(--label-primary)]">
-                        Creator<span className="text-[var(--accent)]">OS</span>
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="p-2 text-[var(--label-secondary)] hover:text-[var(--label-primary)]"
-                    >
-                      <X size={24} />
-                    </button>
-                  </div>
-
-                  {NAV_GROUPS.map((group, groupIdx) => {
-                    const groupItems = group.items
-                      .map((id) => NAV_ITEMS.find((item) => item.id === id))
-                      .filter((item): item is (typeof NAV_ITEMS)[number] => Boolean(item));
-                    if (groupItems.length === 0) return null;
-
-                    return (
-                      <div key={groupIdx} className="space-y-1">
-                        {group.title !== 'Main' && (
-                          <h4 className="px-4 py-2 text-[12px] font-bold tracking-wider text-[var(--label-tertiary)] uppercase">
-                            {group.title}
-                          </h4>
-                        )}
-                        {groupItems.map((item) => (
-                          <Link
-                            key={item.id}
-                            to={item.path as any}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                            className="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group text-[var(--label-secondary)] hover:bg-[var(--separator)]"
-                          >
-                            <div className="flex items-center gap-3">
-                              <item.icon size={20} className="flex-shrink-0" />
-                              <span className="font-semibold text-[15px]">{item.label}</span>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    );
-                  })}
-
-                  <div className="my-4 border-t border-[var(--separator)]" />
-                  <button
-                    onClick={async () => {
-                      try {
-                        await logout();
-                      } catch (err) {
-                        console.error('Logout failed:', err);
-                      }
-                      window.location.href = '/login';
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-[var(--system-red)] hover:bg-[var(--separator)] transition-colors rounded-xl mb-8 lg:mb-0"
-                  >
-                    <LogOut size={20} />
-                    <span className="text-[15px] font-semibold">Logout</span>
-                  </button>
-                </div>
-              </motion.nav>
-            </>
-          )}
-        </AnimatePresence>
 
         <main className="flex-1 overflow-y-auto px-4 lg:px-10 py-6 pb-24 lg:pb-12">
           <div className="max-w-[1400px] mx-auto">
