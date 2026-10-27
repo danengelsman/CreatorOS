@@ -6,7 +6,9 @@ import {
   CheckCircle as CheckCircle2,
   CurrencyDollar,
   Eye,
+  Hexagon,
   Lightning,
+  Path,
   PenNib as PenTool,
   Sparkle,
   Target,
@@ -279,28 +281,28 @@ export default function Dashboard({
 
   const metricCards = [
     {
-      title: 'Audience',
+      title: 'Total Followers',
       value: hasSignal ? formatNumber(totalFollowers) : '—',
       detail: hasSignal ? 'Connected followers' : 'Connect to activate',
       icon: Users,
-      accent: '#a78bfa',
+      accent: '#f4a261',
     },
     {
-      title: 'Reach',
+      title: 'Impressions',
       value: hasSignal ? formatNumber(totalViews) : '—',
       detail: hasSignal ? 'Verified views' : 'Waiting for signal',
       icon: Eye,
-      accent: '#67e8f9',
+      accent: '#d89b5c',
     },
     {
       title: 'Engagement',
       value: hasSignal ? `${engagementRate}%` : '—',
       detail: hasSignal ? 'Across your network' : 'Waiting for signal',
       icon: TrendUp,
-      accent: '#86efac',
+      accent: '#8faa6e',
     },
     {
-      title: 'Revenue',
+      title: 'Revenue Estimate',
       value: hasSignal ? `$${formatNumber(totalRevenue)}` : '—',
       detail: hasSignal ? 'Tracked earnings' : 'Ready when you are',
       icon: CurrencyDollar,
@@ -309,22 +311,224 @@ export default function Dashboard({
   ];
 
   return (
-    <div className="relative isolate pb-20 pt-5 lg:pt-8">
+    <div className="relative isolate pb-20 pt-4 lg:pt-6">
       {signal && <SignalCard signal={signal} />}
-      {/* Ambient studio lighting */}
+      {/* Ambient studio lighting: warm amber and graphite */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-[-8%] top-[-120px] -z-10 h-[620px] overflow-hidden"
       >
-        <div className="absolute left-[8%] top-16 h-72 w-72 rounded-full bg-[#8b5cf6]/[0.13] blur-[110px]" />
-        <div className="absolute right-[8%] top-0 h-80 w-80 rounded-full bg-[#f4a261]/[0.10] blur-[120px]" />
-        <div className="absolute left-[38%] top-40 h-52 w-52 rounded-full bg-[#22d3ee]/[0.06] blur-[100px]" />
+        <div className="absolute left-[10%] top-16 h-72 w-72 rounded-full bg-[#f4a261]/[0.08] blur-[120px]" />
+        <div className="absolute right-[8%] top-0 h-80 w-80 rounded-full bg-[#f4a261]/[0.06] blur-[130px]" />
       </div>
 
       <Today user={user} setActiveTab={setActiveTab} />
 
-      <details className="mt-6 group">
-        <summary className="cursor-pointer rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm font-semibold text-white/70">
+      {/* 3 Supporting Modules from 3D Product Concept Mockup */}
+      <section
+        aria-label="Core studio modules"
+        className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 my-6"
+      >
+        {/* Module 1: Content Studio */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setActiveTab('create')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setActiveTab('create');
+            }
+          }}
+          className="group cursor-pointer rounded-2xl border border-white/10 bg-[#111216] p-5 transition-all hover:-translate-y-1 hover:border-[#f4a261]/40 hover:shadow-[0_12px_30px_rgba(0,0,0,0.4)]"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#f4a261]/10 border border-[#f4a261]/20 text-[#f4a261]">
+              <PenTool size={20} weight="duotone" />
+            </div>
+            <ArrowRight
+              size={16}
+              className="text-white/40 group-hover:text-[#f4a261] group-hover:translate-x-1 transition-all"
+            />
+          </div>
+          <h3 className="text-base font-bold text-white group-hover:text-[#f4a261] transition-colors">
+            Content Studio
+          </h3>
+          <p className="mt-1.5 text-xs text-white/60 leading-relaxed">
+            Draft video scripts, retention hooks, and high-impact ideas.
+          </p>
+          <div className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold text-[#f4a261]">
+            <span>Open Studio</span>
+            <ChevronRight size={12} />
+          </div>
+        </div>
+
+        {/* Module 2: Brand Kit */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setActiveTab('brand')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setActiveTab('brand');
+            }
+          }}
+          className="group cursor-pointer rounded-2xl border border-white/10 bg-[#111216] p-5 transition-all hover:-translate-y-1 hover:border-[#f4a261]/40 hover:shadow-[0_12px_30px_rgba(0,0,0,0.4)]"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#f4a261]/10 border border-[#f4a261]/20 text-[#f4a261]">
+              <Hexagon size={20} weight="duotone" />
+            </div>
+            <ArrowRight
+              size={16}
+              className="text-white/40 group-hover:text-[#f4a261] group-hover:translate-x-1 transition-all"
+            />
+          </div>
+          <h3 className="text-base font-bold text-white group-hover:text-[#f4a261] transition-colors">
+            Brand Kit
+          </h3>
+          <p className="mt-1.5 text-xs text-white/60 leading-relaxed">
+            Positioning, channel archetype, and consistent visual language.
+          </p>
+          <div className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold text-[#f4a261]">
+            <span>{brand ? 'Review Brand System' : 'Establish Brand'}</span>
+            <ChevronRight size={12} />
+          </div>
+        </div>
+
+        {/* Module 3: Your Roadmap */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setActiveTab('roadmap')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setActiveTab('roadmap');
+            }
+          }}
+          className="group cursor-pointer rounded-2xl border border-white/10 bg-[#111216] p-5 transition-all hover:-translate-y-1 hover:border-[#f4a261]/40 hover:shadow-[0_12px_30px_rgba(0,0,0,0.4)]"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#f4a261]/10 border border-[#f4a261]/20 text-[#f4a261]">
+              <Path size={20} weight="duotone" />
+            </div>
+            <ArrowRight
+              size={16}
+              className="text-white/40 group-hover:text-[#f4a261] group-hover:translate-x-1 transition-all"
+            />
+          </div>
+          <h3 className="text-base font-bold text-white group-hover:text-[#f4a261] transition-colors">
+            Your Roadmap
+          </h3>
+          <p className="mt-1.5 text-xs text-white/60 leading-relaxed">
+            Milestones and clear stages from first post to first dollar.
+          </p>
+          <div className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold text-[#f4a261]">
+            <span>View Roadmap</span>
+            <ChevronRight size={12} />
+          </div>
+        </div>
+      </section>
+
+      {/* Spatial Depth Cards (AI Mentor + Roadmap Tracker) from Mockup */}
+      <section
+        aria-label="AI mentor and quick tracker"
+        className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 my-6"
+      >
+        {/* Floating AI Mentor Card */}
+        <div className="rounded-2xl border border-[#f4a261]/30 bg-gradient-to-br from-[#161622] to-[#0c0c12] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.4)] relative overflow-hidden group">
+          <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 bg-[#f4a261]/10 rounded-full blur-2xl" />
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-[#f4a261]/20 text-[#f4a261]">
+                <Sparkle size={16} weight="fill" />
+              </div>
+              <span className="text-xs font-bold uppercase tracking-wider text-[#f4a261]">
+                AI Mentor
+              </span>
+            </div>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              Online
+            </span>
+          </div>
+          <p className="text-sm font-medium text-white/85">
+            Instant strategic guidance tailored to your First Dollar stage.
+          </p>
+          <button
+            type="button"
+            onClick={() => setActiveTab('prompts')}
+            className="mt-3.5 w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-white/[0.06] hover:bg-[#f4a261]/15 border border-white/10 hover:border-[#f4a261]/30 text-xs font-semibold text-[#f3f1ed] transition-all group-hover:border-[#f4a261]/40"
+          >
+            <span>"What should I work on next?"</span>
+            <ArrowRight size={14} className="text-[#f4a261]" />
+          </button>
+        </div>
+
+        {/* Compact Roadmap Card */}
+        <div className="rounded-2xl border border-white/10 bg-[#0c0c12] p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Target size={16} className="text-[#f4a261]" />
+                <span className="text-xs font-bold uppercase tracking-wider text-white/50">
+                  Your Roadmap
+                </span>
+              </div>
+              <span className="text-xs font-mono font-semibold text-[#f4a261]">
+                {completedMilestones} of {milestones.length} milestones
+              </span>
+            </div>
+            <p className="text-sm font-semibold text-white mt-1">Foundation Stage</p>
+            <p className="text-xs text-white/60 mt-1">
+              First Post to First Dollar · Clarify niche, draft first script, ship offer.
+            </p>
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full bg-[#f4a261] rounded-full transition-all duration-500"
+                style={{ width: `${Math.max(15, goalsCompletionPercentage)}%` }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('roadmap')}
+              className="text-xs font-semibold text-[#f4a261] hover:underline shrink-0"
+            >
+              View details
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* 4 Quiet Demo Metrics Row from Mockup */}
+      <section
+        aria-label="Creator metrics"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 my-6"
+      >
+        {metricCards.map((metric, idx) => (
+          <div
+            key={idx}
+            className="rounded-2xl border border-white/[0.08] bg-[#0c0c12] p-4 flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-white/50">{metric.title}</span>
+              <metric.icon size={16} className="text-[#f4a261]/80" />
+            </div>
+            <div className="my-3">
+              <span className="text-2xl lg:text-3xl font-bold tracking-tight text-[#f3f1ed] font-mono">
+                {metric.value}
+              </span>
+            </div>
+            <span className="text-[11px] text-white/40 truncate">{metric.detail}</span>
+          </div>
+        ))}
+      </section>
+
+      <details className="mt-8 group">
+        <summary className="cursor-pointer rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm font-semibold text-white/70 hover:bg-white/[0.05] transition-colors">
           Explore your existing studio, analytics, and projects
         </summary>
         <p className="mt-3 text-xs text-white/55">
@@ -341,7 +545,7 @@ export default function Dashboard({
                 </div>
                 <h1 className="font-serif text-[clamp(38px,5vw,64px)] font-bold leading-[0.96] tracking-[-0.05em] text-[var(--label-primary)]">
                   Good {dayPart},{' '}
-                  <span className="bg-gradient-to-r from-[#fff4e8] via-white to-[#c4b5fd] bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-white via-[#f3f1ed] to-[#f4a261]/90 bg-clip-text text-transparent">
                     {firstName}
                   </span>
                 </h1>
@@ -604,7 +808,7 @@ export default function Dashboard({
                       <defs>
                         <linearGradient id="goalGradient" x1="0" x2="1">
                           <stop offset="0%" stopColor="#f4a261" />
-                          <stop offset="100%" stopColor="#c4b5fd" />
+                          <stop offset="100%" stopColor="#ffc184" />
                         </linearGradient>
                       </defs>
                     </svg>
@@ -640,17 +844,17 @@ export default function Dashboard({
               </section>
 
               {/* Next best move */}
-              <section className="relative overflow-hidden rounded-[28px] border border-[#8b5cf6]/20 bg-[linear-gradient(145deg,rgba(75,47,112,0.22),rgba(16,16,24,0.90))] p-6 shadow-[0_24px_70px_rgba(0,0,0,0.24)] md:p-7 xl:col-span-5">
+              <section className="relative overflow-hidden rounded-[28px] border border-[#f4a261]/20 bg-[linear-gradient(145deg,rgba(44,29,26,0.30),rgba(16,16,24,0.90))] p-6 shadow-[0_24px_70px_rgba(0,0,0,0.24)] md:p-7 xl:col-span-5">
                 <div
                   aria-hidden="true"
-                  className="absolute -right-16 -top-16 h-52 w-52 rounded-full bg-[#8b5cf6]/15 blur-[65px]"
+                  className="absolute -right-16 -top-16 h-52 w-52 rounded-full bg-[#f4a261]/10 blur-[65px]"
                 />
                 <div className="relative z-10 flex h-full min-h-[210px] flex-col justify-between">
                   <div>
-                    <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-[#c4b5fd]/20 bg-[#8b5cf6]/15 text-[#c4b5fd]">
+                    <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-[#f4a261]/20 bg-[#f4a261]/15 text-[#f4a261]">
                       <Sparkle size={22} weight="fill" />
                     </div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#c4b5fd]/70">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#f4a261]/80">
                       Next best move
                     </p>
                     <h3 className="mt-2 text-2xl font-bold tracking-tight">{nextMove.title}</h3>
