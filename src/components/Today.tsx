@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, CheckCircle, CircleNotch, Target } from '@phosphor-icons/react';
+import { cn } from '../lib/utils';
 import { JOURNEY_STEPS, type FirstDollarJourney, type JourneyAction } from '../firstDollarJourney';
 import {
   ensureFirstDollarJourney,
@@ -93,16 +94,23 @@ export default function Today({
   return (
     <section
       aria-label="Today: First Dollar path"
-      className="relative overflow-hidden rounded-[28px] border border-[#f4a261]/25 bg-[linear-gradient(135deg,rgba(42,32,43,0.98),rgba(16,16,25,0.98)_65%,rgba(44,29,26,0.94))] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.32)] md:p-9 text-white"
+      className="relative overflow-hidden rounded-[24px] border border-[#f4a261]/25 bg-[#111216] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.5)] md:p-9 text-white"
     >
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#f4a261]/10 blur-[85px]"
       />
       <div className="relative max-w-3xl">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#f4a261]">
-          Today · Your First Dollar path
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#f4a261]">
+            Today · Your First Dollar path
+          </p>
+          {journey && journey.status !== 'completed' && (
+            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-[#f4a261]/30 bg-[#f4a261]/10 text-[#f4a261]">
+              Step {journey.completedSteps.length + 1} of {JOURNEY_STEPS.length}
+            </span>
+          )}
+        </div>
         {loading ? (
           <p role="status" className="mt-8 flex items-center gap-2 text-white/70">
             <CircleNotch className="animate-spin" size={20} /> Loading your next action…
@@ -122,7 +130,9 @@ export default function Today({
           </div>
         ) : journey.status === 'completed' ? (
           <>
-            <h1 className="mt-5 font-serif text-4xl font-semibold">Your starting plan is saved.</h1>
+            <h1 className="mt-5 font-serif text-3xl md:text-4xl font-semibold">
+              Your starting plan is saved.
+            </h1>
             <p className="mt-3 text-white/70">
               You completed these planning tasks. This does not mean you have earned revenue yet.
             </p>
@@ -148,28 +158,83 @@ export default function Today({
           </>
         ) : (
           <>
-            <div className="mt-5 flex items-center gap-2 text-sm text-white/60">
-              <Target size={17} /> Step {journey.completedSteps.length + 1} of{' '}
-              {JOURNEY_STEPS.length} · {journey.completedSteps.length} completed by you
-            </div>
-            <h1 className="mt-4 font-serif text-[clamp(30px,4vw,48px)] font-semibold leading-tight">
-              {step.title}
+            <h1 className="mt-4 font-serif text-[clamp(28px,3.8vw,44px)] font-bold tracking-tight text-[#f3f1ed]">
+              Make your next move.
             </h1>
-            <p className="mt-4 text-base leading-7 text-white/85">{step.mission}</p>
-            <div className="mt-6 space-y-2 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm leading-6 text-white/70">
-              <p>
-                <strong className="text-white">Why this matters:</strong> {step.why}
-              </p>
-              <p>
-                <strong className="text-white">When you finish:</strong> {step.next}
-              </p>
+            <p className="mt-1 text-sm md:text-base text-white/70">
+              A clear next step. One task at a time.
+            </p>
+
+            {/* Connected 3-node Roadmap progress path directly on the hero card */}
+            <div className="mt-5 flex items-center gap-2 max-w-md">
+              {JOURNEY_STEPS.map((s, idx) => {
+                const isCompleted = journey.completedSteps.includes(s.id);
+                const isCurrent = journey.currentStep === s.id && journey.status !== 'completed';
+                const stepNumber = idx + 1;
+                return (
+                  <React.Fragment key={s.id}>
+                    {idx > 0 && (
+                      <div
+                        className={cn(
+                          'h-0.5 flex-1 transition-colors',
+                          isCompleted ? 'bg-[#8faa6e]' : 'bg-white/10',
+                        )}
+                      />
+                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <div
+                        className={cn(
+                          'w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-all',
+                          isCompleted
+                            ? 'bg-[#8faa6e] text-white shadow-[0_0_8px_rgba(143,170,110,0.4)]'
+                            : isCurrent
+                              ? 'bg-[#f4a261] text-[#050507] ring-2 ring-[#f4a261]/40 shadow-[0_0_12px_rgba(244,162,97,0.5)]'
+                              : 'bg-white/10 text-white/40',
+                        )}
+                      >
+                        {isCompleted ? <CheckCircle size={14} weight="bold" /> : stepNumber}
+                      </div>
+                      <span
+                        className={cn(
+                          'text-[11px] hidden sm:inline font-medium',
+                          isCurrent ? 'text-[#f4a261] font-semibold' : 'text-white/40',
+                        )}
+                      >
+                        {idx === 0 ? 'Direction' : idx === 1 ? 'Audience' : 'Offer'}
+                      </span>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
             </div>
+
+            {/* Active task details */}
+            <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-5 md:p-6 backdrop-blur-sm">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#f4a261]">
+                <Target size={15} />
+                <span>
+                  Step {journey.completedSteps.length + 1} of {JOURNEY_STEPS.length} · {step.title}
+                </span>
+              </div>
+              <p className="mt-2 text-sm md:text-base leading-relaxed text-white/85">
+                {step.mission}
+              </p>
+              <div className="mt-4 pt-4 border-t border-white/[0.08] grid grid-cols-1 md:grid-cols-2 gap-3 text-xs leading-relaxed text-white/60">
+                <p>
+                  <strong className="text-white/80">Why this matters:</strong> {step.why}
+                </p>
+                <p>
+                  <strong className="text-white/80">When you finish:</strong> {step.next}
+                </p>
+              </div>
+            </div>
+
             {journey.status === 'not_started' ? (
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => act({ type: 'start' })}
-                className="mt-6 rounded-xl bg-[#f4a261] px-6 py-3 font-bold text-[#17100b] disabled:opacity-50"
+                className="mt-6 rounded-xl bg-[#f4a261] hover:bg-[#ffc184] px-6 py-3 font-bold text-[#17100b] shadow-[0_10px_25px_rgba(244,162,97,0.25)] transition-all flex items-center gap-2 disabled:opacity-50"
               >
                 {busy ? 'Starting…' : 'Start this task'} <ArrowRight className="inline" size={17} />
               </button>
@@ -196,7 +261,7 @@ export default function Today({
                       type="button"
                       disabled={busy || draft.trim().length < 3}
                       onClick={() => act({ type: 'save', answer: draft })}
-                      className="rounded-xl bg-[#f4a261] px-6 py-3 font-bold text-[#17100b] disabled:opacity-50"
+                      className="rounded-xl bg-[#f4a261] hover:bg-[#ffc184] px-6 py-3 font-bold text-[#17100b] disabled:opacity-50 transition-colors"
                     >
                       {busy ? 'Saving…' : 'Save answer'}
                     </button>
@@ -206,7 +271,7 @@ export default function Today({
                       type="button"
                       disabled={busy}
                       onClick={() => act({ type: 'complete' })}
-                      className="rounded-xl bg-[#f4a261] px-6 py-3 font-bold text-[#17100b] disabled:opacity-50"
+                      className="rounded-xl bg-[#f4a261] hover:bg-[#ffc184] px-6 py-3 font-bold text-[#17100b] disabled:opacity-50 transition-colors"
                     >
                       {busy ? 'Completing…' : 'Mark task complete'}{' '}
                       <ArrowRight className="inline" size={17} />
