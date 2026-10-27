@@ -113,6 +113,13 @@ Week 5 D7-A work landed here (file-based TanStack Router routes under `src/route
 - **Palette Hygiene:** Purged lingering purple/cyan neon glows and gradients in favor of warm amber `#F4A261` and charcoal `#111216`.
 - **CI results on PR #23:** All checks passed green (Typecheck, lint, build, artifact gate ✅, E2E smoke 12/12 ✅, Prettier check ✅, Vercel preview ✅).
 
+## PR #25 merged — Telemetry signal navigation paths fix (2026-10-27, squash `06bb28f`)
+
+- **Root cause:** `calculateOneLever` in `src/services/telemetry.ts` generated legacy navigation paths with a `/dashboard/` prefix (`/dashboard/brand`, `/dashboard/create`, `/dashboard/retention`, `/dashboard/repurpose`). Under the file-based TanStack Router architecture (`src/routes/`), authenticated routes live at the root under the pathless `_auth` layout (e.g., `/brand`, `/create`), while `/dashboard` is solely the Home view and has no child routes. Clicking "Act on Signal" triggered TanStack Router's root not-found component ("not found").
+- **Fix:** updated signal action paths in `src/services/telemetry.ts` to `/<tab>` matching `routeTree.gen.ts` fullPaths (`/brand`, `/create`, `/retention`, `/repurpose`).
+- **Tests added:** `tests/telemetry.test.ts` (5 unit tests covering each signal state and asserting that no paths start with `/dashboard/`). Total Vitest suite now 138/138 passing across 12 files.
+- **CI results on PR #25:** all 5 checks passed green (Typecheck, lint, build, artifact gate ✅, E2E smoke 12/12 ✅, Prettier check ✅, Vercel preview ✅). Squashed and merged to `main`.
+
 ## Next action
 
 1. EXECUTING Week 5 (Active) → Phase 5 frontend architecture: D8-A Zustand slices, F5.4 CalendarView/LandingPage splits, F5.5 font/CSS hygiene.
