@@ -102,6 +102,17 @@ Week 5 D7-A work landed here (file-based TanStack Router routes under `src/route
 - **Gemini model audit completed:** live query via `@google/genai` against Google AI Studio API verified all available models. Updated `ALLOWED_GEMINI_MODELS` in `server.ts` to include verified models (`gemini-3.7-flash`, `gemini-3.5-flash`, `gemini-3.1-pro-preview`, `gemini-flash-latest`, `gemini-2.5-pro`). Server bundle `api/_server.js` regenerated and freshness check confirmed.
 - **CI results on PR #20:** all 4 checks passed (Typecheck/lint/build/artifact-gate, E2E smoke 19/19, Prettier check, Vercel preview).
 
+## PR #23 merged — 3D product mockup UI alignment (2026-10-26, squash `da895b3`)
+
+- **Persistent Desktop Sidebar:** Dedicated left sidebar on desktop (`lg:flex`) featuring the amber hexagon `BrandIcon`, CreatorOS wordmark (`FROM FIRST POST TO FIRST DOLLAR`), the 6 core workspace routes (Home, Create, Brand, Roadmap, Community, Reports) plus secondary studio tools and user account/logout controls.
+- **Top Header Bar:** Updated header with "Your creator workspace" headline, "Demo workspace" badge, and profile avatar with online presence indicator.
+- **"Make your next move" Hero Card (`Today.tsx`):** Aligned with the 3D concept shot featuring the "Make your next move" headline, "A clear next step. One task at a time" subtext, Step 1 of 3 badge, and an integrated 3-node connected roadmap track (Direction → Audience → Offer) while preserving all underlying First Dollar journey actions and tests.
+- **Supporting Modules Grid (`Dashboard.tsx`):** Added 3-module grid for Content Studio, Brand Kit, and Your Roadmap directly beneath Today.
+- **Spatial Depth Cards:** Added the AI Mentor card ("What should I work on next?") and compact Roadmap progress tracker.
+- **Honest Demo Metrics:** Total Followers, Impressions, Engagement, and Revenue Estimate all cleanly formatted with honest empty states (`—`) rather than fake hype.
+- **Palette Hygiene:** Purged lingering purple/cyan neon glows and gradients in favor of warm amber `#F4A261` and charcoal `#111216`.
+- **CI results on PR #23:** All checks passed green (Typecheck, lint, build, artifact gate ✅, E2E smoke 12/12 ✅, Prettier check ✅, Vercel preview ✅).
+
 ## Next action
 
 1. EXECUTING Week 5 (Active) → Phase 5 frontend architecture: D8-A Zustand slices, F5.4 CalendarView/LandingPage splits, F5.5 font/CSS hygiene.
