@@ -21,7 +21,7 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
       title: 'Start Your First Project',
       description: "You haven't created any content yet. Let's set up your first niche strategy.",
       impact: 'Foundation',
-      action: { type: 'navigate', path: '/dashboard/create' },
+      action: { type: 'navigate', path: '/create' },
       priority: 'high',
     };
   }
@@ -41,7 +41,7 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
       impact: '+20% Watch Time',
       action: {
         type: 'navigate',
-        path: '/dashboard/retention',
+        path: '/retention',
         params: { projectId: recentProject.id },
       },
       priority: 'high',
@@ -55,7 +55,7 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
       title: 'Brand Identity Gap',
       description: "Your visual assets aren't aligned with your niche archetype.",
       impact: 'Higher Trust',
-      action: { type: 'navigate', path: '/dashboard/brand' },
+      action: { type: 'navigate', path: '/brand' },
       priority: 'medium',
     };
   }
@@ -66,7 +66,7 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
     title: 'Scale Your Reach',
     description: "Your current scripts are performing well. Let's repurpose them for Shorts.",
     impact: 'Increased Reach',
-    action: { type: 'navigate', path: '/dashboard/repurpose' },
+    action: { type: 'navigate', path: '/repurpose' },
     priority: 'low',
   };
 }
