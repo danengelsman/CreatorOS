@@ -23,6 +23,7 @@ import {
 } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 import BrandIcon from './BrandIcon';
+import MadeWithLove from './MadeWithLove';
 
 /** localStorage key for the "Remember email" checkbox (Phase A). */
 const REMEMBER_EMAIL_KEY = 'creatoros:remember-email';
@@ -609,7 +610,7 @@ export default function Login({
               </div>
             )}
 
-            <div className="mt-8 pt-8 border-t border-[var(--separator)]">
+            <div className="mt-8 pt-8 border-t border-[var(--separator)] space-y-4">
               <p className="text-[12px] text-[var(--label-tertiary)] leading-relaxed font-medium">
                 By continuing, you agree to our{' '}
                 <a
@@ -627,6 +628,7 @@ export default function Login({
                 </a>
                 .
               </p>
+              <MadeWithLove className="justify-start text-[11px]" />
             </div>
           </div>
         </motion.div>

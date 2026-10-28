@@ -26,6 +26,7 @@ import { logout } from '@/firebase';
 import VerificationBanner from '@/components/VerificationBanner';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import BrandIcon from '@/components/BrandIcon';
+import MadeWithLove from '@/components/MadeWithLove';
 
 const FEATURE_COMMUNITY = import.meta.env.VITE_FEATURE_COMMUNITY === 'true';
 
@@ -314,14 +315,18 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
         <VerificationBanner user={user} />
 
         <main className="flex-1 overflow-y-auto px-4 lg:px-10 py-6 pb-24 lg:pb-12">
-          <div className="max-w-[1400px] mx-auto">
+          <div className="max-w-[1400px] mx-auto min-h-full flex flex-col justify-between">
             <RouteErrorBoundary
               onGoHome={() => {
                 window.location.href = '/dashboard';
               }}
             >
-              {children}
+              <div className="flex-1">{children}</div>
             </RouteErrorBoundary>
+
+            <footer className="mt-16 pt-6 pb-2 border-t border-white/[0.06]">
+              <MadeWithLove />
+            </footer>
           </div>
         </main>
 
