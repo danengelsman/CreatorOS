@@ -1,6 +1,7 @@
 import React from 'react';
 import { GithubLogo } from '@phosphor-icons/react';
 import BrandIcon from '../BrandIcon';
+import MadeWithLove from '../MadeWithLove';
 
 interface LandingFooterProps {
   navigate?: (path: string) => void;
@@ -113,6 +114,7 @@ export default function LandingFooter({ navigate }: LandingFooterProps) {
         <p className="text-[13px] text-[var(--label-tertiary)] font-semibold">
           © 2026 CreatorOS. All rights reserved.
         </p>
+        <MadeWithLove className="text-[13px]" />
         <a
           href="https://github.com/danengelsman/CreatorOS"
           target="_blank"
