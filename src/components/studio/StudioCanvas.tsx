@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useBlocker, useNavigate } from '@tanstack/react-router';
 import ContentStudio from '../ContentStudio';
 
@@ -16,6 +16,16 @@ export interface StudioCanvasProps {
 // The route resolves projects; remount only when the owner or project changes.
 export default function StudioCanvas({ user, brand, project, onBack, initialInspector, isCurrentOwner, canWriteProject, unavailable }: StudioCanvasProps) {
   const state = useRef({ dirty: false, saving: false, storageError: false });
+  // A server read can detect loss of access before the live listener does.
+  // Latch synchronously so later callbacks cannot re-enable writes in this mount.
+  const invalidProject = useRef(false);
+  const [readUnavailable, setReadUnavailable] = useState(false);
+  const effectiveUnavailable = unavailable || (readUnavailable ? 'missing' : undefined);
+  const markUnavailable = () => {
+    if ((isCurrentOwner && !isCurrentOwner()) || (canWriteProject && !canWriteProject())) return;
+    invalidProject.current = true;
+    setReadUnavailable(true);
+  };
   const bypass = useRef(false);
   const navigate = useNavigate();
   const key = `${user?.uid || ''}:${project?.id || ''}`;
@@ -49,8 +59,8 @@ export default function StudioCanvas({ user, brand, project, onBack, initialInsp
         </button>
         <h1 className="text-xl font-semibold text-[var(--label-primary)]">Project canvas</h1>
       </header>
-      {unavailable && <div role="alert" className="space-y-2">
-        <p>{unavailable === 'missing' ? 'This project is no longer available to this account.' : 'The project connection failed.'} Saving is disabled. Copy your draft before leaving; your editor remains open in this tab.</p>
+      {effectiveUnavailable && <div role="alert" className="space-y-2">
+        <p>{effectiveUnavailable === 'missing' ? 'This project is no longer available to this account.' : 'The project connection failed.'} Saving is disabled. Copy your draft before leaving; your editor remains open in this tab.</p>
       </div>}
       {!user?.uid || !project?.id || project.userId !== user.uid || project.type !== 'content' ? (
         <p role="alert">This content project is not available for this account.</p>
@@ -59,8 +69,9 @@ export default function StudioCanvas({ user, brand, project, onBack, initialInsp
           key={key}
           user={user}
           isCurrentOwner={isCurrentOwner}
-          canWriteProject={canWriteProject}
-          projectUnavailable={!!unavailable}
+          canWriteProject={() => !invalidProject.current && (!canWriteProject || canWriteProject())}
+          onProjectUnavailable={markUnavailable}
+          projectUnavailable={!!effectiveUnavailable}
           brand={brand}
           selectedProject={project}
           canvasMode

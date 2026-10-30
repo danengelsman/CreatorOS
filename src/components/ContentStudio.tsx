@@ -55,6 +55,7 @@ export default function Create({
   onDirtyChange,
   isCurrentOwner,
   canWriteProject,
+  onProjectUnavailable,
   projectUnavailable = false,
 }: {
   brand: any;
@@ -68,6 +69,7 @@ export default function Create({
   onDirtyChange?: (state: { dirty: boolean; saving: boolean; storageError: boolean }) => void;
   isCurrentOwner?: () => boolean;
   canWriteProject?: () => boolean;
+  onProjectUnavailable?: () => void;
   projectUnavailable?: boolean;
 }) {
   const [studioTab, setStudioTab] = useState<
@@ -156,7 +158,12 @@ export default function Create({
     getDocFromServer(doc(db, 'projects', selectedProject.id)).then((snapshot) => {
       if (cancelled || (canWriteProject && !canWriteProject()) || savingRef.current || saveGeneration.current !== generationAtRead ||
           currentSignature.current !== signatureAtRead || !sameDraft(draftAtRead, latestDraft.current)) return;
-      if (!trustedServerSnapshot(snapshot) || !snapshot.exists() || snapshot.data().userId !== user?.uid) {
+      if (!trustedServerSnapshot(snapshot)) {
+        setVerificationError(true);
+        return;
+      }
+      if (!snapshot.exists() || snapshot.data().userId !== user?.uid || snapshot.data().type !== 'content') {
+        onProjectUnavailable?.();
         setVerificationError(true);
         return;
       }
@@ -386,17 +393,31 @@ export default function Create({
           const projectAtRead = currentProject.current;
           deliveredSignature.current = currentSignature.current;
           deferredProject.current = null;
+          let invalidLatest = false;
+          let verifiedLatest = false;
           try {
             const latest = await getDocFromServer(ref);
-            if (currentProject.current === projectAtRead && trustedServerSnapshot(latest) && latest.exists() && latest.data().userId === user.uid) {
-              const remote = projectBaseline(latest.data());
-              deferredProject.current = sameBaseline(remote, written) ? null : remote;
+            if ((isCurrentOwner && !isCurrentOwner()) || (canWriteProject && !canWriteProject())) throw new Error('Project unavailable');
+            if (trustedServerSnapshot(latest)) {
+              if (!latest.exists() || latest.data().userId !== user.uid || latest.data().type !== 'content') {
+                invalidLatest = true;
+              } else {
+                verifiedLatest = true;
+                if (currentProject.current === projectAtRead) {
+                  const remote = projectBaseline(latest.data());
+                  deferredProject.current = sameBaseline(remote, written) ? null : remote;
+                }
+              }
             }
           } catch (error) {
             // The write succeeded. Keep local text rather than apply an unverified snapshot.
             console.warn('Saved, but could not refresh project:', error);
           }
-          if (canWriteProject && !canWriteProject()) throw new Error('Project unavailable');
+          if (invalidLatest) {
+            onProjectUnavailable?.();
+            throw new Error('Project unavailable');
+          }
+          if (!verifiedLatest || (isCurrentOwner && !isCurrentOwner()) || (canWriteProject && !canWriteProject())) throw new Error('Project unavailable');
           transactionSaved = true;
           setBaseline(written);
           setVerificationError(false);
@@ -439,7 +460,9 @@ export default function Create({
         setSaveError('Project changed elsewhere. Your draft was not saved; copy it before reopening.');
         showToast('Project changed elsewhere. Your draft was not overwritten.');
       } else {
-        setSaveError('Could not save your draft. Please try again.');
+        setSaveError(canvasMode
+          ? 'Could not save your draft with confirmation. The save may have completed; your draft was kept.'
+          : 'Could not save your draft. Please try again.');
         showToast(getFriendlyError(error));
       }
     } finally {
@@ -562,8 +585,12 @@ export default function Create({
                 setIsSaving(true);
                 try {
                   const snapshot = await getDocFromServer(doc(db, 'projects', selectedProject.id));
-                  if (canWriteProject && !canWriteProject()) throw new Error('unavailable');
-                  if (!trustedServerSnapshot(snapshot) || !snapshot.exists() || snapshot.data().userId !== user.uid) throw new Error('unavailable');
+                  if ((isCurrentOwner && !isCurrentOwner()) || (canWriteProject && !canWriteProject())) throw new Error('unavailable');
+                  if (!trustedServerSnapshot(snapshot)) throw new Error('unavailable');
+                  if (!snapshot.exists() || snapshot.data().userId !== user.uid || snapshot.data().type !== 'content') {
+                    onProjectUnavailable?.();
+                    throw new Error('unavailable');
+                  }
                   if (!sameDraft(before, latestDraft.current)) {
                     showToast('Your draft changed while loading. The newer draft was kept.');
                     return;

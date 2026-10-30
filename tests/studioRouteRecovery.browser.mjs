@@ -36,7 +36,7 @@ const mocks = {
 export const doc=(_db,_col,id)=>({id}), collection=()=>({}), query=()=>({}), where=()=>({}), orderBy=()=>({});
 export const onSnapshot=(ref,next,error)=>{const entry={ref,next,error,active:true}; window.listeners.push(entry); return ()=>{entry.active=false}};
 export const getDocs=async()=>({docs:[]});
-export const getDocFromServer=async()=>{if(window.holdRefresh) await new Promise(resolve=>window.releaseRefresh=resolve); return {exists:()=>!!window.remote,data:()=>window.remote,metadata:{fromCache:false,hasPendingWrites:false}}};
+export const getDocFromServer=async()=>{if(window.holdRefresh) await new Promise(resolve=>window.releaseRefresh=resolve); if(window.failRefresh) throw Error('offline'); return {exists:()=>!!window.remote,data:()=>window.remote,metadata:window.refreshMetadata ?? {fromCache:false,hasPendingWrites:false}}};
 export const addDoc=async()=>{throw Error('unexpected create')}; export const updateDoc=async()=>{throw Error('unexpected update')};
 export const runTransaction=async(_db,fn)=>{if(window.holdSave) await new Promise(resolve=>window.releaseSave=resolve); return fn({get:async()=>({exists:()=>!!window.remote,data:()=>window.remote}),update:(ref,changes)=>{window.writes.push({id:ref.id,changes}); for(const [key,value] of Object.entries(changes)){if(key.startsWith('data.'))window.remote.data[key.slice(5)]=value;else window.remote[key]=value}}});};`,
   gemini: `export const analyzeAndOptimizeRetention=async()=>({}); export const generateScenePlan=async()=>({}); export const repurposeContent=async()=>({}); export const scoreContent=async()=>({}); export const quickPolish=async x=>x; export const remixContent=async x=>x; export const generateContentIdeas=async()=>[]; export const optimizeSearchTerms=async()=>''; export const generateSmartSuggestions=async()=>({}); export const transcribeAudio=async()=>'';`,
@@ -54,9 +54,10 @@ const bundle=await build({stdin:{contents:harness,resolveDir:root,sourcefile:'ro
  b.onLoad({filter:/.*/,namespace:'mock'},args=>({contents:mocks[args.path],loader:'jsx',resolveDir:root}));
 }}]});
 const browser=await chromium.launch({headless:true});
+const newPage=async()=>{const page=await browser.newPage(); await page.route('**/*',route=>route.abort()); return page;};
 try {
  for(const failure of ['missing','denied','owner','type']) {
-  const page=await browser.newPage();
+  const page=await newPage();
   page.on('pageerror', error => console.error('PAGE ERROR', error));
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1');
@@ -104,7 +105,7 @@ try {
   await page.close();
  }
  for(const [name,platform] of [['The Contrarian Thread','twitter'],['3 Reasons Why','tiktok'],['Behind the Scenes Process','instagram'],['The "How I..." Story','youtube']]) {
-  const page=await browser.newPage(); await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'})); await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  const page=await newPage(); await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'})); await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
   await page.waitForFunction(()=>window.listeners.length===1);
   await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote})});
   await page.getByRole('button',{name:'Templates',exact:true}).click();
@@ -128,7 +129,7 @@ try {
   await page.close();
  }
  {
-  const page=await browser.newPage();
+  const page=await newPage();
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
   await page.waitForFunction(()=>window.listeners.length===1);
@@ -144,7 +145,7 @@ try {
   await page.close();
  }
  {
-  const page=await browser.newPage();
+  const page=await newPage();
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
   await page.waitForFunction(()=>window.listeners.length===1);
@@ -159,7 +160,7 @@ try {
   await page.close();
  }
  {
-  const page=await browser.newPage();
+  const page=await newPage();
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
   await page.waitForFunction(()=>window.listeners.length===1);
@@ -174,7 +175,7 @@ try {
   await page.close();
  }
  {
-  const page=await browser.newPage();
+  const page=await newPage();
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
   await page.waitForFunction(()=>window.listeners.length===1);
@@ -186,7 +187,7 @@ try {
   assert.deepEqual(await page.evaluate(()=>window.writes),[]); await page.close();
  }
  {
-  const page=await browser.newPage();
+  const page=await newPage();
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
   await page.waitForFunction(()=>window.listeners.length===1);
@@ -211,7 +212,7 @@ try {
  // A newer memory-only draft must supersede the older storage-backed record.
  // A successful save must clear recovery rather than resurrecting that old copy.
  for (const unavailable of ['missing','denied']) {
-  const page=await browser.newPage();
+  const page=await newPage();
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
   await page.waitForFunction(()=>window.listeners.length===1);
@@ -243,7 +244,7 @@ try {
  // An old in-flight save resolving after A → B → A must not overwrite the new
  // generation's recovery, or clear its unresolved save record.
  {
-  const page=await browser.newPage();
+  const page=await newPage();
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
   await page.waitForFunction(()=>window.listeners.length===1);
@@ -268,7 +269,7 @@ try {
  }
  // A failed remove after a confirmed save must shadow old storage until reload.
  {
-  const page=await browser.newPage();
+  const page=await newPage();
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
   await page.waitForFunction(()=>window.listeners.length===1);
@@ -287,7 +288,7 @@ try {
  }
  // A read failure, even when setItem succeeds, requires memory escrow too.
  {
-  const page=await browser.newPage();
+  const page=await newPage();
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
   await page.waitForFunction(()=>window.listeners.length===1);
@@ -304,7 +305,7 @@ try {
  }
  // A failed initial read must not overwrite an unseen storage-backed draft.
  {
-  const page=await browser.newPage();
+  const page=await newPage();
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1');
   await page.evaluate(()=>{
@@ -327,7 +328,7 @@ try {
  }
  // Colons in IDs cannot make two account/project pairs share a stored draft.
  {
-  const page=await browser.newPage();
+  const page=await newPage();
   await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
   await page.waitForFunction(()=>window.listeners.length===1);
@@ -338,6 +339,128 @@ try {
   await page.evaluate(()=>window.router.navigate({to:'/studio/p1:p1'})); await page.waitForFunction(()=>window.listeners.length===4);
   await page.evaluate(()=>window.listeners[3].next({exists:()=>false})); await page.getByText('Project not found').waitFor();
   assert.equal(await page.getByLabel('Recovered draft').count(),0);
+  await page.close();
+ }
+ // An authoritative read can see a type change before the listener delivers it.
+ for (const [memoryOnly, invalid] of [[false,'type'],[true,'type'],[false,'owner'],[true,'owner']]) {
+  const page=await newPage();
+  await page.route('**/*',route=>route.abort());
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote})});
+  const input=page.getByLabel('Project script');
+  if(memoryOnly) await page.evaluate(()=>{Storage.prototype.setItem=()=>{throw Error('quota')}});
+  await input.fill('Protected local draft');
+  await page.evaluate(()=>{window.remote={...window.remote,data:{...window.remote.data,body:'Remote conflict'}}});
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await page.getByText(/Project changed elsewhere. Your draft was not saved/).waitFor();
+  await page.evaluate(invalid=>{window.remote={...window.remote,...(invalid==='type'?{type:'brand'}:{userId:'B'}),data:{...window.remote.data,body:'Not available to A'}}},invalid);
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Discard local draft and load project'}).click();
+  await page.getByText(/no longer available to this account/i).waitFor();
+  assert.equal(await input.inputValue(),'Protected local draft');
+  if(!memoryOnly) assert.match(await page.evaluate(()=>sessionStorage.getItem('studio-draft:A:p1')),/Protected local draft/);
+  await page.evaluate(()=>window.switchAccount('B')); await page.waitForFunction(()=>window.listeners.length===2);
+  await page.evaluate(()=>window.listeners[1].error(Error('denied'))); await page.getByText('Unable to load project').waitFor();
+  assert.equal(await page.getByLabel('Recovered draft').count(),0);
+  await page.evaluate(()=>window.switchAccount('A')); await page.waitForFunction(()=>window.listeners.length===3);
+  await page.evaluate(()=>window.listeners[2].next({exists:()=>false}));
+  const recovered=page.getByLabel('Recovered draft'); await recovered.waitFor(); assert.match(await recovered.inputValue(),/Protected local draft/);
+  await page.close();
+ }
+ // A clean editor must not reconcile a listener delivery to a different type.
+ for (const mode of ['clean','stored-edit','memory-edit']) {
+  const page=await newPage();
+  await page.route('**/*',route=>route.abort());
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote})});
+  const input=page.getByLabel('Project script'); await input.waitFor();
+  await page.evaluate(()=>{window.holdRefresh=true;window.listeners[0].next({id:'p1',exists:()=>true,data:()=>({...window.remote,data:{...window.remote.data,body:'Listener update'}})});});
+  await page.waitForFunction(()=>typeof window.releaseRefresh==='function');
+  if(mode==='memory-edit') await page.evaluate(()=>{Storage.prototype.setItem=()=>{throw Error('quota')}});
+  if(mode!=='clean') await input.fill('Edited during read');
+  await page.evaluate(()=>{window.remote={...window.remote,type:'brand',data:{...window.remote.data,body:'Not a content project'}};window.releaseRefresh()});
+  if(mode!=='clean') {
+   await page.waitForTimeout(150);
+   assert.equal(await input.inputValue(),'Edited during read');
+   if(mode==='stored-edit') assert.match(await page.evaluate(()=>sessionStorage.getItem('studio-draft:A:p1')),/Edited during read/);
+   await page.evaluate(()=>window.switchAccount('B')); await page.waitForFunction(()=>window.listeners.length===2);
+   await page.evaluate(()=>window.listeners[1].error(Error('denied'))); await page.getByText('Unable to load project').waitFor();
+   assert.equal(await page.getByLabel('Recovered draft').count(),0);
+   await page.evaluate(()=>window.switchAccount('A')); await page.waitForFunction(()=>window.listeners.length===3);
+   await page.evaluate(()=>window.listeners[2].next({exists:()=>false}));
+   const recovered=page.getByLabel('Recovered draft'); await recovered.waitFor(); assert.match(await recovered.inputValue(),/Edited during read/);
+  } else {
+   await page.getByText(/no longer available to this account/i).waitFor();
+   assert.equal(await input.inputValue(),'Original');
+  }
+  await page.close();
+ }
+ // A verified content project still supports explicit recovery discard.
+ {
+  const page=await newPage();
+  await page.route('**/*',route=>route.abort());
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote})});
+  const input=page.getByLabel('Project script'); await input.fill('Discardable draft');
+  await page.evaluate(()=>{window.remote={...window.remote,data:{...window.remote.data,body:'Latest content'}}});
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await page.getByText(/Project changed elsewhere. Your draft was not saved/).waitFor();
+  page.once('dialog',dialog=>dialog.accept()); await page.getByRole('button',{name:'Discard local draft and load project'}).click();
+  await page.waitForFunction(()=>document.querySelector('[role=status]')?.textContent.includes('No unsaved'));
+  assert.equal(await input.inputValue(),'Latest content');
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('studio-draft:A:p1')),null);
+  await page.close();
+ }
+ // A normal content update still reconciles through a verified server read.
+ {
+  const page=await newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote})});
+  const input=page.getByLabel('Project script'); await input.waitFor();
+  await page.evaluate(()=>{window.remote={...window.remote,data:{...window.remote.data,body:'Verified update'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote})});
+  await page.waitForFunction(()=>document.querySelector('[aria-label="Project script"]')?.value==='Verified update');
+  assert.equal(await page.getByRole('button',{name:'Save',exact:true}).isDisabled(),false);
+  await page.close();
+ }
+ // A type change during a post-commit refresh also retains unresolved recovery.
+ {
+  const page=await newPage();
+  await page.route('**/*',route=>route.abort());
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote});window.holdRefresh=true});
+  const input=page.getByLabel('Project script'); await input.fill('Saved but recoverable');
+  await page.getByRole('button',{name:'Save',exact:true}).click(); await page.waitForFunction(()=>typeof window.releaseRefresh==='function');
+  await page.evaluate(()=>{window.remote={...window.remote,type:'brand',data:{...window.remote.data,body:'Not content'}};window.releaseRefresh()});
+  await page.getByText(/no longer available to this account/i).waitFor();
+  assert.equal(await input.inputValue(),'Saved but recoverable');
+  const saved=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('studio-draft:A:p1')));
+  assert.equal(saved.draft.body,'Saved but recoverable'); assert.equal(saved.pendingWrites[0].body,'Saved but recoverable');
+  assert.equal(await page.getByRole('button',{name:'Save',exact:true}).isDisabled(),true);
+  await page.close();
+ }
+ // A failed or non-authoritative post-save read cannot prune recovery.
+ for(const failure of ['offline','cache','pending']) {
+  const page=await newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(failure=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote});window.failRefresh=failure==='offline';if(failure!=='offline') window.refreshMetadata={fromCache:failure==='cache',hasPendingWrites:failure==='pending'}},failure);
+  const input=page.getByLabel('Project script'); await input.fill('Unverified saved draft');
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await page.getByText(/save may have completed/).waitFor();
+  const recovery=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('studio-draft:A:p1')));
+  assert.equal(recovery.draft.body,'Unverified saved draft'); assert.equal(recovery.pendingWrites[0].body,'Unverified saved draft');
+  assert.equal(await input.inputValue(),'Unverified saved draft');
   await page.close();
  }
  console.log('Studio route recovery and template roundtrip passed');
