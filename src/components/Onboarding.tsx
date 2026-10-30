@@ -10,18 +10,13 @@ import {
 } from '@phosphor-icons/react';
 import BrandIcon from './BrandIcon';
 import { cn } from '../lib/utils';
-import {
-  db,
-  serverTimestamp,
-  handleFirestoreError,
-  OperationType,
-  apiFetch,
-} from '../firebase';
+import { db, serverTimestamp, handleFirestoreError, OperationType, apiFetch } from '../firebase';
 import { doc, getDoc, runTransaction } from 'firebase/firestore';
 import Confetti from './Confetti';
 import {
   ONBOARDING_IN_PROGRESS,
   OnboardingConflictError,
+  validateOnboardingBrandName,
   type OnboardingAnswers,
   type OnboardingBrandKit,
 } from '@/lib/onboardingState';
@@ -152,7 +147,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
   // Phase 1: every "go to Today" path funnels through onComplete, which
   // ensures the journey doc before resolving. A failure here keeps the
   // onboarding open with a retry-able error instead of stranding the user.
-  const continueToToday = async () => {
+  const continueToToday = async (withoutKit = false) => {
     if (transitionBusy) return;
     setTransitionBusy(true);
     setTransitionError('');
@@ -173,11 +168,9 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
               summary: '',
             }
           : undefined;
-      if (answers && pendingKit.current) answers.summary = pendingKit.current.tagline || '';
-      await onComplete(
-        useExistingProfile.current ? undefined : answers,
-        pendingKit.current || undefined,
-      );
+      const kit = withoutKit ? undefined : pendingKit.current || undefined;
+      if (answers && kit) answers.summary = kit.tagline || '';
+      await onComplete(useExistingProfile.current ? undefined : answers, kit);
     } catch (error) {
       if (error instanceof OnboardingConflictError) {
         pendingKit.current = null;
@@ -507,6 +500,8 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
           'The generated tagline exceeds 1000 characters. Please retry or continue without it.',
         );
       }
+      // Reject unusable results before replacing a previously retryable kit.
+      validateOnboardingBrandName(kit);
       // Keep the generated kit for an exact retry if journey or transaction fails.
       pendingKit.current = kit;
       await onComplete(
@@ -526,7 +521,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
       }
       console.error('Error generating brand kit during onboarding:', error);
       setTransitionError(
-        `Could not finish the brand kit. You can still go to Today. ${error instanceof Error ? error.message : ''}`,
+        `Could not finish the brand kit. Choose an option below to retry or continue. ${error instanceof Error ? error.message : ''}`,
       );
       setPhase('success');
     }
@@ -646,7 +641,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
                   </button>
 
                   <button
-                    onClick={continueToToday}
+                    onClick={() => continueToToday()}
                     disabled={transitionBusy}
                     className="ios-button ios-button-tinted w-full h-14 mt-3 text-[15px] font-medium text-[var(--label-secondary)] border-0 bg-transparent"
                   >
@@ -687,7 +682,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
                   <button
                     type="button"
                     disabled={transitionBusy}
-                    onClick={continueToToday}
+                    onClick={() => continueToToday()}
                     className="text-xs font-semibold text-[var(--accent)] hover:underline"
                   >
                     {transitionBusy ? 'Opening…' : 'Go to Today'}
@@ -888,13 +883,31 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
 
                 <div className="pt-2">
                   <button
-                    onClick={continueToToday}
+                    onClick={() => continueToToday()}
                     disabled={transitionBusy}
                     className="ios-button ios-button-filled w-full h-14 text-[17px] font-semibold"
                   >
-                    {transitionBusy ? 'Opening Today…' : 'Continue to Today'}
+                    {transitionBusy
+                      ? 'Opening Today…'
+                      : transitionError && !pendingKit.current && !useExistingProfile.current
+                        ? 'Continue to Today without a brand kit'
+                        : 'Continue to Today'}
                     <ChevronRight size={22} strokeWidth={2} className="ml-2" />
                   </button>
+                  {pendingKit.current && !useExistingProfile.current && (
+                    <>
+                      <p className="mt-3 text-sm text-[var(--label-secondary)]">
+                        Continue to Today retries saving your previously generated brand kit.
+                      </p>
+                      <button
+                        onClick={() => continueToToday(true)}
+                        disabled={transitionBusy}
+                        className="ios-button ios-button-tinted w-full h-12 mt-3 text-sm font-semibold"
+                      >
+                        Continue without brand kit
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={handleBuildBrandKit}
                     disabled={transitionBusy || useExistingProfile.current}

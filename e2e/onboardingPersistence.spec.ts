@@ -194,24 +194,52 @@ test('stale brand completion cannot replace another tab profile', async ({ page,
   expect(await other.evaluate(() => localStorage.getItem('projects/brand_A'))).toBeNull();
 });
 
-test('oversized generated name keeps the kit and permits regeneration without partial writes', async ({
+test('oversized name allows continuing with the interview and preserves an existing draft', async ({
   page,
 }) => {
   await mount(page);
   await interview(page);
+  const draft = {
+    userId: 'A',
+    name: 'Draft',
+    type: 'brand_kit',
+    status: 'draft',
+    draft: { niche: 'Garden', pitch: 'Keep this' },
+    extra: 'preserve',
+  };
+  await page.evaluate((value) => {
+    localStorage.setItem('projects/brand_A', JSON.stringify(value));
+    (window as any).test.kit = { name: 'x'.repeat(100), tagline: 'Rejected', marker: 'invalid' };
+  }, draft);
+  await page.getByRole('button', { name: 'Build my channel style first' }).click();
+  await expect(page.getByRole('alert')).toContainText('99 characters');
+  expect(await answers(page)).toEqual({ summary: '__onboarding_in_progress__' });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('projects/brand_A')!))).toEqual(
+    draft,
+  );
+  await page.getByRole('button', { name: 'Continue to Today without a brand kit' }).click();
+  await expect(page.getByText('Router ready')).toBeVisible();
+  expect(await answers(page)).toEqual({
+    niche: 'Gardening',
+    audience: 'Beginners',
+    vibe: 'Calm',
+    summary: '',
+  });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('projects/brand_A')!))).toEqual(
+    draft,
+  );
+});
+
+test('oversized name permits regeneration and saves the valid replacement', async ({ page }) => {
+  await mount(page);
+  await interview(page);
   await page.evaluate(() => {
-    (window as any).test.kit = {
-      name: 'x'.repeat(100),
-      tagline: 'Grow together',
-      marker: 'original',
-    };
+    (window as any).test.kit = { name: 'x'.repeat(100), tagline: 'Rejected' };
   });
   await page.getByRole('button', { name: 'Build my channel style first' }).click();
   await expect(page.getByRole('alert')).toContainText('99 characters');
   expect(await answers(page)).toEqual({ summary: '__onboarding_in_progress__' });
   expect(await page.evaluate(() => localStorage.getItem('projects/brand_A'))).toBeNull();
-  await page.getByRole('button', { name: 'Continue to Today' }).click();
-  await expect(page.getByRole('alert')).toContainText('99 characters');
   await page.evaluate(() => {
     (window as any).test.kit = {
       name: 'x'.repeat(99),
@@ -221,13 +249,92 @@ test('oversized generated name keeps the kit and permits regeneration without pa
   });
   await page.getByRole('button', { name: 'Build my channel style first' }).click();
   await expect(page.getByText('Router ready')).toBeVisible();
+  expect(await answers(page)).toEqual({
+    niche: 'Gardening',
+    audience: 'Beginners',
+    vibe: 'Calm',
+    summary: 'Grow together',
+  });
   expect(
     await page.evaluate(() => JSON.parse(localStorage.getItem('projects/brand_A')!).data),
-  ).toEqual({
-    name: 'x'.repeat(99),
-    tagline: 'Grow together',
-    marker: 'regenerated',
+  ).toEqual({ name: 'x'.repeat(99), tagline: 'Grow together', marker: 'regenerated' });
+});
+
+test('invalid regeneration retains an earlier retryable kit and offers explicit skip', async ({
+  page,
+}) => {
+  await mount(page);
+  await interview(page);
+  await page.evaluate(() => {
+    (window as any).test.failCompletion = true;
   });
+  await page.getByRole('button', { name: 'Build my channel style first' }).click();
+  await expect(page.getByRole('alert')).toContainText('completion failed');
+  await page.evaluate(() => {
+    (window as any).test.kit = { name: 'x'.repeat(100), tagline: 'Rejected' };
+    (window as any).test.failCompletion = false;
+  });
+  await page.getByRole('button', { name: 'Build my channel style first' }).click();
+  await expect(page.getByRole('alert')).toContainText('99 characters');
+  await expect(
+    page.getByText('Continue to Today retries saving your previously generated brand kit.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Continue without brand kit' }).click();
+  await expect(page.getByText('Router ready')).toBeVisible();
+  expect(await answers(page)).toEqual({
+    niche: 'Gardening',
+    audience: 'Beginners',
+    vibe: 'Calm',
+    summary: '',
+  });
+  expect(await page.evaluate(() => localStorage.getItem('projects/brand_A'))).toBeNull();
+});
+
+test('invalid regeneration preserves the earlier kit for exact retry', async ({ page }) => {
+  await mount(page);
+  await interview(page);
+  await page.evaluate(() => {
+    (window as any).test.failCompletion = true;
+  });
+  await page.getByRole('button', { name: 'Build my channel style first' }).click();
+  await expect(page.getByRole('alert')).toContainText('completion failed');
+  await page.evaluate(() => {
+    (window as any).test.kit = { name: 'x'.repeat(100), tagline: 'Rejected' };
+    (window as any).test.failCompletion = false;
+  });
+  await page.getByRole('button', { name: 'Build my channel style first' }).click();
+  await expect(page.getByRole('alert')).toContainText('99 characters');
+  await page.getByRole('button', { name: 'Continue to Today', exact: true }).click();
+  await expect(page.getByText('Router ready')).toBeVisible();
+  expect(await answers(page)).toEqual({
+    niche: 'Gardening',
+    audience: 'Beginners',
+    vibe: 'Calm',
+    summary: 'Grow together',
+  });
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('projects/brand_A')!).data),
+  ).toEqual({ name: 'Garden', tagline: 'Grow together' });
+});
+
+test('supplementary Unicode names respect the UTF-16 boundary', async ({ page }) => {
+  await mount(page);
+  await interview(page);
+  await page.evaluate(() => {
+    (window as any).test.kit = { name: '😀'.repeat(50), tagline: 'Rejected' };
+  });
+  await page.getByRole('button', { name: 'Build my channel style first' }).click();
+  await expect(page.getByRole('alert')).toContainText('99 characters');
+  expect(await answers(page)).toEqual({ summary: '__onboarding_in_progress__' });
+  expect(await page.evaluate(() => localStorage.getItem('projects/brand_A'))).toBeNull();
+  await page.evaluate(() => {
+    (window as any).test.kit = { name: '😀'.repeat(49), tagline: 'Accepted' };
+  });
+  await page.getByRole('button', { name: 'Build my channel style first' }).click();
+  await expect(page.getByText('Router ready')).toBeVisible();
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('projects/brand_A')!).data.name),
+  ).toBe('😀'.repeat(49));
 });
 
 test('failed brand completion can continue with the exact generated kit', async ({ page }) => {
