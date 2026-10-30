@@ -248,9 +248,12 @@ export async function exchangeSessionCookie(): Promise<void> {
 
 /**
  * Phase A — "Sign out of all devices": revokes every refresh token server-side
- * (POST /api/auth/revoke-all) and clears this device's session cookie. Pair
- * with a client `logout()` so the current tab returns to the login view.
+ * (POST /api/auth/revoke-all). Owner-bound requests leave the revoked cookie
+ * in the browser to avoid clearing a newer account's cookie. Pair with a
+ * client `logout()` so the current tab returns to the login view.
  */
-export async function revokeAllSessions(): Promise<void> {
-  await apiFetch('/api/auth/revoke-all', { method: 'POST' });
+export async function revokeAllSessions(owner?: ApiRequestOwner): Promise<void> {
+  // A delayed response must not clear a newer account's shared cookie.
+  // Revocation invalidates the old cookie server-side; owned calls ignore Set-Cookie.
+  await apiFetch('/api/auth/revoke-all', { method: 'POST', ...(owner ? { credentials: 'omit' as const } : {}) }, owner);
 }

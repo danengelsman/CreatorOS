@@ -253,7 +253,7 @@ export const quickPolish = async (content: string) => {
   return data.text;
 };
 
-export const repurposeContent = async (content: string) => {
+export const repurposeContent = async (content: string, owner?: ApiRequestOwner) => {
   const response = await apiFetch('/api/gemini/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -329,7 +329,7 @@ export const repurposeContent = async (content: string) => {
         },
       },
     }),
-  });
+  }, owner);
   if (!response.ok) {
     const errText = await response.text();
     try {
@@ -528,7 +528,7 @@ export const generateSmartSuggestions = async (brandData: any, existingContent: 
   return parseModelJson(smartSuggestionsSchema, data.text, 'smart suggestions');
 };
 
-export const generateScenePlan = async (scriptText: string, title?: string, brand?: any) => {
+export const generateScenePlan = async (scriptText: string, title?: string, brand?: any, owner?: ApiRequestOwner) => {
   const brandContext = brand
     ? `\nCREATOR BRAND CONTEXT:\n- Name: ${brand.name}\n- Archetype: ${brand.archetype}\n- Visual Style: ${brand.visual_style || 'N/A'}\n- Primary Color: ${brand.colors?.primary || 'N/A'}\nKeep these visual aesthetics in mind, particularly for title cards and image prompts.`
     : '';
@@ -625,7 +625,7 @@ ${scriptText}`;
         },
       },
     }),
-  });
+  }, owner);
 
   if (!response.ok) {
     const errText = await response.text();
@@ -645,6 +645,7 @@ export const analyzeAndOptimizeRetention = async (
   scriptOrHookText: string,
   platform: string = 'youtube',
   brand?: any,
+  owner?: ApiRequestOwner,
 ) => {
   const brandContext = brand
     ? `\nCREATOR BRAND CONTEXT:\n- Archetype: ${brand.archetype}\n- Personality: ${brand.personality}\n- Preferred Hooks: ${Array.isArray(brand.content_hooks) ? brand.content_hooks.join(', ') : 'N/A'}\nEnsure your hook rewrites and diagnosis align with this brand voice, feeling authentic to their creator archetype.`
@@ -739,7 +740,7 @@ Draft Hook / Intro Script to Analyze:
         },
       },
     }),
-  });
+  }, owner);
 
   if (!response.ok) {
     const errText = await response.text();

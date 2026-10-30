@@ -17,8 +17,12 @@ import {
 import { cn } from '../lib/utils';
 import { analyzeAndOptimizeRetention } from '../services/gemini';
 import { getFriendlyError } from '../lib/friendlyError';
+import { auth } from '../firebase';
+import type { ApiRequestOwner } from '../lib/apiClient';
+import { useBoundRequestOwner } from '../hooks/useBoundRequestOwner';
 
 interface RetentionHookLabProps {
+  owner?: ApiRequestOwner;
   initialText?: string;
   currentText?: string;
   showToast?: (msg: string) => void;
@@ -34,7 +38,9 @@ export default function RetentionHookLab({
   onApplyHookToEditor,
   onSendToScenePlanner: _onSendToScenePlanner,
   brand,
+  owner: inputOwner,
 }: RetentionHookLabProps) {
+  const owner = useBoundRequestOwner(inputOwner);
   const [localInput, setInputText] = useState(initialText);
   const inputText = currentText ?? localInput;
   const [platform, setPlatform] = useState<'youtube' | 'tiktok' | 'reels'>('youtube');
@@ -45,6 +51,7 @@ export default function RetentionHookLab({
   const [copiedHookIndex, setCopiedHookIndex] = useState<number | null>(null);
 
   const handleAnalyze = async () => {
+    if (!owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
     if (!inputText.trim()) {
       setError('Please provide a hook or intro to analyze.');
       return;
@@ -52,15 +59,17 @@ export default function RetentionHookLab({
     setError('');
     setIsAnalyzing(true);
     try {
-      const data = await analyzeAndOptimizeRetention(inputText, platform, brand);
+      const data = await analyzeAndOptimizeRetention(inputText, platform, brand, owner);
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       setResult(data?.retention_analysis || data);
       setResultInput(inputText);
       showToast('Retention analysis complete!');
     } catch (err: any) {
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       console.error('Retention Analysis failed:', err);
       showToast(getFriendlyError(err));
     } finally {
-      setIsAnalyzing(false);
+      if (auth.currentUser?.uid === owner.uid && owner.isCurrent()) setIsAnalyzing(false);
     }
   };
 

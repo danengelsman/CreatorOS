@@ -13,7 +13,9 @@ import {
   X,
   Cards,
 } from '@phosphor-icons/react';
-import { apiFetch } from '../firebase';
+import { apiFetch, auth } from '../firebase';
+import type { ApiRequestOwner } from '../lib/apiClient';
+import { useBoundRequestOwner } from '../hooks/useBoundRequestOwner';
 import { cn } from '../lib/utils';
 import { getFriendlyError } from '../lib/friendlyError';
 
@@ -85,10 +87,13 @@ const PLATFORM_ICONS: Record<string, any> = {
 export default function ViralTemplatesLibrary({
   brand,
   onSelectTemplate,
+  owner: inputOwner,
 }: {
   brand: any;
   onSelectTemplate: (template: any) => void;
+  owner?: ApiRequestOwner;
 }) {
+  const owner = useBoundRequestOwner(inputOwner);
   const [selectedPlatform, setSelectedPlatform] = useState<string>('All');
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
 
@@ -104,7 +109,7 @@ export default function ViralTemplatesLibrary({
       : TEMPLATES.filter((t) => t.platform === selectedPlatform);
 
   const handleTailorToBrand = async () => {
-    if (!selectedTemplate) return;
+    if (!selectedTemplate || !owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
 
     setIsTailoring(true);
     setErrorMsg('');
@@ -149,13 +154,14 @@ export default function ViralTemplatesLibrary({
             },
           },
         }),
-      });
+      }, owner);
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to tailor template.');
       }
       const data = await response.json();
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
 
       if (data.text) {
         const parsed = JSON.parse(data.text);
@@ -167,9 +173,10 @@ export default function ViralTemplatesLibrary({
         });
       }
     } catch (err: any) {
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       setErrorMsg(getFriendlyError(err));
     } finally {
-      setIsTailoring(false);
+      if (auth.currentUser?.uid === owner.uid && owner.isCurrent()) setIsTailoring(false);
     }
   };
 

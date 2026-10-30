@@ -21,7 +21,8 @@ import { doc, updateDoc } from 'firebase/firestore';
 import AvatarGenerator from './AvatarGenerator';
 import Integrations from './Integrations';
 import { authorizedFetch } from '../firebase';
-import { revokeAllSessions } from '../lib/apiClient';
+import { revokeAllSessions, type ApiRequestOwner } from '../lib/apiClient';
+import { useBoundRequestOwner } from '../hooks/useBoundRequestOwner';
 import { fetchDailyGoalsFromCloud, getLocalDailyGoals } from '../services/dailyGoals';
 
 import { User as FirebaseUser } from 'firebase/auth';
@@ -31,12 +32,15 @@ export default function Profile({
   userData,
   brand,
   projects = [],
+  owner: inputOwner,
 }: {
   user: FirebaseUser;
   userData: any;
   brand: any;
   projects?: any[];
+  owner?: ApiRequestOwner;
 }) {
+  const owner = useBoundRequestOwner(inputOwner);
   const [isUploading, setIsUploading] = useState(false);
   const [showAvatarGenerator, setShowAvatarGenerator] = useState(false);
   const [stats, setStats] = useState({ reach: '---', score: '0', streak: '0' });
@@ -46,15 +50,17 @@ export default function Profile({
   const [revokeError, setRevokeError] = useState('');
 
   const handleRevokeAllSessions = async () => {
-    if (isRevokingAll) return;
+    if (isRevokingAll || !owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
     setIsRevokingAll(true);
     setRevokeError('');
     try {
-      // Server revokes every refresh token for this user and clears the
-      // session cookie; signing out locally returns to the login view.
-      await revokeAllSessions();
+      // Server revokes every refresh token for this user. The owned request
+      // ignores cookie writes so a late response cannot clear another session.
+      await revokeAllSessions(owner);
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       await auth.signOut();
     } catch (error: any) {
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       console.error('Sign out of all devices failed:', error);
       setRevokeError(error?.message || "Couldn't sign out everywhere. Please try again.");
       setIsRevokingAll(false);
@@ -361,7 +367,7 @@ export default function Profile({
           </div>
           <div className="mt-8">
             <button
-              onClick={() => auth.signOut()}
+              onClick={() => { if (owner && auth.currentUser?.uid === owner.uid && owner.isCurrent()) void auth.signOut(); }}
               className="ios-button ios-button-tinted w-full mt-6"
               style={{
                 color: 'var(--system-red)',
