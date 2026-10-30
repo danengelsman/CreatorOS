@@ -23,7 +23,7 @@ const mocks = {
   firebase: 'export const db = {};',
   firestore: `
 export const collection = () => ({});
-export const doc = () => ({id:'project-' + (Number(sessionStorage.getItem('nextId') || 0) + 1)});
+export const doc = (...args) => ({id:args.length === 3 ? args[2] : 'project-' + (Number(sessionStorage.getItem('nextId') || 0) + 1)});
 export const serverTimestamp = () => 'timestamp';
 export const runTransaction = async (_db, callback) => {
   const docs = JSON.parse(sessionStorage.getItem('documents') || '{}');
@@ -42,6 +42,7 @@ const result = await build({stdin:{contents:source,resolveDir:root,sourcefile:'h
 const browser = await chromium.launch({headless:true});
 try {
   const page = await browser.newPage();
+  await page.route('**/*', route => route.abort());
   await page.route('https://hub.test/**', route => route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
   for (const scenario of ['remount','reload']) {
     await page.goto('https://hub.test/');
@@ -61,10 +62,11 @@ try {
       // The harness reselects the same idea after reload; the real workspace store is in memory.
     }
     await page.getByRole('button',{name:'New project'}).click();
-    await page.getByRole('button',{name:'Create from selected idea'}).click();
-    await page.waitForFunction(() => Object.keys(JSON.parse(sessionStorage.getItem('documents'))).length === 2);
+    await page.getByRole('button',{name:'Retry saving selected project'}).click();
+    await page.waitForFunction(() => !document.querySelector('dialog[open]'));
+    assert.equal(await page.evaluate(() => Object.keys(JSON.parse(sessionStorage.getItem('documents'))).length),1);
     const ids = await page.evaluate(() => Object.keys(JSON.parse(sessionStorage.getItem('documents'))));
-    console.log(`${scenario}: ambiguous committed create followed by retry produced ${ids.join(', ')}`);
+    console.log(`${scenario}: ambiguous committed create followed by retry retained ${ids.join(', ')}`);
   }
   await page.close();
 } finally { await browser.close(); }

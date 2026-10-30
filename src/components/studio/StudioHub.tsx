@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { collection, doc, type DocumentReference } from 'firebase/firestore';
+import { collection, doc } from 'firebase/firestore';
 import { Plus, ArrowRight } from '@phosphor-icons/react';
 import { db } from '../../firebase';
 import ContentIdeaGenerator from '../ContentIdeaGenerator';
 import ViralTemplatesLibrary from '../ViralTemplatesLibrary';
 import { contentProjects, getPipelineColumn, isScheduleManaged, makeProjectDraft, type PipelineColumn, type StarterKind, type StudioStage } from './studioHubHelpers';
 import { createProjectIfAbsent, updateStudioStage } from './studioHubPersistence';
+import { clearPending, readPending, writePending, type PendingCreate } from './studioHubRecovery';
 
 type Props = {
   user: any;
@@ -63,13 +64,17 @@ export function StudioHubContent({ user, brand, projects, isProjectsLoading, pro
   const [visited, setVisited] = useState<StarterKind[]>(['blank']);
   const [saving, setSaving] = useState(false);
   const [createError, setCreateError] = useState('');
-  const [retrySeed, setRetrySeed] = useState<{ seed: any; kind: StarterKind; handoff: boolean } | null>(null);
+  const [recovery] = useState(() => {
+    try { return { pending: readPending(user.uid), error: false }; }
+    catch { return { pending: null, error: true }; }
+  });
+  const [pending, setPending] = useState<PendingCreate | null>(recovery.pending);
+  const [storageBlocked, setStorageBlocked] = useState(recovery.error);
+  const handoffSeed = useRef<any>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [statusErrors, setStatusErrors] = useState<Record<string, string>>({});
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
   const createLock = useRef(false);
-  const pendingProject = useRef<DocumentReference | null>(null);
-  const pendingOwner = useRef<string | null>(null);
   const openedSaved = useRef(false);
   const statusLocks = useRef(new Set<string>());
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -89,8 +94,8 @@ export function StudioHubContent({ user, brand, projects, isProjectsLoading, pro
 
   const openNew = () => {
     if (savedId && openedSaved.current) {
-      setMode('blank'); setCreateError(''); setRetrySeed(null); setSavedId(null);
-      setVisited(['blank']); pendingProject.current = null; pendingOwner.current = null; openedSaved.current = false;
+      setMode('blank'); setCreateError(''); setSavedId(null);
+      setVisited(['blank']); openedSaved.current = false;
     }
     setShowNew(true);
   };
@@ -102,53 +107,71 @@ export function StudioHubContent({ user, brand, projects, isProjectsLoading, pro
 
 
   const createProject = async (seed: any = {}, kind: StarterKind = 'blank', handoff = false) => {
-    if (createLock.current || savedId) return;
-    if (!user?.uid) {
-      setCreateError('Please sign in before creating a project.');
-      return;
-    }
-    if (pendingOwner.current && pendingOwner.current !== user.uid) {
-      setCreateError('Sign in to the original account to retry this project, or start over.');
-      return;
-    }
-    let draft: ReturnType<typeof makeProjectDraft>;
-    try { draft = makeProjectDraft(user.uid, seed, kind); }
-    catch (error) { setCreateError(error instanceof Error ? error.message : 'Unsupported template.'); return; }
+    if (createLock.current || savedId || storageBlocked || !(isCurrentOwner?.() ?? true)) return;
+    if (!user?.uid) { setCreateError('Please sign in before creating a project.'); return; }
+    if (pending && pending.owner !== user.uid) { setCreateError('Sign in to the original account to retry this project.'); return; }
     createLock.current = true;
     setSaving(true);
     setCreateError('');
-    setRetrySeed({ seed, kind, handoff });
-    let id: string;
+    let operation: PendingCreate;
     try {
-      // This ID and seed survive dialog close, but not a component remount or reload.
-      const ref = pendingProject.current ?? doc(collection(db, 'projects'));
-      pendingProject.current = ref;
-      pendingOwner.current = user.uid;
-      await createProjectIfAbsent(db, ref, draft, isCurrentOwner);
-      id = ref.id;
-      setSavedId(id);
+      // Re-read before generating an ID: a remounted instance may have a recovery record.
+      const existing = readPending(user.uid);
+      if (existing) {
+        operation = existing;
+      } else {
+        const draft = makeProjectDraft(user.uid, seed, kind);
+        const ref = doc(collection(db, 'projects'));
+        operation = { version: 1, owner: user.uid, id: ref.id, operationId: crypto.randomUUID(), draft, kind };
+        writePending(operation); // Must be durable and verified before any transaction starts.
+        if (handoff) handoffSeed.current = seed;
+      }
+      setPending(operation);
     } catch (error) {
-      console.error('Could not create project:', error);
-      setCreateError('Your project could not be saved. Check your connection and try again.');
+      if (error instanceof Error && /not supported/i.test(error.message)) setCreateError(error.message);
+      else {
+        setStorageBlocked(true);
+        setCreateError('Browser session storage is unavailable or its recovery record cannot be verified. Enable storage, then reload; no new save was dispatched.');
+      }
       createLock.current = false;
       setSaving(false);
       return;
     }
-    if (handoff && selectedIdeaRef.current === seed) {
-      try { onClearSelectedIdea?.(); }
-      catch (error) { console.error('Project saved but selected idea could not be cleared:', error); }
-    }
     try {
-      onOpenProject(id);
-      openedSaved.current = true;
-      setShowNew(false);
+      if (!(isCurrentOwner?.() ?? true)) return;
+      await createProjectIfAbsent(db, doc(db, 'projects', operation.id), operation.draft, operation.operationId, isCurrentOwner);
+      if (!(isCurrentOwner?.() ?? true)) return;
+      setSavedId(operation.id);
+      try { clearPending(operation); setPending(null); }
+      catch { setStorageBlocked(true); setCreateError('Project saved, but its recovery record could not be cleared. Enable browser storage before creating another project.'); }
+      // A reselected equal idea is not proof of the original handoff.
+      if (handoffSeed.current && selectedIdeaRef.current === handoffSeed.current) {
+        try { onClearSelectedIdea?.(); }
+        catch (error) { console.error('Project saved but selected idea could not be cleared:', error); }
+      }
+      try {
+        onOpenProject(operation.id);
+        openedSaved.current = true;
+        setShowNew(false);
+      } catch (error) {
+        console.error('Could not open saved project:', error);
+        setCreateError('Your project was saved, but could not be opened. Use Open saved project to try again.');
+      }
     } catch (error) {
-      console.error('Could not open saved project:', error);
-      setCreateError('Your project was saved, but could not be opened. Use Open saved project to try again.');
+      if (!(isCurrentOwner?.() ?? true)) return;
+      console.error('Could not create project:', error);
+      setCreateError('Your project could not be confirmed. Retry the same project; the previous save may still finish.');
     } finally {
       createLock.current = false;
-      setSaving(false);
+      if (isCurrentOwner?.() ?? true) setSaving(false);
     }
+  };
+
+  const abandonPending = () => {
+    if (!pending || !(isCurrentOwner?.() ?? true)) return;
+    if (!window.confirm('The previous save may still finish. Starting over may create a duplicate project. Abandon this recovery and start over?')) return;
+    try { clearPending(pending); setPending(null); setCreateError(''); handoffSeed.current = null; }
+    catch { setStorageBlocked(true); setCreateError('Browser storage is unavailable. Enable it and reload to recover this project.'); }
   };
 
   const changeStatus = async (project: any, stage: StudioStage) => {
@@ -159,11 +182,12 @@ export function StudioHubContent({ user, brand, projects, isProjectsLoading, pro
     try {
       await updateStudioStage(db, doc(db, 'projects', project.id), user.uid, stage, isCurrentOwner);
     } catch (error) {
+      if (!(isCurrentOwner?.() ?? true)) return;
       console.error('Could not update project status:', error);
       setStatusErrors((current) => ({ ...current, [project.id]: error instanceof Error && !('code' in error) ? error.message : 'Stage could not be saved. Check your connection and try again.' }));
     } finally {
       statusLocks.current.delete(project.id);
-      setUpdating((current) => ({ ...current, [project.id]: false }));
+      if (isCurrentOwner?.() ?? true) setUpdating((current) => ({ ...current, [project.id]: false }));
     }
   };
 
@@ -209,15 +233,16 @@ export function StudioHubContent({ user, brand, projects, isProjectsLoading, pro
       <dialog ref={dialogRef} aria-labelledby="new-project-title" onCancel={(event) => { event.preventDefault(); closeNew(); }} className="m-auto max-h-[90vh] w-[min(95vw,72rem)] overflow-y-auto rounded-3xl border border-[var(--separator)] bg-[var(--bg-primary)] text-[var(--label-primary)] shadow-2xl backdrop:bg-black/70">
         <div className="p-5 sm:p-8">
           <div className="mb-6 flex items-start justify-between gap-4"><div><h2 id="new-project-title" className="font-serif text-2xl font-semibold">Start a project</h2><p className="mt-2 text-sm text-[var(--label-secondary)]">Choose a starting point. Your project is saved before it opens.</p></div><button autoFocus type="button" disabled={saving} onClick={closeNew} className={`${button} border border-[var(--separator)] disabled:opacity-50`}>Close</button></div>
-          <div role="group" aria-label="Project starting point" className="mb-6 flex flex-wrap gap-2">{([['blank', 'Blank'], ['idea', 'AI ideas'], ['template', 'Templates']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={mode === id} disabled={saving || !!savedId || (!!retrySeed && !!createError)} onClick={() => { setMode(id); setVisited((current) => current.includes(id) ? current : [...current, id]); }} className={`${button} border border-[var(--separator)] disabled:opacity-50 ${mode === id ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-secondary)]'}`}>{label}</button>)}</div>
+          <div role="group" aria-label="Project starting point" className="mb-6 flex flex-wrap gap-2">{([['blank', 'Blank'], ['idea', 'AI ideas'], ['template', 'Templates']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={mode === id} disabled={saving || !!savedId || !!pending || storageBlocked} onClick={() => { setMode(id); setVisited((current) => current.includes(id) ? current : [...current, id]); }} className={`${button} border border-[var(--separator)] disabled:opacity-50 ${mode === id ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-secondary)]'}`}>{label}</button>)}</div>
           {createError && <p role="alert" className="mb-4 rounded-xl bg-red-500/10 p-4 text-sm text-red-500">{createError}</p>}
+          {storageBlocked && !createError && <p role="alert" className="mb-4 text-sm text-red-500">Browser session storage is unavailable or the recovery record is invalid. Enable storage and reload; do not clear it if you need to recover your project.</p>}
           {saving && <p role="status" className="mb-4 text-sm">Saving your project...</p>}
           {savedId ? <button type="button" onClick={() => {
             try { onOpenProject(savedId); openedSaved.current = true; setShowNew(false); }
             catch (error) { console.error('Could not open saved project:', error); setCreateError('Your project was saved, but could not be opened. Use Open saved project to try again.'); }
           }} className={`${button} bg-[var(--accent)] text-white`}>Open saved project</button> : <>
-            {retrySeed && createError && <div className="mb-4 flex flex-wrap items-center gap-3"><button type="button" disabled={saving} onClick={() => void createProject(retrySeed.seed, retrySeed.kind, retrySeed.handoff)} className={`${button} border border-[var(--separator)] disabled:opacity-50`}>Retry saving selected project</button><button type="button" disabled={saving} onClick={() => { pendingProject.current = null; pendingOwner.current = null; setRetrySeed(null); setCreateError(''); }} className={`${button} border border-[var(--separator)] disabled:opacity-50`}>Start over</button><p className="text-xs text-[var(--label-secondary)]">Retry is available only while this Studio view remains open. Reloading, leaving Studio, or starting over may create another project if the previous save succeeded despite the error.</p></div>}
-            <div inert={saving || (!!retrySeed && !!createError)}>
+            {pending && <div className="mb-4 flex flex-wrap items-center gap-3"><p className="text-sm">A previous project save is unresolved. Retry the original project before creating another.</p><button type="button" disabled={saving || storageBlocked} onClick={() => void createProject()} className={`${button} border border-[var(--separator)] disabled:opacity-50`}>Retry saving selected project</button><button type="button" disabled={saving || storageBlocked} onClick={abandonPending} className={`${button} border border-[var(--separator)] disabled:opacity-50`}>Start over</button><p className="text-xs text-[var(--label-secondary)]">Starting over can create a duplicate if the previous save finishes. Recovery lasts for this browser tab.</p></div>}
+            <div inert={saving || !!pending || storageBlocked}>
               {selectedIdea && <div className="mb-5 rounded-2xl border border-[var(--separator)] bg-[var(--bg-secondary)] p-6"><h3 className="font-semibold">Selected idea: {typeof selectedIdea.title === 'string' ? selectedIdea.title : 'Untitled idea'}</h3>{typeof selectedIdea.hook === 'string' && <p className="mt-2 text-sm text-[var(--label-secondary)]">{selectedIdea.hook}</p>}{typeof selectedIdea.description === 'string' && <p className="mt-2 text-sm text-[var(--label-secondary)]">{selectedIdea.description}</p>}<button type="button" onClick={() => void createProject(selectedIdea, 'idea', true)} className={`${button} mt-4 bg-[var(--accent)] text-white`}>Create from selected idea</button></div>}
               <div hidden={mode !== 'blank'}><div className="rounded-2xl border border-[var(--separator)] bg-[var(--bg-secondary)] p-6"><h3 className="font-semibold">Start from scratch</h3><p className="mt-2 text-sm text-[var(--label-secondary)]">Create an empty draft and make it your own.</p><button type="button" onClick={() => void createProject()} className={`${button} mt-5 bg-[var(--accent)] text-white`}>Create blank project</button></div></div>
               {visited.includes('idea') && <div hidden={mode !== 'idea'}><ContentIdeaGenerator brand={brand} isCurrentOwner={isCurrentOwner} onSelectIdea={(idea) => void createProject(idea, 'idea')} /></div>}

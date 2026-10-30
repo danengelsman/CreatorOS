@@ -23,7 +23,7 @@ beforeEach(() => { store.current = undefined; store.writes = []; store.retryWith
 describe('Studio persistence safety', () => {
   it('does not write a project after its account generation changes during a read', async () => {
     const isCurrent = vi.fn().mockReturnValueOnce(true).mockReturnValue(false);
-    await expect(createProjectIfAbsent({} as any, ref, draft, isCurrent)).rejects.toThrow();
+    await expect(createProjectIfAbsent({} as any, ref, draft, 'operation', isCurrent)).rejects.toThrow();
     expect(store.writes).toEqual([]);
   });
   it('does not update a stage after its account generation changes during a read', async () => {
@@ -33,24 +33,24 @@ describe('Studio persistence safety', () => {
     expect(store.writes).toEqual([]);
   });
   it('creates once and reconciles a retry without touching edited content', async () => {
-    await createProjectIfAbsent({} as any, ref, draft);
+    await createProjectIfAbsent({} as any, ref, draft, 'operation');
     expect(store.writes).toHaveLength(1);
     store.writes = [];
-    store.current = { ...draft, name: 'Edited elsewhere', data: { body: 'edited' } };
-    await createProjectIfAbsent({} as any, ref, draft);
+    store.current = { ...draft, studioCreateId: 'operation', name: 'Edited elsewhere', data: { body: 'edited' } };
+    await createProjectIfAbsent({} as any, ref, draft, 'operation');
     expect(store.writes).toEqual([]);
     expect(store.current.name).toBe('Edited elsewhere');
   });
   it('retries a create transaction after a concurrent create without replacing it', async () => {
-    store.retryWith = { ...draft, name: 'Concurrent edit' };
-    await createProjectIfAbsent({} as any, ref, draft);
+    store.retryWith = { ...draft, studioCreateId: 'operation', name: 'Concurrent edit' };
+    await createProjectIfAbsent({} as any, ref, draft, 'operation');
     expect(store.writes).toEqual([]);
     expect(store.current.name).toBe('Concurrent edit');
   });
   it('refuses an existing mismatched owner or type', async () => {
-    for (const current of [{ ...draft, userId: 'other' }, { ...draft, type: 'workflow' }]) {
+    for (const current of [{ ...draft, userId: 'other' }, { ...draft, type: 'workflow' }, { ...draft }, { ...draft, studioCreateId: 'different' }]) {
       store.current = current;
-      await expect(createProjectIfAbsent({} as any, ref, draft)).rejects.toThrow();
+      await expect(createProjectIfAbsent({} as any, ref, draft, 'operation')).rejects.toThrow();
       expect(store.writes).toEqual([]);
     }
   });

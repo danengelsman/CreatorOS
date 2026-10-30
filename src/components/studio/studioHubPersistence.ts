@@ -3,19 +3,22 @@ import { isPublished, isScheduleManaged, type StudioStage } from './studioHubHel
 
 type ProjectDraft = { userId: string; type: 'content'; [key: string]: unknown };
 
-export async function createProjectIfAbsent(db: Firestore, ref: DocumentReference, draft: ProjectDraft, isCurrent: () => boolean = () => true): Promise<void> {
+export async function createProjectIfAbsent(db: Firestore, ref: DocumentReference, draft: ProjectDraft, operationId: string, isCurrent: () => boolean = () => true): Promise<void> {
   if (!isCurrent()) throw new Error('Account changed');
   await runTransaction(db, async (tx) => {
     const snapshot = await tx.get(ref);
     if (!isCurrent()) throw new Error('Account changed');
     if (snapshot.exists()) {
       const existing = snapshot.data();
-      if (existing.userId !== draft.userId || existing.type !== 'content') {
-        throw new Error('The saved project does not match this account or project type.');
+      if (existing.userId !== draft.userId || existing.type !== 'content' || existing.studioCreateId !== operationId) {
+        throw new Error('The saved project does not match this creation attempt.');
       }
       return;
     }
-    tx.set(ref, { ...draft, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    // A staged or dispatched commit cannot be recalled after an account switch.
+    // The captured reference and draft remain A's; the shared SDK may obtain the
+    // current account's credentials at RPC time, so this is not credential fencing.
+    tx.set(ref, { ...draft, studioCreateId: operationId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
   });
 }
 

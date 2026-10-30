@@ -17,7 +17,7 @@ vi.mock('../src/components/ContentIdeaGenerator', () => ({ default: () => null }
 vi.mock('../src/components/ViralTemplatesLibrary', () => ({ default: () => null }));
 vi.mock('firebase/firestore', () => ({
   collection: () => ({}),
-  doc: () => ({ id: `project-${++h.nextId}` }),
+  doc: (...args: any[]) => ({ id: args.length === 3 ? args[2] : `project-${++h.nextId}` }),
   serverTimestamp: () => 'timestamp',
   runTransaction: async (_db: any, callback: any) => {
     if (h.failBeforeWrite) { h.failBeforeWrite = false; throw new Error('offline'); }
@@ -45,7 +45,7 @@ function button(tree: any, label: string) {
   return result;
 }
 
-beforeEach(() => { h.slots = []; h.index = 0; h.writes = []; h.docs.clear(); h.failAfterWrite = false; h.failBeforeWrite = false; h.nextId = 0; vi.spyOn(console, 'error').mockImplementation(() => {}); });
+beforeEach(() => { const data = new Map<string, string>(); vi.stubGlobal('sessionStorage', { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => data.set(key, value), removeItem: (key: string) => data.delete(key) }); h.slots = []; h.index = 0; h.writes = []; h.docs.clear(); h.failAfterWrite = false; h.failBeforeWrite = false; h.nextId = 0; vi.spyOn(console, 'error').mockImplementation(() => {}); });
 describe('StudioHub retry interaction', () => {
   it('retains the handoff on a definite failure and retries the same project', async () => {
     const idea = { title: 'Original', description: 'Keep this' };
@@ -109,7 +109,7 @@ describe('StudioHub retry interaction', () => {
   });
 });
 
-it.fails('known bug: ambiguous create after remount should reconcile instead of duplicating', async () => {
+it('ambiguous create after remount reconciles instead of duplicating', async () => {
   const idea = { title: 'Original', description: 'Keep this' };
   const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, onClearSelectedIdea: vi.fn(), onOpenProject: vi.fn() };
   const render = () => { h.index = 0; return StudioHubContent(props); };
@@ -118,8 +118,8 @@ it.fails('known bug: ambiguous create after remount should reconcile instead of 
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(h.writes).toHaveLength(1);
   expect(props.onClearSelectedIdea).not.toHaveBeenCalled();
-  h.slots = []; // remount loses the pending ID and retry state
-  button(render(), 'Create from selected idea').props.onClick();
+  h.slots = []; // remount recovers the pending ID and draft
+  button(render(), 'Retry saving selected project').props.onClick();
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(h.writes).toHaveLength(1);
 });
