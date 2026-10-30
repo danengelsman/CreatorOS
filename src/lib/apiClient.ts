@@ -1,4 +1,5 @@
 import { auth, onAuthStateChanged } from '../firebase';
+import { useWorkspaceStore } from '../store/ownedWorkspaceStore';
 
 /**
  * F1.7 — Unified authenticated API client.
@@ -6,8 +7,8 @@ import { auth, onAuthStateChanged } from '../firebase';
  * Every same-origin `/api/*` request goes through `apiFetch`, which:
  *  - attaches `Authorization: Bearer <idToken>` from the current Firebase user,
  *  - on 401, force-refreshes the ID token ONCE (`getIdToken(true)`) and retries once,
- *  - on a second 401, dispatches the `creatoros:auth-expired` window event and
- *    throws AuthExpiredError (App.tsx listens and signs the user out),
+ *  - on a second 401, dispatches an account-scoped `creatoros:auth-expired`
+ *    event and throws AuthExpiredError,
  *  - on 429, throws RateLimitError with the server-provided retry hint
  *    (body.retryAfter / body.retryAfterSeconds, falling back to the Retry-After header),
  *  - on any other non-OK response, throws Error(body.error || status).
@@ -86,6 +87,10 @@ async function currentUserIdToken(forceRefresh = false, assertActive: () => void
     return sanitizeToken(await abortable(user.getIdToken(forceRefresh), signal));
   } catch (error) {
     assertActive();
+    const code = (error as { code?: string })?.code;
+    if (code && ['auth/user-token-expired', 'auth/invalid-user-token', 'auth/user-disabled', 'auth/user-not-found'].includes(code)) {
+      throw new AuthExpiredError();
+    }
     console.warn('apiClient: failed to resolve ID token:', error);
     return null;
   }
@@ -168,6 +173,33 @@ async function throwForResponse(response: Response, assertActive: () => void): P
   throw new Error(body?.error || `Request failed with status ${response.status}`);
 }
 
+function guardResponseBody(response: Response, assertActive: () => void, signal?: AbortSignal | null): Response {
+  // Body reads happen after fetch resolves. Fence the consumption as well as
+  // response headers, including clones. Direct ReadableStream access requires
+  // caller-side fencing; current API consumers use these methods.
+  for (const method of ['json', 'text', 'blob', 'arrayBuffer', 'formData', 'bytes'] as const) {
+    const original = (response as any)[method];
+    if (typeof original !== 'function') continue;
+    Object.defineProperty(response, method, { configurable: true, value: async (...args: unknown[]) => {
+      assertActive();
+      try {
+        const value = await abortable(original.apply(response, args), signal);
+        assertActive();
+        return value;
+      } catch (error) {
+        assertActive();
+        throw error;
+      }
+    } });
+  }
+  const clone = response.clone?.bind(response);
+  if (clone) Object.defineProperty(response, 'clone', { configurable: true, value: () => {
+    assertActive();
+    return guardResponseBody(clone(), assertActive, signal);
+  } });
+  return response;
+}
+
 /**
  * Single authenticated fetch for all same-origin `/api/*` requests.
  * Returns the raw Response (throws on non-OK), so callers keep using
@@ -182,24 +214,52 @@ export async function apiFetch(
   options?: { suppressAuthExpiredEvent?: boolean; retryUnauthorized?: boolean },
 ): Promise<Response> {
   const signal = init.signal !== undefined ? init.signal : input instanceof Request ? input.signal : undefined;
+  const rawUrl = extractRequestUrl(input);
+
+  // Non-API requests remain untouched and must never inherit account ownership.
+  if (!isSameOriginApiUrl(rawUrl)) return fetch(input, init);
+
+  // OAuth callbacks are public browser endpoints, not bearer API calls.
+  const path = new URL(rawUrl, window.location.origin).pathname;
+  if (path === '/api/auth/google/callback' || path === '/api/auth/tiktok/callback') return fetch(input, init);
+
+  // Capture both the actual SDK user and the workspace lifecycle at invocation,
+  // before any await. A sign-in that finishes later must never adopt this payload.
+  const originUser = auth.currentUser;
+  const originWorkspace = useWorkspaceStore.getState();
+  const originGeneration = originWorkspace.generation;
+  const originUid = originWorkspace.uid;
   const assertOwner = () => {
     if (signal?.aborted) throw signal.reason ?? new DOMException('Request aborted', 'AbortError');
-    if (owner && (auth.currentUser?.uid !== owner.uid || !owner.isCurrent())) {
+    const workspace = useWorkspaceStore.getState();
+    if ((originUser && originUser.uid !== originUid) || auth.currentUser !== originUser || workspace.uid !== originUid || workspace.generation !== originGeneration ||
+        (owner && (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()))) {
       throw new DOMException('Request owner is no longer current', 'AbortError');
     }
   };
   assertOwner();
-  const rawUrl = extractRequestUrl(input);
-
-  // Only same-origin /api/* requests are authenticated — everything else passes through untouched.
-  if (!isSameOriginApiUrl(rawUrl)) {
-    return fetch(input, init);
-  }
+  const reportExpired = () => {
+    assertOwner();
+    if (!options?.suppressAuthExpiredEvent && originUid) {
+      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, {
+        detail: { uid: originUid, generation: originGeneration },
+      }));
+    }
+  };
+  const acquireToken = async (force: boolean) => {
+    try {
+      return force ? await currentUserIdToken(true, assertOwner, signal) : await requireIdToken(assertOwner, signal);
+    } catch (error) {
+      if (error instanceof AuthExpiredError) reportExpired();
+      throw error;
+    }
+  };
 
   // The request may be replayed once after a token refresh, so clone Request bodies up front.
   const request: RequestInfo | URL = input instanceof Request ? input.clone() : input;
 
-  const token = await requireIdToken(assertOwner, signal);
+  const token = await acquireToken(false);
+  if (!token) throw new Error('User not authenticated');
   assertOwner();
   const headers = buildApiHeaders(input, init, token);
 
@@ -219,7 +279,7 @@ export async function apiFetch(
   if (response.status === 401) {
     // Owner-bound revocation opts out: a forced SDK refresh can itself initiate
     // an unscoped asynchronous sign-out, and must not replay the destructive request.
-    const refreshed = options?.retryUnauthorized === false ? null : await currentUserIdToken(true, assertOwner, signal);
+    const refreshed = options?.retryUnauthorized === false ? null : await acquireToken(true);
     assertOwner();
     if (refreshed) {
       headers.set('Authorization', `Bearer ${refreshed}`);
@@ -227,7 +287,7 @@ export async function apiFetch(
       assertOwner();
     }
     if (response.status === 401) {
-      if (!options?.suppressAuthExpiredEvent) window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+      reportExpired();
       throw new AuthExpiredError();
     }
   }
@@ -235,18 +295,9 @@ export async function apiFetch(
   if (!response.ok) {
     return throwForResponse(response, assertOwner);
   }
-  return response;
+  return guardResponseBody(response, assertOwner, signal);
 }
 
-/**
- * Phase A — exchange the current ID token for a Firebase session cookie
- * (POST /api/auth/session). Best-effort by design: callers fire-and-forget it
- * after sign-in/registration; the Bearer flow keeps working if it fails.
- * The cookie is an ABSOLUTE 14-day session (never renewed by traffic).
- */
-export async function exchangeSessionCookie(): Promise<void> {
-  await apiFetch('/api/auth/session', { method: 'POST' });
-}
 
 /**
  * Phase A — "Sign out of all devices": revokes every refresh token server-side
@@ -257,6 +308,6 @@ export async function exchangeSessionCookie(): Promise<void> {
 export async function revokeAllSessions(owner?: ApiRequestOwner): Promise<void> {
   // A delayed response must not clear a newer account's shared cookie.
   // Firebase may still accept a same-second cookie until expiry; do not promise otherwise.
-  // Don't fire the global sign-out event or force-refresh/replay on a 401.
-  await apiFetch('/api/auth/revoke-all', { method: 'POST', ...(owner ? { credentials: 'omit' as const } : {}) }, owner, { suppressAuthExpiredEvent: !!owner, retryUnauthorized: !owner });
+  // Do not force-refresh or replay this destructive request on a 401.
+  await apiFetch('/api/auth/revoke-all', { method: 'POST', ...(owner ? { credentials: 'omit' as const } : {}) }, owner, { retryUnauthorized: !owner });
 }

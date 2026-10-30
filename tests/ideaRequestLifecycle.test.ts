@@ -11,6 +11,7 @@ vi.mock('../src/firebase', () => ({
 }));
 import { apiFetch as realApiFetch } from '../src/lib/apiClient';
 import ContentIdeaGenerator from '../src/components/ContentIdeaGenerator';
+import { useWorkspaceStore } from '../src/store/ownedWorkspaceStore';
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -22,6 +23,7 @@ const response = (status: number) => new Response(JSON.stringify({ text: '{"idea
 let fetchMock: ReturnType<typeof vi.fn>;
 let dispatch: ReturnType<typeof vi.fn>;
 beforeEach(() => {
+  useWorkspaceStore.getState().changeAccount('A');
   h.effects = []; h.analytics.mockReset().mockResolvedValue({ success: true, summary: {} });
   fetchMock = vi.fn(); dispatch = vi.fn();
   vi.stubGlobal('fetch', fetchMock);

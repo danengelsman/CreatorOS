@@ -143,13 +143,14 @@ describe('owner boundaries beyond the first 401', () => {
     expect(text(updated)).toContain('until expiration');
     expect(button(updated, 'Revoke sessions on all devices').props.disabled).toBe(false);
   });
-  it('does not trigger global sign out on a current-owner revocation 401', async () => {
+  it('reports a current-owner revocation 401 without global sign out', async () => {
     const token = useWorkspaceStore.getState().changeAccount('A')!;
     const owner = { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) };
     fetchMock.mockResolvedValue(response(401));
     h.index = 0; const tree = Profile({ user: h.user, userData: {}, brand: null, owner } as any);
     await button(tree, 'Revoke sessions on all devices').props.onClick();
-    expect(fetchMock).toHaveBeenCalledTimes(1); expect(h.expired).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1); expect(h.expired).toHaveBeenCalledTimes(1);
+    expect(h.expired.mock.calls[0][0].detail).toEqual(token);
     expect(h.user.getIdToken).toHaveBeenCalledTimes(1);
     expect(h.signOut).not.toHaveBeenCalled();
   });

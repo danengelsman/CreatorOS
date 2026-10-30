@@ -10,6 +10,7 @@ import {
 } from '@phosphor-icons/react';
 import BrandIcon from './BrandIcon';
 import { cn } from '../lib/utils';
+import { AuthExpiredError } from '../lib/apiClient';
 import {
   db,
   serverTimestamp,
@@ -308,6 +309,10 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
       }
     } catch (err) {
       if (!isCurrent()) return;
+      if (err instanceof AuthExpiredError) {
+        setShowSparks(false);
+        return;
+      }
       console.warn('Sparks fetch error:', err);
       setSparksData({
         museMessage:
@@ -392,6 +397,12 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
       }
     } catch (error) {
       if (!isCurrent()) return;
+      if (error instanceof AuthExpiredError) {
+        setMessages(messages);
+        setShowSparks(true);
+        setInputError('Sign in again, then select your idea to retry.');
+        return;
+      }
       console.warn(
         'Network issue during onboarding chat after selecting spark, using local fallback:',
         error,
@@ -447,6 +458,12 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
       }
     } catch (error) {
       if (!isCurrent()) return;
+      if (error instanceof AuthExpiredError) {
+        setMessages(messages);
+        setInputValue(userText);
+        setInputError('Sign in again, then send your reply to retry.');
+        return;
+      }
       console.warn('Network issue during onboarding chat, using local fallback:', error);
       const userCount = updatedMessages.filter((m) => m.role === 'user').length;
       if (userCount === 1) {

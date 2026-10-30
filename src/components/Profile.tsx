@@ -404,8 +404,9 @@ export default function Profile({
               authenticated in the same second as revocation may remain usable until expiration
               (up to 14 days). Cookies remain in this browser until expiration or replacement.
               Firebase may sign this browser out when a revoked refresh fails.
-              To sign out now, use Logout in the navigation. Avoid switching accounts during
-              revocation, token refresh or sign-out: Firebase does not scope sign-out to one account.
+              Logout in the navigation signs out of Firebase on this browser, but does not remove
+              or invalidate an existing server cookie. Avoid switching accounts during revocation,
+              token refresh or sign-out: Firebase does not scope sign-out to one account.
             </p>
           </div>
         </section>

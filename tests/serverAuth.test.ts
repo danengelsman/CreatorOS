@@ -335,6 +335,25 @@ describe('POST /api/auth/session (session-cookie exchange)', () => {
 });
 
 describe('authenticateUser with the session cookie', () => {
+  it('uses the bearer identity instead of a different account cookie', async () => {
+    fsState.listIntegrations.mockResolvedValue([]);
+    const res = await fetch(`${baseUrl}/api/accounts`, {
+      headers: { Authorization: 'Bearer valid.bearer-user', Cookie: 'creatoros_session=valid.session-cookie' },
+    });
+    expect(res.status).toBe(200);
+    expect(fsState.listIntegrations).toHaveBeenCalledWith('bearer-user');
+    expect(adminState.verifySessionCookie).not.toHaveBeenCalled();
+  });
+
+  it('does not fall back to a cookie for an invalid bearer', async () => {
+    const res = await fetch(`${baseUrl}/api/accounts`, {
+      headers: { Authorization: 'Bearer invalid', Cookie: 'creatoros_session=valid.session-cookie' },
+    });
+    expect(res.status).toBe(401);
+    expect(adminState.verifySessionCookie).not.toHaveBeenCalled();
+    expect(fsState.listIntegrations).not.toHaveBeenCalled();
+  });
+
   it('serves the route from a valid creatoros_session cookie (revocation-checked)', async () => {
     fsState.listIntegrations.mockResolvedValue([]);
 

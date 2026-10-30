@@ -5,8 +5,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoadingScreen from './components/LoadingScreen';
 import Onboarding from './components/Onboarding';
 import VerificationBanner from './components/VerificationBanner';
+import SessionExpired from './components/SessionExpired';
 import { ensureFirstDollarJourney } from './services/firstDollarJourney';
-import { db, logout, serverTimestamp } from '@/firebase';
+import { db, serverTimestamp } from '@/firebase';
 import { doc, runTransaction } from 'firebase/firestore';
 import {
   ONBOARDING_IN_PROGRESS,
@@ -43,20 +44,8 @@ function RouterWrapper() {
     }
   }, [auth.user, auth.isAuthLoading, auth.authError]);
 
-  // Handle auth expired event
-  useEffect(() => {
-    const handleAuthExpired = () => {
-      console.warn('Session expired — signing out.');
-      logout()
-        .catch((err) => console.error('Forced sign-out failed:', err))
-        .finally(() => {
-          // Navigate to login page
-          window.location.href = '/login';
-        });
-    };
-    window.addEventListener('creatoros:auth-expired', handleAuthExpired);
-    return () => window.removeEventListener('creatoros:auth-expired', handleAuthExpired);
-  }, []);
+  // Do not turn an unscoped API event into Firebase signOut or navigation.
+  // Either can affect a different account after the initiating request ends.
 
   // Ensure first dollar journey when user is authenticated and not showing onboarding
   useEffect(() => {
@@ -202,6 +191,7 @@ function RouterWrapper() {
 export default function AppRoot() {
   return (
     <AuthProvider>
+      <SessionExpired />
       <RouterWrapper />
     </AuthProvider>
   );
