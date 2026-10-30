@@ -9,10 +9,12 @@ export interface StudioCanvasProps {
   onBack: () => void;
   initialInspector?: 'retention' | 'planner' | 'repurpose';
   isCurrentOwner?: () => boolean;
+  canWriteProject?: () => boolean;
+  unavailable?: 'missing' | 'error';
 }
 
 // The route resolves projects; remount only when the owner or project changes.
-export default function StudioCanvas({ user, brand, project, onBack, initialInspector, isCurrentOwner }: StudioCanvasProps) {
+export default function StudioCanvas({ user, brand, project, onBack, initialInspector, isCurrentOwner, canWriteProject, unavailable }: StudioCanvasProps) {
   const state = useRef({ dirty: false, saving: false, storageError: false });
   const bypass = useRef(false);
   const navigate = useNavigate();
@@ -47,6 +49,9 @@ export default function StudioCanvas({ user, brand, project, onBack, initialInsp
         </button>
         <h1 className="text-xl font-semibold text-[var(--label-primary)]">Project canvas</h1>
       </header>
+      {unavailable && <div role="alert" className="space-y-2">
+        <p>{unavailable === 'missing' ? 'This project is no longer available to this account.' : 'The project connection failed.'} Saving is disabled. Copy your draft before leaving; your editor remains open in this tab.</p>
+      </div>}
       {!user?.uid || !project?.id || project.userId !== user.uid || project.type !== 'content' ? (
         <p role="alert">This content project is not available for this account.</p>
       ) : (
@@ -54,6 +59,8 @@ export default function StudioCanvas({ user, brand, project, onBack, initialInsp
           key={key}
           user={user}
           isCurrentOwner={isCurrentOwner}
+          canWriteProject={canWriteProject}
+          projectUnavailable={!!unavailable}
           brand={brand}
           selectedProject={project}
           canvasMode

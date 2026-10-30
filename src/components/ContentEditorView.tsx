@@ -74,6 +74,7 @@ export interface ContentEditorViewProps {
   showToast: (msg: string) => void;
   setStudioTab: (tab: any) => void;
   isSaving: boolean;
+  saveDisabled?: boolean;
   onPublish: () => void;
   isScoring: boolean;
   onScore: () => void;
@@ -94,6 +95,7 @@ export default function ContentEditorView({
   showToast,
   setStudioTab,
   isSaving,
+  saveDisabled = false,
   onPublish,
   isScoring,
   onScore,
@@ -570,7 +572,7 @@ export default function ContentEditorView({
           </button>
           <button
             onClick={onPublish}
-            disabled={isSaving || (!body && !canvasMode)}
+            disabled={isSaving || saveDisabled || (!body && !canvasMode)}
             className="ios-button ios-button-gray"
           >
             {isSaving ? (

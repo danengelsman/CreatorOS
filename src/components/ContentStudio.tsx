@@ -40,6 +40,7 @@ import ContentIdeaGenerator from './ContentIdeaGenerator';
 import ViralTemplatesLibrary from './ViralTemplatesLibrary';
 import { recordJourneyEvent } from '../services/creatorJourney';
 import { getFriendlyError } from '../lib/friendlyError';
+import { templatePlatform } from './studio/studioHubHelpers';
 
 export default function Create({
   brand,
@@ -52,6 +53,8 @@ export default function Create({
   initialInspector = 'retention',
   onDirtyChange,
   isCurrentOwner,
+  canWriteProject,
+  projectUnavailable = false,
 }: {
   brand: any;
   setActiveTab: (tab: string) => void;
@@ -63,6 +66,8 @@ export default function Create({
   initialInspector?: 'retention' | 'planner' | 'repurpose';
   onDirtyChange?: (state: { dirty: boolean; saving: boolean; storageError: boolean }) => void;
   isCurrentOwner?: () => boolean;
+  canWriteProject?: () => boolean;
+  projectUnavailable?: boolean;
 }) {
   const [studioTab, setStudioTab] = useState<
     'editor' | 'ideas' | 'templates' | 'retention' | 'planner' | 'calendar'
@@ -133,6 +138,7 @@ export default function Create({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [copyStatus, setCopyStatus] = useState('');
 
   const draft = { title, body, platform };
   const dirty = canvasMode && (!sameDraft(draft, baseline) || pendingSave.current.length > 0 || baseline.name === undefined);
@@ -141,7 +147,10 @@ export default function Create({
   const latestDraft = useRef(draft);
   latestDraft.current = draft;
   useEffect(() => {
-    if (!canvasMode || !selectedProject) return;
+    if (projectUnavailable) setStudioTab('editor');
+  }, [projectUnavailable]);
+  useEffect(() => {
+    if (!canvasMode || !selectedProject || (canWriteProject && !canWriteProject())) return;
     if (deliveredSignature.current !== projectSignature) {
       deliveredSignature.current = projectSignature;
       deferredProject.current = projectBaseline(selectedProject);
@@ -155,7 +164,7 @@ export default function Create({
     const draftAtRead = latestDraft.current;
     const generationAtRead = saveGeneration.current;
     getDocFromServer(doc(db, 'projects', selectedProject.id)).then((snapshot) => {
-      if (cancelled || savingRef.current || saveGeneration.current !== generationAtRead ||
+      if (cancelled || (canWriteProject && !canWriteProject()) || savingRef.current || saveGeneration.current !== generationAtRead ||
           currentSignature.current !== signatureAtRead || !sameDraft(draftAtRead, latestDraft.current)) return;
       if (!trustedServerSnapshot(snapshot) || !snapshot.exists() || snapshot.data().userId !== user?.uid) {
         setVerificationError(true);
@@ -330,7 +339,7 @@ export default function Create({
   };
 
   const handlePublish = async () => {
-    if (!user || (isCurrentOwner && !isCurrentOwner()) || (!body && !canvasMode) || (canvasMode && !selectedProject?.id)) return;
+    if (!user || (isCurrentOwner && !isCurrentOwner()) || (canvasMode && canWriteProject && !canWriteProject()) || (!body && !canvasMode) || (canvasMode && !selectedProject?.id)) return;
     if (canvasMode && !canAddRecoveryWrite(pendingSave.current, { title, body, platform })) {
       setSaveError(pendingSave.current.length
         ? 'Recovery history is full. Your current draft remains in the editor. Copy it, then discard local recovery and load the project before saving again.'
@@ -371,9 +380,11 @@ export default function Create({
           await runTransaction(db, async (transaction) => {
             const snapshot = await transaction.get(ref);
             if (isCurrentOwner && !isCurrentOwner()) throw new Error('Account changed');
+            if (canWriteProject && !canWriteProject()) throw new Error('Project unavailable');
             if (
               !snapshot.exists() ||
               snapshot.data().userId !== user.uid ||
+              snapshot.data().type !== 'content' ||
               !sameBaseline(projectBaseline(snapshot.data()), baseline)
             ) {
               throw new Error('studio-conflict');
@@ -381,7 +392,7 @@ export default function Create({
             transaction.update(ref, changes);
           });
           if (isCurrentOwner && !isCurrentOwner()) throw new Error('Account changed');
-          transactionSaved = true;
+          if (canWriteProject && !canWriteProject()) throw new Error('Project unavailable');
           const written = savedBaseline(savedDraft);
           // Snapshots received before the transaction completed may be stale. Verify
           // them against the server before reconciling, and don't outrun newer props.
@@ -398,11 +409,13 @@ export default function Create({
             // The write succeeded. Keep local text rather than apply an unverified snapshot.
             console.warn('Saved, but could not refresh project:', error);
           }
+          if (canWriteProject && !canWriteProject()) throw new Error('Project unavailable');
+          transactionSaved = true;
           setBaseline(written);
           setVerificationError(false);
           setConflict(false);
         } else await updateDoc(ref, changes);
-        if (firstDraftRevision) {
+        if (firstDraftRevision && (!canWriteProject || canWriteProject())) {
           try {
             await recordJourneyEvent(user.uid, { type: 'save_draft', projectId: activeProjectId });
           } catch (err) {
@@ -529,6 +542,18 @@ export default function Create({
             : ' This project changed elsewhere. Your local draft remains in the editor; copy it before reopening the project.')}
         </div>
       )}
+      {canvasMode && projectUnavailable && <div className="space-y-2">
+        <button type="button" className="ios-button ios-button-tinted" onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(`Title: ${title}\nPlatform: ${platform}\n\n${body}`);
+            setCopyStatus('Draft copied.');
+          } catch {
+            setCopyStatus('Copy unavailable. Select and copy the title and script from the editor.');
+            setStudioTab('editor');
+          }
+        }}>Copy draft</button>
+        <p role="status">{copyStatus}</p>
+      </div>}
       {canvasMode && (saveError || storageError || pendingSave.current.length > 0) && (
         <div role="alert" className="space-y-2">
           {storageError && <p>{dirty ? 'The latest draft could not be stored for browser recovery. It remains in the editor; copy it before leaving.' : 'Browser draft recovery is unavailable.'}</p>}
@@ -538,7 +563,7 @@ export default function Create({
             <button
               type="button"
               className="ios-button ios-button-tinted"
-              disabled={isSaving}
+              disabled={isSaving || projectUnavailable}
               onClick={async () => {
                 if (!window.confirm('Discard your local draft and load the latest project?')) return;
                 const before = latestDraft.current;
@@ -548,6 +573,7 @@ export default function Create({
                 setIsSaving(true);
                 try {
                   const snapshot = await getDocFromServer(doc(db, 'projects', selectedProject.id));
+                  if (canWriteProject && !canWriteProject()) throw new Error('unavailable');
                   if (!trustedServerSnapshot(snapshot) || !snapshot.exists() || snapshot.data().userId !== user.uid) throw new Error('unavailable');
                   if (!sameDraft(before, latestDraft.current)) {
                     showToast('Your draft changed while loading. The newer draft was kept.');
@@ -691,6 +717,11 @@ export default function Create({
         <ViralTemplatesLibrary
           brand={brand}
           onSelectTemplate={(template) => {
+            const nextPlatform = templatePlatform(template.platform);
+            if (!nextPlatform) {
+              showToast('This template’s platform is not supported in the editor. Choose a different template.');
+              return;
+            }
             if (
               canvasMode &&
               (title || body) &&
@@ -701,17 +732,7 @@ export default function Create({
               return;
             setTitle(template.title);
             setBody(`Hook: ${template.hook}\n\nScript: ${template.body}`);
-            if (
-              template.platform === 'TikTok' ||
-              template.platform === 'YouTube Shorts' ||
-              template.platform === 'Instagram'
-            ) {
-              setPlatform('youtube');
-            } else if (template.platform === 'Twitter') {
-              setPlatform('x');
-            } else {
-              setPlatform('linkedin');
-            }
+            setPlatform(nextPlatform);
             setStudioTab('editor');
           }}
         />
@@ -753,6 +774,7 @@ export default function Create({
               showToast={showToast}
               setStudioTab={openStudioTab}
               isSaving={isSaving}
+              saveDisabled={projectUnavailable}
               onPublish={handlePublish}
               isScoring={isScoring}
               onScore={handleScore}
