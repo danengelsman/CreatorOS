@@ -56,6 +56,75 @@ const bundle=await build({stdin:{contents:harness,resolveDir:root,sourcefile:'ro
 const browser=await chromium.launch({headless:true});
 const newPage=async()=>{const page=await browser.newPage(); await page.route('**/*',route=>route.abort()); return page;};
 try {
+ // The same legacy key can represent two different account/project pairs.
+ for(const [uid,projectId] of [['A:legacy','p1'],['A','legacy:p1']]) {
+  const page=await newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto(`https://studio.test/studio/${projectId}`);
+  const old=JSON.stringify({draft:{title:'Secret',body:'Ambiguous private draft',platform:'youtube'},baseline:{title:'Secret',body:'Original',platform:'youtube',name:'Secret'}});
+  await page.evaluate(old=>sessionStorage.setItem('studio-draft:A:legacy:p1',old),old);
+  await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  if(uid!=='A') { await page.evaluate(uid=>window.switchAccount(uid),uid); await page.waitForFunction(()=>window.listeners.length===2); }
+  await page.evaluate(({uid,projectId})=>{window.remote={userId:uid,type:'content',name:'Title',data:{title:'Title',body:'Current account',platform:'youtube'}};window.listeners.at(-1).next({id:projectId,exists:()=>true,data:()=>window.remote})},{uid,projectId});
+  const input=page.getByLabel('Project script'); await input.waitFor();
+  assert.equal(await input.inputValue(),'Current account');
+  await page.getByText(/older draft may not be recoverable automatically/i).waitFor();
+  assert.equal(await page.getByText('Ambiguous private draft').count(),0);
+  await input.fill('New scoped draft '+uid);
+  const key=`studio-draft-v2:${JSON.stringify([uid,projectId])}`;
+  await page.waitForFunction(key=>sessionStorage.getItem(key)?.includes('New scoped draft'),key);
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('studio-draft:A:legacy:p1')),old);
+  page.once('dialog',dialog=>dialog.accept()); await page.reload();
+  await page.addScriptTag({content:bundle.outputFiles[0].text}); await page.waitForFunction(()=>window.listeners.length===1);
+  if(uid!=='A') { await page.evaluate(uid=>window.switchAccount(uid),uid); await page.waitForFunction(()=>window.listeners.length===2); }
+  await page.evaluate(()=>window.listeners.at(-1).next({exists:()=>false}));
+  await page.getByText(/older draft may not be recoverable automatically/i).waitFor();
+  assert.match(await page.getByLabel('Recovered draft').inputValue(),new RegExp('New scoped draft '+uid));
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('studio-draft:A:legacy:p1')),old);
+  await page.close();
+ }
+ // Warning does not reveal whether an ambiguous legacy entry exists.
+ for(const present of [false,true]) {
+  const page=await newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/legacy:p1');
+  if(present) await page.evaluate(()=>sessionStorage.setItem('studio-draft:A:legacy:p1',JSON.stringify({draft:{title:'Secret',body:'Do not show',platform:'youtube'}})));
+  await page.addScriptTag({content:bundle.outputFiles[0].text}); await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>window.listeners[0].next({exists:()=>false}));
+  await page.getByText(/older draft may not be recoverable automatically/i).waitFor();
+  assert.equal(await page.getByLabel('Recovered draft').count(),0);
+  assert.equal(await page.getByText('Do not show').count(),0);
+  assert.equal(!!await page.evaluate(()=>sessionStorage.getItem('studio-draft:A:legacy:p1')),present);
+  await page.close();
+ }
+ // Both v2 records coexist in one tab despite the shared old key.
+ {
+  const page=await newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1');
+  const values=await page.evaluate(()=>{
+   const record=body=>JSON.stringify({draft:{title:'T',body,platform:'youtube'},baseline:{title:'T',body:'original',platform:'youtube',name:'T'}});
+   const old=record('Ambiguous secret'), first=record('First owner secret'), second=record('Second owner secret');
+   const k1=`studio-draft-v2:${JSON.stringify(['A:legacy','p1'])}`, k2=`studio-draft-v2:${JSON.stringify(['A','legacy:p1'])}`;
+   sessionStorage.setItem('studio-draft:A:legacy:p1',old);sessionStorage.setItem(k1,first);sessionStorage.setItem(k2,second);
+   return {old,first,second,k1,k2};
+  });
+  await page.addScriptTag({content:bundle.outputFiles[0].text}); await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>window.switchAccount('A:legacy')); await page.waitForFunction(()=>window.listeners.length===2);
+  await page.evaluate(()=>window.listeners.at(-1).next({exists:()=>false}));
+  assert.match(await page.getByLabel('Recovered draft').inputValue(),/First owner secret/);
+  await page.getByText(/older draft may not be recoverable automatically/i).waitFor();
+  await page.evaluate(()=>window.switchAccount('A')); await page.waitForFunction(()=>window.listeners.length===3);
+  page.once('dialog',dialog=>dialog.accept());
+  await page.evaluate(()=>window.router.navigate({to:'/studio/$projectId',params:{projectId:'legacy:p1'}}));
+  await page.waitForFunction(()=>window.listeners.some(l=>l.active && l.ref.id==='legacy:p1'));
+  await page.evaluate(()=>window.listeners.find(l=>l.active && l.ref.id==='legacy:p1').next({exists:()=>false}));
+  assert.match(await page.getByLabel('Recovered draft').inputValue(),/Second owner secret/);
+  assert.doesNotMatch(await page.getByLabel('Recovered draft').inputValue(),/First owner secret|Ambiguous secret/);
+  assert.deepEqual(await page.evaluate(v=>[sessionStorage.getItem('studio-draft:A:legacy:p1'),sessionStorage.getItem(v.k1),sessionStorage.getItem(v.k2)],values),[values.old,values.first,values.second]);
+  await page.close();
+ }
  for(const failure of ['missing','denied','owner','type']) {
   const page=await newPage();
   page.on('pageerror', error => console.error('PAGE ERROR', error));

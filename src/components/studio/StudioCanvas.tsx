@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { useBlocker, useNavigate } from '@tanstack/react-router';
 import ContentStudio from '../ContentStudio';
+import LegacyDraftWarning from './LegacyDraftWarning';
 
 export interface StudioCanvasProps {
   user: any;
@@ -59,6 +60,7 @@ export default function StudioCanvas({ user, brand, project, onBack, initialInsp
         </button>
         <h1 className="text-xl font-semibold text-[var(--label-primary)]">Project canvas</h1>
       </header>
+      {user?.uid && project?.id && <LegacyDraftWarning userId={user.uid} projectId={project.id} />}
       {effectiveUnavailable && <div role="alert" className="space-y-2">
         <p>{effectiveUnavailable === 'missing' ? 'This project is no longer available to this account.' : 'The project connection failed.'} Saving is disabled. Copy your draft before leaving; your editor remains open in this tab.</p>
       </div>}

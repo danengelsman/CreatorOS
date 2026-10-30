@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspaceStore, selectBrand, isWorkspaceTokenCurrent } from '@/store/workspaceStore';
 import StudioCanvas from '@/components/studio/StudioCanvas';
 import UnavailableDraftRecovery from '@/components/studio/UnavailableDraftRecovery';
+import LegacyDraftWarning from '@/components/studio/LegacyDraftWarning';
 
 export const Route = createFileRoute('/_auth/studio/$projectId')({
   component: StudioProject,
@@ -84,7 +85,10 @@ function StudioProject() {
             ? 'This project may no longer exist or may not be available to this account.'
             : 'Check your connection and try again.'}
         </p>
-        {token && user?.uid && projectId && !projectId.includes('/') && <UnavailableDraftRecovery key={scope} userId={user.uid} projectId={projectId} />}
+        {token && user?.uid && projectId && !projectId.includes('/') && <>
+          <LegacyDraftWarning userId={user.uid} projectId={projectId} />
+          <UnavailableDraftRecovery key={scope} userId={user.uid} projectId={projectId} />
+        </>}
         <Link to="/studio" className="text-[var(--accent)] underline">Back to Studio</Link>
       </div>
     );
