@@ -1,3 +1,4 @@
+import { useAuth } from '../contexts/AuthContext';
 import React, { useState, useRef, useEffect } from 'react';
 import { Lightbulb, ArrowsClockwise as RefreshCw } from '@phosphor-icons/react';
 import { Mic, Square, Trash2, Check, Loader2, CheckCircle2 } from 'lucide-react';
@@ -21,6 +22,7 @@ export default function VideoIdeas({
   setActiveTab: any;
   setSelectedIdea?: any;
 }) {
+  const { captureAccount } = useAuth();
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [, setErrorMsg] = useState('');
 
@@ -168,11 +170,13 @@ export default function VideoIdeas({
 
   const handleGenerateIdeas = async () => {
     if (!user || !brand) return;
+    const isCurrent = captureAccount(user.uid);
     setIsGeneratingIdeas(true);
     setErrorMsg('');
 
     try {
       const ideas = await generateContentIdeas(brand);
+      if (!isCurrent()) return;
       const updatedBrand = { ...brand, content_ideas: [...ideas, ...(brand.content_ideas || [])] };
 
       const brandRef = doc(db, 'projects', `brand_${user.uid}`);
@@ -183,7 +187,7 @@ export default function VideoIdeas({
         handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`),
       );
 
-      setBrand(updatedBrand);
+      if (isCurrent()) setBrand(updatedBrand);
     } catch (error: any) {
       console.error(error);
       setErrorMsg(getFriendlyError(error));

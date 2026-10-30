@@ -4,22 +4,15 @@ import {
   UsersThree,
   List as Menu,
   X,
-  CurrencyDollar as DollarSign,
   SignOut as LogOut,
   UserCircle,
   House,
   PenNib,
   Hexagon,
   Path,
-  ChatsCircle,
   ChartLineUp,
   BookOpen,
-  Sparkle,
   ShieldCheck,
-  Recycle,
-  Lightbulb,
-  Lightning,
-  VideoCamera,
 } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
 import { logout } from '@/firebase';
@@ -28,53 +21,23 @@ import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import BrandIcon from '@/components/BrandIcon';
 import MadeWithLove from '@/components/MadeWithLove';
 
-const FEATURE_COMMUNITY = import.meta.env.VITE_FEATURE_COMMUNITY === 'true';
-
-const baseNavItems = [
+const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: House, path: '/dashboard' },
-  { id: 'first_dollar', label: 'First Dollar', icon: DollarSign, path: '/first-dollar' },
-  { id: 'create', label: 'Create', icon: PenNib, path: '/create' },
-  { id: 'retention', label: 'Retention Lab', icon: Lightning, path: '/retention' },
-  { id: 'analyzer', label: 'Video Analyzer', icon: VideoCamera, path: '/analyzer' },
-  { id: 'repurpose', label: 'Repurpose', icon: Recycle, path: '/repurpose' },
+  { id: 'studio', label: 'Studio', icon: PenNib, path: '/studio' },
   { id: 'brand', label: 'Brand', icon: Hexagon, path: '/brand' },
-  { id: 'ideas', label: 'Ideas', icon: Lightbulb, path: '/ideas' },
   { id: 'roadmap', label: 'Roadmap', icon: Path, path: '/roadmap' },
   { id: 'hub', label: 'Creator Hub', icon: UsersThree, path: '/hub' },
-  { id: 'community', label: 'Community', icon: ChatsCircle, path: '/community' },
   { id: 'reports', label: 'Reports', icon: ChartLineUp, path: '/reports' },
-  { id: 'help', label: 'Help', icon: BookOpen, path: '/help' },
-  { id: 'prompts', label: 'Co-Pilot', icon: Sparkle, path: '/prompts' },
   { id: 'profile', label: 'Profile', icon: UserCircle, path: '/profile' },
-  { id: 'support', label: 'Support Hub', icon: ShieldCheck, path: '/support' },
+  { id: 'help', label: 'Help', icon: BookOpen, path: '/help' },
+  { id: 'support', label: 'Support', icon: ShieldCheck, path: '/support' },
 ];
 
-const NAV_ITEMS = FEATURE_COMMUNITY
-  ? baseNavItems
-  : baseNavItems.filter((item) => item.id !== 'community');
-
-// The 6 prominent primary items from the 3D product concept mockup
-const MOCKUP_PRIMARY_IDS = ['home', 'create', 'brand', 'roadmap', 'community', 'reports'];
-const PRIMARY_NAV_ITEMS = NAV_ITEMS.filter((item) => MOCKUP_PRIMARY_IDS.includes(item.id));
-const STUDIO_NAV_ITEMS = NAV_ITEMS.filter(
-  (item) =>
-    !MOCKUP_PRIMARY_IDS.includes(item.id) && !['profile', 'help', 'support'].includes(item.id),
-);
-
-const baseNavGroups = [
-  { title: 'Main', items: ['home'] },
-  {
-    title: 'Studio',
-    items: ['create', 'retention', 'analyzer', 'repurpose', 'brand', 'ideas', 'prompts'],
-  },
-  { title: 'Growth', items: ['first_dollar', 'hub', 'reports', 'roadmap', 'community'] },
+const NAV_GROUPS = [
+  { title: 'Workspace', items: ['home', 'studio', 'brand'] },
+  { title: 'Growth', items: ['roadmap', 'hub', 'reports'] },
   { title: 'Settings', items: ['profile', 'help', 'support'] },
 ];
-
-const NAV_GROUPS = baseNavGroups.map((group) => ({
-  title: group.title,
-  items: FEATURE_COMMUNITY ? group.items : group.items.filter((item) => item !== 'community'),
-}));
 
 export default function LayoutShell({ children, user }: { children: React.ReactNode; user: any }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -186,49 +149,33 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
 
         {/* Navigation list */}
         <div className="flex-1 overflow-y-auto p-3 space-y-5 custom-scrollbar">
-          <div>
-            <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-white/40">
-              Workspace
+          {NAV_GROUPS.map((group) => (
+            <div key={group.title}>
+              <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-white/40">
+                {group.title}
+              </div>
+              <div className="space-y-1">
+                {group.items.map((id) => {
+                  const item = NAV_ITEMS.find((entry) => entry.id === id);
+                  if (!item) return null;
+                  return (
+                    <Link
+                      key={item.id}
+                      to={item.path as any}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-white/70 hover:text-white hover:bg-white/[0.05] text-sm font-medium"
+                      activeProps={{
+                        className:
+                          'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[var(--accent)] bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-sm font-semibold',
+                      }}
+                    >
+                      <item.icon size={19} className="flex-shrink-0" />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-            <div className="space-y-1">
-              {PRIMARY_NAV_ITEMS.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.path as any}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-white/70 hover:text-white hover:bg-white/[0.05] text-sm font-medium"
-                  activeProps={{
-                    className:
-                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[var(--accent)] bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-sm font-semibold shadow-[0_0_15px_rgba(244,162,97,0.06)]',
-                  }}
-                >
-                  <item.icon size={19} className="flex-shrink-0" />
-                  <span>{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-white/40">
-              Studio Tools
-            </div>
-            <div className="space-y-1">
-              {STUDIO_NAV_ITEMS.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.path as any}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-white/60 hover:text-white hover:bg-white/[0.04] text-xs font-medium"
-                  activeProps={{
-                    className:
-                      'w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-[var(--accent)] bg-[var(--accent)]/10 border border-[var(--accent)]/20 text-xs font-semibold',
-                  }}
-                >
-                  <item.icon size={17} className="flex-shrink-0" />
-                  <span>{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* Sidebar user footer */}
@@ -333,7 +280,7 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
         <nav className="fixed bottom-0 left-0 right-0 z-[60] lg:hidden material-thick border-t border-[var(--separator)] px-2 pb-[env(safe-area-inset-bottom,4px)] pt-1 h-[calc(env(safe-area-inset-bottom,0px)+49px)]">
           <div className="flex items-center justify-around h-full">
             {NAV_ITEMS.filter((item) =>
-              ['home', 'create', 'repurpose', 'brand', 'profile'].includes(item.id),
+              ['home', 'studio', 'brand', 'roadmap', 'profile'].includes(item.id),
             ).map((item) => (
               <Link
                 key={item.id}

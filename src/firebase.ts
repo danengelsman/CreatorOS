@@ -290,8 +290,8 @@ export { apiFetch, AuthExpiredError, RateLimitError, AUTH_EXPIRED_EVENT } from '
 import { apiFetch as unifiedApiFetch } from './lib/apiClient';
 
 /** Legacy helper: authenticated fetch that parses JSON (throws on non-OK, including 401/429). */
-export async function authorizedFetch(url: string, options: RequestInit = {}) {
-  const response = await unifiedApiFetch(url, options);
+export async function authorizedFetch(url: string, options: RequestInit = {}, owner?: import('./lib/apiClient').ApiRequestOwner) {
+  const response = await unifiedApiFetch(url, options, owner);
   return response.json();
 }
 

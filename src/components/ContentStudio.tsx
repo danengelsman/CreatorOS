@@ -1,5 +1,5 @@
-import { apiFetch } from '../firebase';
-import React, { useState, useEffect } from 'react';
+import { apiFetch, auth } from '../firebase';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   CheckCircle as CheckCircle2,
   DownloadSimple as Download,
@@ -18,16 +18,20 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDocFromServer,
   query,
   where,
   orderBy,
   updateDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import VideoStudio from './VideoStudio';
 import CalendarView from './CalendarView';
 import CustomVideoPlayer from './CustomVideoPlayer';
 import ScenePlanner from './ScenePlanner';
 import RetentionHookLab from './RetentionHookLab';
+import ContentRepurposer from './ContentRepurposer';
+import { canAddRecoveryWrite, recoveryPendingWrites, projectBaseline, savedBaseline, sameBaseline, sameDraft, studioUpdate, trustedServerSnapshot, type StudioBaseline, type StudioDraft } from './studio/studioDraft';
 import localforage from 'localforage';
 import Confetti from './Confetti';
 import ContentEditorView from './ContentEditorView';
@@ -44,6 +48,10 @@ export default function Create({
   selectedIdea,
   setSelectedIdea,
   selectedProject,
+  canvasMode = false,
+  initialInspector = 'retention',
+  onDirtyChange,
+  isCurrentOwner,
 }: {
   brand: any;
   setActiveTab: (tab: string) => void;
@@ -51,26 +59,149 @@ export default function Create({
   selectedIdea?: any;
   setSelectedIdea?: any;
   selectedProject?: any;
+  canvasMode?: boolean;
+  initialInspector?: 'retention' | 'planner' | 'repurpose';
+  onDirtyChange?: (state: { dirty: boolean; saving: boolean; storageError: boolean }) => void;
+  isCurrentOwner?: () => boolean;
 }) {
   const [studioTab, setStudioTab] = useState<
     'editor' | 'ideas' | 'templates' | 'retention' | 'planner' | 'calendar'
   >('editor');
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+  const storageKey = canvasMode ? `studio-draft:${user?.uid}:${selectedProject?.id}` : '';
+  const [initial] = useState(() => {
+    const baseline: StudioBaseline = selectedProject
+      ? projectBaseline(selectedProject)
+      : { title: '', body: '', platform: 'youtube', name: null };
+    if (storageKey) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
+        if (
+          saved &&
+          ['title', 'body', 'platform'].every(
+            (key) =>
+              typeof saved.draft?.[key] === 'string' && typeof saved.baseline?.[key] === 'string',
+          )
+        ) {
+          const pending = recoveryPendingWrites(saved);
+          return { draft: saved.draft as StudioDraft, baseline: saved.baseline as StudioBaseline, pending };
+        }
+      } catch {
+        /* Storage may be unavailable. The editor still works. */
+      }
+    }
+    return { draft: baseline, baseline, pending: [] as StudioDraft[] };
+  });
+  const [baseline, setBaseline] = useState<StudioBaseline>(initial.baseline);
+  const [title, setTitle] = useState(canvasMode ? initial.draft.title : '');
+  const [body, setBody] = useState(canvasMode ? initial.draft.body : '');
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspector, setInspector] = useState<'retention' | 'planner' | 'repurpose'>(initialInspector);
+  const [storageError, setStorageError] = useState(false);
+  const [verificationError, setVerificationError] = useState(false);
+  const [conflict, setConflict] = useState(canvasMode && initial.baseline.name === undefined);
+  const [saveError, setSaveError] = useState(
+    canvasMode && initial.baseline.name === undefined
+      ? 'This recovered draft is from an older version, so its original project name is unknown. Copy your draft before loading the latest project.'
+      : '',
+  );
+  // Delivery identity is distinct from the server-verified baseline. Repeated stale
+  // props must not initiate reads, but a later different delivery must still do so.
+  const projectSignature = JSON.stringify([selectedProject?.id, selectedProject?.userId, projectBaseline(selectedProject || {})]);
+  const deliveredSignature = useRef(projectSignature);
+  const currentSignature = useRef(projectSignature);
+  currentSignature.current = projectSignature;
+  const deferredProject = useRef<StudioBaseline | null>(
+    selectedProject && !sameBaseline(initial.baseline, projectBaseline(selectedProject))
+      ? projectBaseline(selectedProject) : null,
+  );
+  const currentProject = useRef(selectedProject);
+  currentProject.current = selectedProject;
+  const pendingSave = useRef<StudioDraft[]>(initial.pending);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     selectedProject?.id || null,
   );
   const [videoHistory, setVideoHistory] = useState<any[]>([]);
   const [allProjects, setAllProjects] = useState<any[]>([]);
   const [activePreviewVideo, setActivePreviewVideo] = useState<any>(null);
-  const [platform, setPlatform] = useState('youtube');
+  const [platform, setPlatform] = useState(canvasMode ? initial.draft.platform : 'youtube');
   const [isScoring, setIsScoring] = useState(false);
   const [scoreData, setScoreData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
+  const saveGeneration = useRef(0);
   const [isPolishing, setIsPolishing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  const draft = { title, body, platform };
+  const dirty = canvasMode && (!sameDraft(draft, baseline) || pendingSave.current.length > 0 || baseline.name === undefined);
+  const latestBody = useRef(body);
+  latestBody.current = body;
+  const latestDraft = useRef(draft);
+  latestDraft.current = draft;
+  useEffect(() => {
+    if (!canvasMode || !selectedProject) return;
+    if (deliveredSignature.current !== projectSignature) {
+      deliveredSignature.current = projectSignature;
+      deferredProject.current = projectBaseline(selectedProject);
+    }
+    const incoming = deferredProject.current;
+    if (!incoming || dirty || isSaving) return;
+    // Props have no Firestore metadata or version and may be delayed. Read the
+    // server after the event, then guard against intervening edits and saves.
+    let cancelled = false;
+    const signatureAtRead = projectSignature;
+    const draftAtRead = latestDraft.current;
+    const generationAtRead = saveGeneration.current;
+    getDocFromServer(doc(db, 'projects', selectedProject.id)).then((snapshot) => {
+      if (cancelled || savingRef.current || saveGeneration.current !== generationAtRead ||
+          currentSignature.current !== signatureAtRead || !sameDraft(draftAtRead, latestDraft.current)) return;
+      if (!trustedServerSnapshot(snapshot) || !snapshot.exists() || snapshot.data().userId !== user?.uid) {
+        setVerificationError(true);
+        return;
+      }
+      const latest = projectBaseline(snapshot.data());
+      setVerificationError(false);
+      deferredProject.current = null;
+      setTitle(latest.title);
+      setBody(latest.body);
+      setPlatform(latest.platform);
+      setBaseline(latest);
+      setConflict(false);
+    }).catch((error) => {
+      console.warn('Could not verify project update; current draft was kept:', error);
+      if (!cancelled) setVerificationError(true);
+    });
+    return () => { cancelled = true; };
+  }, [canvasMode, projectSignature, dirty, isSaving, user?.uid]);
+  useLayoutEffect(() => {
+    if (!storageKey) {
+      onDirtyChange?.({ dirty, saving: isSaving, storageError: false });
+      return;
+    }
+    let unavailable = false;
+    try {
+      if (dirty || pendingSave.current.length > 0)
+        sessionStorage.setItem(
+          storageKey,
+          JSON.stringify({ draft: { title, body, platform }, baseline, pending: pendingSave.current[0] || null, pendingWrites: pendingSave.current }),
+        );
+      else sessionStorage.removeItem(storageKey);
+    } catch {
+      unavailable = true;
+    }
+    setStorageError(unavailable);
+    onDirtyChange?.({ dirty, saving: isSaving, storageError: unavailable });
+  }, [storageKey, dirty, title, body, platform, baseline, isSaving]);
+
+  const openStudioTab = (tab: any) => {
+    if (canvasMode && (tab === 'retention' || tab === 'planner')) {
+      setInspector(tab);
+      setInspectorOpen(true);
+      setStudioTab('editor');
+    } else setStudioTab(tab);
+  };
 
   const loadVideoHistory = async () => {
     if (!user) return;
@@ -135,7 +266,8 @@ export default function Create({
       } else {
         // /api/video-download URLs are same-origin API routes — use the unified
         // authenticated client (F1.7); local blobs were handled above.
-        const response = await apiFetch(url);
+        const owner = { uid: user?.uid || '', isCurrent: () => !!user?.uid && auth.currentUser?.uid === user.uid && (isCurrentOwner?.() ?? false) };
+        const response = await apiFetch(url, {}, owner);
         if (!response.ok) throw new Error('Video not found');
         blob = await response.blob();
       }
@@ -154,7 +286,7 @@ export default function Create({
   };
 
   useEffect(() => {
-    if (!selectedProject?.id || selectedProject.userId !== user?.uid) return;
+    if (canvasMode || !selectedProject?.id || selectedProject.userId !== user?.uid) return;
     setActiveProjectId(selectedProject.id);
     setTitle(selectedProject.data?.title || selectedProject.name || '');
     setBody(selectedProject.data?.body || '');
@@ -178,11 +310,16 @@ export default function Create({
   };
 
   const handleScore = async () => {
-    if (!body || !brand) return;
+    if (!body) return;
+    if (!brand) {
+      showToast('Set up your brand to score your draft.');
+      return;
+    }
     setIsScoring(true);
     setScoreData(null); // Clear previous score while loading
     try {
-      const result = await scoreContent(body, `${brand.personality} - ${brand.tagline}`);
+      const owner = { uid: user?.uid || '', isCurrent: () => !!user?.uid && auth.currentUser?.uid === user.uid && (isCurrentOwner?.() ?? false) };
+      const result = await scoreContent(body, `${brand?.personality || ''} - ${brand?.tagline || ''}`, owner);
       setScoreData(result);
     } catch (error) {
       console.error(error);
@@ -193,26 +330,78 @@ export default function Create({
   };
 
   const handlePublish = async () => {
-    if (!user || !body) return;
+    if (!user || (isCurrentOwner && !isCurrentOwner()) || (!body && !canvasMode) || (canvasMode && !selectedProject?.id)) return;
+    if (canvasMode && !canAddRecoveryWrite(pendingSave.current, { title, body, platform })) {
+      setSaveError(pendingSave.current.length
+        ? 'Recovery history is full. Your current draft remains in the editor. Copy it, then discard local recovery and load the project before saving again.'
+        : 'This draft is too large for safe recovery. Copy it and shorten it before saving.');
+      return;
+    }
+    savingRef.current = true;
+    saveGeneration.current++;
     setIsSaving(true);
+    if (canvasMode) onDirtyChange?.({ dirty, saving: true, storageError });
+    setSaveError('');
+    const previousPending = pendingSave.current;
+    let transactionSaved = false;
+    let transactionConflict = false;
     try {
       const firstDraftRevision =
         activeProjectId === selectedProject?.id &&
         selectedProject?.journeyStep === 'first_content' &&
         body.trim() !== (selectedProject.starterBody || selectedProject.data?.body || '').trim();
+      const savedDraft = { title, body, platform };
       const changes = {
-        name: title || 'Untitled Content',
-        data: {
-          title,
-          body,
-          platform,
-          score: scoreData?.score || 0,
-        },
+        ...studioUpdate(savedDraft, scoreData?.score),
         updatedAt: serverTimestamp(),
         ...(firstDraftRevision ? { journeyDraftSavedAt: serverTimestamp() } : {}),
       };
       if (activeProjectId) {
-        await updateDoc(doc(db, 'projects', activeProjectId), changes);
+        const ref = doc(db, 'projects', activeProjectId);
+        if (canvasMode) {
+          // Record every unresolved write before starting it; an earlier result may
+          // be observed while a retry is still in flight or after a reload.
+          pendingSave.current = [...previousPending, savedDraft];
+          try {
+            sessionStorage.setItem(storageKey, JSON.stringify({ draft: savedDraft, baseline, pending: pendingSave.current[0], pendingWrites: pendingSave.current }));
+          } catch {
+            setStorageError(true);
+            onDirtyChange?.({ dirty, saving: true, storageError: true });
+          }
+          await runTransaction(db, async (transaction) => {
+            const snapshot = await transaction.get(ref);
+            if (isCurrentOwner && !isCurrentOwner()) throw new Error('Account changed');
+            if (
+              !snapshot.exists() ||
+              snapshot.data().userId !== user.uid ||
+              !sameBaseline(projectBaseline(snapshot.data()), baseline)
+            ) {
+              throw new Error('studio-conflict');
+            }
+            transaction.update(ref, changes);
+          });
+          if (isCurrentOwner && !isCurrentOwner()) throw new Error('Account changed');
+          transactionSaved = true;
+          const written = savedBaseline(savedDraft);
+          // Snapshots received before the transaction completed may be stale. Verify
+          // them against the server before reconciling, and don't outrun newer props.
+          const projectAtRead = currentProject.current;
+          deliveredSignature.current = currentSignature.current;
+          deferredProject.current = null;
+          try {
+            const latest = await getDocFromServer(ref);
+            if (currentProject.current === projectAtRead && trustedServerSnapshot(latest) && latest.exists() && latest.data().userId === user.uid) {
+              const remote = projectBaseline(latest.data());
+              deferredProject.current = sameBaseline(remote, written) ? null : remote;
+            }
+          } catch (error) {
+            // The write succeeded. Keep local text rather than apply an unverified snapshot.
+            console.warn('Saved, but could not refresh project:', error);
+          }
+          setBaseline(written);
+          setVerificationError(false);
+          setConflict(false);
+        } else await updateDoc(ref, changes);
         if (firstDraftRevision) {
           try {
             await recordJourneyEvent(user.uid, { type: 'save_draft', projectId: activeProjectId });
@@ -220,9 +409,11 @@ export default function Create({
             console.warn('Draft saved; mission history will recover from the project:', err);
           }
         }
-      } else {
+      } else if (!canvasMode) {
         const projectRef = await addDoc(collection(db, 'projects'), {
-          ...changes,
+          name: title || 'Untitled Content',
+          data: { title, body, platform, score: scoreData?.score || 0 },
+          updatedAt: serverTimestamp(),
           userId: user.uid,
           type: 'content',
           status: 'Draft',
@@ -242,12 +433,24 @@ export default function Create({
       loadExistingProjects();
     } catch (error) {
       console.error(error);
+      if (canvasMode && error instanceof Error && error.message === 'studio-conflict') {
+        transactionConflict = true;
+        setConflict(true);
+        setSaveError('Project changed elsewhere. Your draft was not saved; copy it before reopening.');
+        showToast('Project changed elsewhere. Your draft was not overwritten.');
+      } else {
+        setSaveError('Could not save your draft. Please try again.');
+        showToast(getFriendlyError(error));
+      }
     } finally {
+      if (transactionSaved && previousPending.length === 0) pendingSave.current = [];
+      else if (transactionConflict) pendingSave.current = previousPending;
+      savingRef.current = false;
       setIsSaving(false);
     }
   };
 
-  if (!brand) {
+  if (!brand && !canvasMode) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center space-y-8 max-w-sm mx-auto">
         <div className="w-24 h-24 bg-[var(--bg-secondary)] rounded-[22px] flex items-center justify-center ios-elevated">
@@ -281,6 +484,7 @@ export default function Create({
     setIsPolishing(true);
     showToast(`Formatting for ${label}...`);
     try {
+      const owner = { uid: user?.uid || '', isCurrent: () => !!user?.uid && auth.currentUser?.uid === user.uid && (isCurrentOwner?.() ?? false) };
       const response = await apiFetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -288,11 +492,17 @@ export default function Create({
           model: 'gemini-3.8-flash',
           contents: `Rewrite the following content to be formatted specifically for ${label}. Adapt the tone, length, and style appropriately. Keep it high quality.\n\nContent:\n${body}`,
         }),
-      });
+      }, owner);
       if (!response.ok) throw new Error('Format failed');
       const data = await response.json();
-      setBody(data.text);
-      showToast(`Formatted for ${label}`);
+      if (canvasMode && latestBody.current !== body) {
+        showToast('Your draft changed while formatting. The newer text was kept.');
+      } else if (typeof data.text !== 'string' || !data.text.trim()) {
+        showToast('No replacement text was returned. Your draft was kept.');
+      } else {
+        setBody(data.text);
+        showToast(`Formatted for ${label}`);
+      }
     } catch (error) {
       console.error('Format error:', error);
       showToast('Failed to format content');
@@ -303,6 +513,75 @@ export default function Create({
 
   return (
     <div className="space-y-8 pb-20">
+      {canvasMode && !brand && (
+        <div className="text-sm text-[var(--label-secondary)]">
+          You can write and save now. Set up your brand to use brand-dependent AI tools such as scoring.{' '}
+          <button type="button" className="underline" onClick={() => setActiveTab('brand')}>Set up brand</button>
+        </div>
+      )}
+      {canvasMode && (
+        <div role="status" className="text-sm text-[var(--label-secondary)]">
+          {dirty ? (storageError ? 'Unsaved changes.' : 'Unsaved changes — draft kept in this browser tab.') : 'No unsaved changes.'}
+          {storageError && ' Browser draft recovery is unavailable; copy your current draft before leaving.'}
+          {verificationError && ' Could not verify the latest project update. Current editor content was kept.'}
+          {conflict && (baseline.name === undefined
+            ? ' This older local draft remains in the editor; its original project name could not be verified.'
+            : ' This project changed elsewhere. Your local draft remains in the editor; copy it before reopening the project.')}
+        </div>
+      )}
+      {canvasMode && (saveError || storageError || pendingSave.current.length > 0) && (
+        <div role="alert" className="space-y-2">
+          {storageError && <p>{dirty ? 'The latest draft could not be stored for browser recovery. It remains in the editor; copy it before leaving.' : 'Browser draft recovery is unavailable.'}</p>}
+          {saveError && <p>{saveError}</p>}
+          {pendingSave.current.length > 0 && <p>An earlier save has an unknown outcome. Your current draft remains in the editor. Copy it before explicitly discarding local recovery and loading the project.</p>}
+          {(conflict || pendingSave.current.length > 0) && (
+            <button
+              type="button"
+              className="ios-button ios-button-tinted"
+              disabled={isSaving}
+              onClick={async () => {
+                if (!window.confirm('Discard your local draft and load the latest project?')) return;
+                const before = latestDraft.current;
+                const projectAtRead = currentProject.current;
+                savingRef.current = true;
+                saveGeneration.current++;
+                setIsSaving(true);
+                try {
+                  const snapshot = await getDocFromServer(doc(db, 'projects', selectedProject.id));
+                  if (!trustedServerSnapshot(snapshot) || !snapshot.exists() || snapshot.data().userId !== user.uid) throw new Error('unavailable');
+                  if (!sameDraft(before, latestDraft.current)) {
+                    showToast('Your draft changed while loading. The newer draft was kept.');
+                    return;
+                  }
+                  if (currentProject.current !== projectAtRead) {
+                    setSaveError('The project changed while loading. Your draft was kept; try loading the project again.');
+                    return;
+                  }
+                  const latest = projectBaseline(snapshot.data());
+                  deliveredSignature.current = currentSignature.current;
+                  deferredProject.current = null;
+                  pendingSave.current = [];
+                  setTitle(latest.title);
+                  setBody(latest.body);
+                  setPlatform(latest.platform);
+                  setBaseline(latest);
+                  setVerificationError(false);
+                  setConflict(false);
+                  setSaveError('');
+                } catch (error) {
+                  console.error('Could not reload project', error);
+                  setSaveError('Could not load the latest project. Your draft was kept.');
+                } finally {
+                  savingRef.current = false;
+                  setIsSaving(false);
+                }
+              }}
+            >
+              Discard local draft and load project
+            </button>
+          )}
+        </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center px-1 pt-4 pb-4 gap-4">
         <div className="flex bg-[var(--bg-secondary)]/50 p-1.5 rounded-[24px] w-full max-w-[850px] shadow-inner border border-[var(--separator)]/30 backdrop-blur-md overflow-x-auto no-scrollbar">
           <button
@@ -349,7 +628,7 @@ export default function Create({
             <span>Templates</span>
           </button>
           <button
-            onClick={() => setStudioTab('retention')}
+            onClick={() => openStudioTab('retention')}
             className={cn(
               'shrink-0 whitespace-nowrap px-4 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform flex items-center justify-center gap-1',
               studioTab === 'retention'
@@ -365,7 +644,7 @@ export default function Create({
             <span>Retention Lab</span>
           </button>
           <button
-            onClick={() => setStudioTab('planner')}
+            onClick={() => openStudioTab('planner')}
             className={cn(
               'shrink-0 whitespace-nowrap px-4 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform flex items-center justify-center gap-1',
               studioTab === 'planner'
@@ -375,7 +654,7 @@ export default function Create({
           >
             <span>Scene Planner</span>
           </button>
-          <button
+          {!canvasMode && <button
             onClick={() => setStudioTab('calendar')}
             className={cn(
               'shrink-0 whitespace-nowrap px-6 py-2 rounded-[18px] text-[14px] font-bold transition-all duration-300 transform',
@@ -385,7 +664,7 @@ export default function Create({
             )}
           >
             Calendar
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -395,6 +674,14 @@ export default function Create({
         <ContentIdeaGenerator
           brand={brand}
           onSelectIdea={(idea) => {
+            if (
+              canvasMode &&
+              (title || body) &&
+              !window.confirm(
+                'Replace the current project draft with this idea? This cannot be undone.',
+              )
+            )
+              return;
             setTitle(idea.title);
             setBody(`Hook: ${idea.hook}\n\nConcept: ${idea.description}`);
             setStudioTab('editor');
@@ -404,6 +691,14 @@ export default function Create({
         <ViralTemplatesLibrary
           brand={brand}
           onSelectTemplate={(template) => {
+            if (
+              canvasMode &&
+              (title || body) &&
+              !window.confirm(
+                'Replace the current project draft with this template? This cannot be undone.',
+              )
+            )
+              return;
             setTitle(template.title);
             setBody(`Hook: ${template.hook}\n\nScript: ${template.body}`);
             if (
@@ -438,9 +733,15 @@ export default function Create({
           showToast={showToast}
           brand={brand}
         />
-      ) : (
+      ) : null}
+      <div hidden={studioTab !== 'editor'}>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          <div className="lg:col-span-8 space-y-6">
+          <div
+            className={cn(
+              'min-w-0 space-y-6',
+              canvasMode ? (inspectorOpen ? 'lg:col-span-7' : 'lg:col-span-11') : 'lg:col-span-8',
+            )}
+          >
             <ContentEditorView
               title={title}
               setTitle={setTitle}
@@ -450,7 +751,7 @@ export default function Create({
               setPlatform={setPlatform}
               brand={brand}
               showToast={showToast}
-              setStudioTab={setStudioTab}
+              setStudioTab={openStudioTab}
               isSaving={isSaving}
               onPublish={handlePublish}
               isScoring={isScoring}
@@ -458,6 +759,7 @@ export default function Create({
               isPolishing={isPolishing}
               setIsPolishing={setIsPolishing}
               onFormat={handleFormat}
+              canvasMode={canvasMode}
             />
 
             {/* Gemini Video Studio */}
@@ -468,6 +770,7 @@ export default function Create({
               brand={brand}
               showToast={showToast}
               user={user}
+              isCurrentOwner={isCurrentOwner}
               onVideoSaved={loadVideoHistory}
             />
 
@@ -489,10 +792,70 @@ export default function Create({
               onSelectVideo={setActivePreviewVideo}
               isScoring={isScoring}
               scoreData={scoreData}
+              canvasMode={canvasMode}
             />
           </div>
+          {canvasMode && (
+            <aside
+              aria-label="Script inspector"
+              className={cn('min-w-0', inspectorOpen ? 'lg:col-span-5' : 'lg:col-span-1')}
+            >
+              <button
+                type="button"
+                className="ios-button ios-button-tinted"
+                aria-expanded={inspectorOpen}
+                aria-controls="studio-inspector"
+                onClick={() => setInspectorOpen((open) => !open)}
+              >
+                {inspectorOpen ? 'Collapse inspector' : 'Open inspector'}
+              </button>
+              <div id="studio-inspector" hidden={!inspectorOpen} className="space-y-4 mt-4">
+                <div className="flex flex-wrap gap-2" aria-label="Inspector tools">
+                  {(['retention', 'planner', 'repurpose'] as const).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      aria-pressed={inspector === item}
+                      onClick={() => setInspector(item)}
+                      className={cn(
+                        'ios-button',
+                        inspector === item ? 'ios-button-filled' : 'ios-button-tinted',
+                      )}
+                    >
+                      {item === 'retention'
+                        ? 'Retention'
+                        : item === 'planner'
+                          ? 'Scene planner'
+                          : 'Repurpose'}
+                    </button>
+                  ))}
+                </div>
+                <div hidden={inspector !== 'retention'}>
+                  <RetentionHookLab
+                    currentText={body}
+                    brand={brand}
+                    showToast={showToast}
+                    onApplyHookToEditor={(hook) =>
+                      setBody((prev) => (prev ? `${hook}\n\n${prev}` : hook))
+                    }
+                  />
+                </div>
+                <div hidden={inspector !== 'planner'}>
+                  <ScenePlanner
+                    currentScript={body}
+                    currentTitle={title}
+                    showToast={showToast}
+                    brand={brand}
+                  />
+                </div>
+                <div hidden={inspector !== 'repurpose'}>
+                  <ContentRepurposer currentContent={body} />
+                </div>
+              </div>
+            </aside>
+          )}
         </div>
-      )}
+      </div>
 
       {showConfetti && <Confetti count={150} />}
 

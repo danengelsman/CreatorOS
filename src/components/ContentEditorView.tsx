@@ -80,6 +80,7 @@ export interface ContentEditorViewProps {
   isPolishing: boolean;
   setIsPolishing: (b: boolean) => void;
   onFormat: (targetPlatformId: string, label: string, isPro?: boolean) => void;
+  canvasMode?: boolean;
 }
 
 export default function ContentEditorView({
@@ -99,6 +100,7 @@ export default function ContentEditorView({
   isPolishing,
   setIsPolishing,
   onFormat,
+  canvasMode = false,
 }: ContentEditorViewProps) {
   // Moved Local State
   const [remixInstruction, setRemixInstruction] = useState('');
@@ -112,6 +114,21 @@ export default function ContentEditorView({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<BlobPart[]>([]);
+  const latestBody = useRef(body);
+  latestBody.current = body;
+
+  const applyGeneratedBody = (source: string, result: unknown) => {
+    if (canvasMode && latestBody.current !== source) {
+      showToast('Your draft changed while the AI was working. The newer text was kept.');
+      return false;
+    }
+    if (typeof result !== 'string' || !result.trim()) {
+      showToast('No replacement text was returned. Your draft was kept.');
+      return false;
+    }
+    setBody(result);
+    return true;
+  };
 
   // Moved Handlers
   const handleBrainstorm = async () => {
@@ -140,11 +157,15 @@ export default function ContentEditorView({
   };
 
   const handlePolish = async () => {
-    if (!body || !brand) return;
+    if (!body) return;
+    if (!brand) {
+      showToast('Set up your brand to use Auto-Polish.');
+      return;
+    }
     setIsPolishing(true);
     try {
       const polished = await quickPolish(body);
-      setBody(polished);
+      applyGeneratedBody(body, polished);
     } catch (error: any) {
       console.error('Polish failed:', error);
       showToast(getFriendlyError(error));
@@ -158,8 +179,7 @@ export default function ContentEditorView({
     setIsPolishing(true);
     try {
       const remixed = await remixContent(body, remixInstruction);
-      setBody(remixed);
-      setRemixInstruction('');
+      if (applyGeneratedBody(body, remixed)) setRemixInstruction('');
     } catch (error: any) {
       console.error('Remix failed:', error);
       showToast(getFriendlyError(error));
@@ -301,7 +321,11 @@ export default function ContentEditorView({
   };
 
   const handleGenerateScript = async () => {
-    if (!body || !brand) return;
+    if (!body) return;
+    if (!brand) {
+      showToast('Set up your brand to generate a branded video script.');
+      return;
+    }
     setIsPolishing(true);
     showToast('Generating detailed video script...');
     try {
@@ -315,8 +339,7 @@ export default function ContentEditorView({
       });
       if (!response.ok) throw new Error('Failed to generate script');
       const data = await response.json();
-      setBody(data.text);
-      showToast('Video script generated');
+      if (applyGeneratedBody(body, data.text)) showToast('Video script generated');
     } catch (err) {
       console.error(err);
       showToast('Failed to generate video script');
@@ -366,6 +389,7 @@ export default function ContentEditorView({
           <input
             type="text"
             value={title}
+            aria-label="Project title"
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Title or Hook"
             className="w-full font-serif text-[24px] font-semibold tracking-[-0.015em] outline-none placeholder:text-[var(--label-tertiary)] bg-transparent"
@@ -419,6 +443,7 @@ export default function ContentEditorView({
                       <button
                         key={idx}
                         onClick={() => {
+                          if (canvasMode && (title || body) && !window.confirm('Replace the current project draft with this idea?')) return;
                           setTitle(idea.title);
                           setBody(idea.hook + '\n\n' + idea.description);
                           setShowBrainstorm(false);
@@ -442,6 +467,7 @@ export default function ContentEditorView({
 
         <textarea
           value={body}
+          aria-label="Project script"
           onChange={(e) => setBody(e.target.value)}
           placeholder="What's the narrative? AI will score your brand voice..."
           className="w-full h-[400px] text-[17px] leading-relaxed outline-none resize-none placeholder:text-[var(--label-tertiary)] bg-transparent font-medium"
@@ -544,7 +570,7 @@ export default function ContentEditorView({
           </button>
           <button
             onClick={onPublish}
-            disabled={isSaving || !body}
+            disabled={isSaving || (!body && !canvasMode)}
             className="ios-button ios-button-gray"
           >
             {isSaving ? (

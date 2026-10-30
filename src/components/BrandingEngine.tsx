@@ -1,3 +1,4 @@
+import { useAuth } from '../contexts/AuthContext';
 import React, { useState } from 'react';
 import {
   ArrowsClockwise as RefreshCw,
@@ -21,6 +22,7 @@ import BrandArchetypeQuiz from './BrandArchetypeQuiz';
 import { getFriendlyError } from '../lib/friendlyError';
 
 export default function Brand({ brand, setBrand, user }: { brand: any; setBrand: any; user: any }) {
+  const { captureAccount } = useAuth();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -32,7 +34,8 @@ export default function Brand({ brand, setBrand, user }: { brand: any; setBrand:
   const [isGeneratingStyleGuide, setIsGeneratingStyleGuide] = useState(false);
 
   const handleGenerateStyleGuide = async () => {
-    if (!brand) return;
+    if (!brand || !user) return;
+    const isCurrent = captureAccount(user.uid);
     setIsStyleGuideModalOpen(true);
     if (brand.styleGuideSummary) {
       setStyleGuideContent(brand.styleGuideSummary);
@@ -42,6 +45,7 @@ export default function Brand({ brand, setBrand, user }: { brand: any; setBrand:
     setIsGeneratingStyleGuide(true);
     try {
       const summary = await generateStyleGuideSummary(brand);
+      if (!isCurrent()) return;
       setStyleGuideContent(summary);
 
       const brandRef = doc(db, 'projects', `brand_${user.uid}`);
@@ -52,7 +56,7 @@ export default function Brand({ brand, setBrand, user }: { brand: any; setBrand:
         handleFirestoreError(err, OperationType.UPDATE, `projects/brand_${user.uid}`),
       );
 
-      setBrand({ ...brand, styleGuideSummary: summary });
+      if (isCurrent()) setBrand({ ...brand, styleGuideSummary: summary });
     } catch (error: any) {
       console.error(error);
       setStyleGuideContent('Failed to generate style guide.');
@@ -63,10 +67,12 @@ export default function Brand({ brand, setBrand, user }: { brand: any; setBrand:
 
   const handleGenerateLogo = async () => {
     if (!user || !brand) return;
+    const isCurrent = captureAccount(user.uid);
     setIsGeneratingLogo(true);
     try {
       const prompt = `A professional, minimalist vector brand logo for a channel with archetype '${brand.archetype}' and personality '${brand.personality}'. Primary color theme is ${brand.colors?.primary || '#000'}. Do not include text or letters, just a clean, simple flat icon or symbol. Minimalist style, thick strokes, solid colors. White background.`;
       const logoUrl = await generateBrandLogo(prompt, '1:1');
+      if (!isCurrent()) return;
 
       const brandRef = doc(db, 'projects', `brand_${user.uid}`);
       await updateDoc(brandRef, {
@@ -76,7 +82,7 @@ export default function Brand({ brand, setBrand, user }: { brand: any; setBrand:
         handleFirestoreError(err, OperationType.UPDATE, `projects/brand_${user.uid}`),
       );
 
-      setBrand({ ...brand, logoUrl });
+      if (isCurrent()) setBrand({ ...brand, logoUrl });
     } catch (error: any) {
       console.error(error);
       setErrorMsg(getFriendlyError(error));
@@ -87,10 +93,12 @@ export default function Brand({ brand, setBrand, user }: { brand: any; setBrand:
 
   const handleGenerate = async () => {
     if (!input || !user) return;
+    const isCurrent = captureAccount(user.uid);
     setIsLoading(true);
     setErrorMsg('');
     try {
       const kit = await generateBrandKit(input);
+      if (!isCurrent()) return;
 
       const brandRef = doc(db, 'projects', `brand_${user.uid}`);
       await setDoc(brandRef, {
@@ -104,7 +112,7 @@ export default function Brand({ brand, setBrand, user }: { brand: any; setBrand:
         handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`),
       );
 
-      setBrand(kit);
+      if (isCurrent()) setBrand(kit);
     } catch (error: any) {
       console.error(error);
       setErrorMsg(getFriendlyError(error));

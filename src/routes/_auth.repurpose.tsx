@@ -1,16 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
-import ContentRepurposer from '@/components/ContentRepurposer';
-import LayoutShell from '@/components/LayoutShell';
-import { useAuth } from '@/contexts/AuthContext';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
+// Old links retain their tool intent after the user chooses a project.
 export const Route = createFileRoute('/_auth/repurpose')({
-  component: () => {
-    const auth = useAuth();
-
-    return (
-      <LayoutShell user={auth.user}>
-        <ContentRepurposer />
-      </LayoutShell>
-    );
+  beforeLoad: () => {
+    throw redirect({ to: '/studio', search: { inspector: 'repurpose' } });
   },
 });

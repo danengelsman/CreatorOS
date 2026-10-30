@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateVideo, getOperationStatus } from '../services/gemini';
-import { db, serverTimestamp } from '../firebase';
+import { db, serverTimestamp, auth } from '../firebase';
+import type { ApiRequestOwner } from '../lib/apiClient';
 import { collection, addDoc } from 'firebase/firestore';
 import localforage from 'localforage';
 import { getFriendlyError } from '../lib/friendlyError';
@@ -13,6 +14,7 @@ export interface UseVideoGenerationProps {
   user: any;
   showToast: (msg: string) => void;
   onVideoSaved?: () => void;
+  isCurrentOwner?: () => boolean;
 }
 
 export function useVideoGeneration({
@@ -23,6 +25,7 @@ export function useVideoGeneration({
   user,
   showToast,
   onVideoSaved,
+  isCurrentOwner,
 }: UseVideoGenerationProps) {
   const [videoStyle, setVideoStyle] = useState<'faceless' | 'avatar' | 'upload'>('faceless');
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
@@ -35,6 +38,10 @@ export function useVideoGeneration({
   // Customization Settings
   const [videoLength, setVideoLength] = useState('Short (5s)');
   const parseVideoSeconds = (s: string) => (s.includes('20') ? 20 : s.includes('10') ? 10 : 5);
+  const owner: ApiRequestOwner = {
+    uid: user?.uid || '',
+    isCurrent: () => !!user?.uid && auth.currentUser?.uid === user.uid && (isCurrentOwner?.() ?? false),
+  };
   const [avatarGender, setAvatarGender] = useState(brand?.avatar?.gender || 'Female');
   const [avatarClothing, setAvatarClothing] = useState(
     brand?.avatar?.clothing || 'Professional business attire',
@@ -186,7 +193,7 @@ export function useVideoGeneration({
     try {
       let operation;
       try {
-        operation = await generateVideo(promptStr, videoAspect, parseVideoSeconds(videoLength));
+        operation = await generateVideo(promptStr, videoAspect, parseVideoSeconds(videoLength), owner);
       } catch (createErr: any) {
         if (TIER_LIMIT_RE.test(String(createErr?.message || createErr))) {
           throw new Error(TIER_LIMIT_MSG);
@@ -210,7 +217,7 @@ export function useVideoGeneration({
           updateProgress();
           await new Promise((r) => setTimeout(r, 5000));
           try {
-            status = await getOperationStatus(finalOp);
+            status = await getOperationStatus(finalOp, owner);
             pollFailures = 0;
             if (typeof (status as any)?.progressPercentage === 'number') {
               updateProgress((status as any).progressPercentage);

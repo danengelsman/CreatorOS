@@ -21,6 +21,8 @@ import { getFriendlyError } from '../lib/friendlyError';
 
 interface ScenePlannerProps {
   initialScript?: string;
+  currentScript?: string;
+  currentTitle?: string;
   initialTitle?: string;
   showToast: (msg: string) => void;
   onSendToVideoStudio?: (prompt: string) => void;
@@ -29,15 +31,20 @@ interface ScenePlannerProps {
 
 export default function ScenePlanner({
   initialScript = '',
+  currentScript,
+  currentTitle,
   initialTitle = '',
   showToast,
   onSendToVideoStudio,
   brand,
 }: ScenePlannerProps) {
-  const [scriptText, setScriptText] = useState(initialScript);
-  const [titleText, setTitleText] = useState(initialTitle);
+  const [localScript, setScriptText] = useState(initialScript);
+  const [localTitle, setTitleText] = useState(initialTitle);
+  const scriptText = currentScript ?? localScript;
+  const titleText = currentTitle ?? localTitle;
   const [isGenerating, setIsGenerating] = useState(false);
   const [scenePlan, setScenePlan] = useState<any | null>(null);
+  const [resultInput, setResultInput] = useState({ script: '', title: '' });
   const [, setCopiedBeatId] = useState<string | null>(null);
   const [copiedJson, setCopiedJson] = useState(false);
   const [error, setError] = useState('');
@@ -52,6 +59,7 @@ export default function ScenePlanner({
     try {
       const plan = await generateScenePlan(scriptText, titleText, brand);
       setScenePlan(plan?.video_plan || plan);
+      setResultInput({ script: scriptText, title: titleText });
       setError('');
       showToast('Scene plan generated successfully!');
     } catch (err: any) {
@@ -178,6 +186,8 @@ export default function ScenePlanner({
             <input
               type="text"
               value={titleText}
+              readOnly={currentTitle !== undefined}
+              aria-label="Video working title"
               onChange={(e) => setTitleText(e.target.value)}
               placeholder="E.g., 5 Daily Habits That Changed My Life"
               className="w-full bg-[var(--bg-secondary)] border border-[var(--separator)] rounded-xl px-3 py-2 text-[13px] font-medium text-[var(--label-primary)] outline-none focus:border-[var(--accent)]"
@@ -190,6 +200,8 @@ export default function ScenePlanner({
             </label>
             <textarea
               value={scriptText}
+              readOnly={currentScript !== undefined}
+              aria-label="Finished script"
               onChange={(e) => setScriptText(e.target.value)}
               placeholder="Paste your full YouTube script here..."
               className="w-full h-36 bg-[var(--bg-secondary)] border border-[var(--separator)] rounded-xl p-3 text-[13px] font-medium text-[var(--label-primary)] outline-none focus:border-[var(--accent)] resize-none"
@@ -247,6 +259,7 @@ export default function ScenePlanner({
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
+          {(resultInput.script !== scriptText || resultInput.title !== titleText) && <p role="status">The editor changed since this plan was generated. Generate again for the current draft.</p>}
           {/* Summary Overview Bar */}
           <div className="bg-[var(--bg-tertiary)] p-4 rounded-2xl border border-[var(--separator)] grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>

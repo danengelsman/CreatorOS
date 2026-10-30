@@ -2,13 +2,15 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import CreatorHub from '@/components/CreatorHub';
 import LayoutShell from '@/components/LayoutShell';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useWorkspaceStore, selectProjects } from '@/store/workspaceStore';
 
 export const Route = createFileRoute('/_auth/hub')({
   component: () => {
     const auth = useAuth();
     const navigate = useNavigate();
-    const { projects } = useWorkspaceStore();
+    const state = useWorkspaceStore();
+    const token = auth.workspaceToken?.uid === auth.user?.uid ? auth.workspaceToken : null;
+    const projects = selectProjects(state, token);
 
     return (
       <LayoutShell user={auth.user}>

@@ -58,32 +58,75 @@ function sanitizeToken(token: string): string {
   return token.replace(/[\r\n\t]/g, '').trim();
 }
 
-async function currentUserIdToken(forceRefresh = false): Promise<string | null> {
+function abortError(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException('Request aborted', 'AbortError');
+}
+
+/** Settle immediately on abort while still observing a late token rejection. */
+function abortable<T>(promise: Promise<T>, signal?: AbortSignal | null): Promise<T> {
+  if (!signal) return promise;
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      signal.removeEventListener('abort', onAbort);
+      reject(abortError(signal));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => { signal.removeEventListener('abort', onAbort); resolve(value); },
+      (error) => { signal.removeEventListener('abort', onAbort); reject(error); },
+    );
+    if (signal.aborted) onAbort();
+  });
+}
+
+async function currentUserIdToken(forceRefresh = false, assertActive: () => void = () => {}, signal?: AbortSignal | null): Promise<string | null> {
   const user = auth.currentUser;
   if (!user) return null;
   try {
-    return sanitizeToken(await user.getIdToken(forceRefresh));
+    return sanitizeToken(await abortable(user.getIdToken(forceRefresh), signal));
   } catch (error) {
+    assertActive();
     console.warn('apiClient: failed to resolve ID token:', error);
     return null;
   }
 }
 
 /** Resolves the current ID token, briefly waiting for Firebase auth to finish restoring a session. */
-async function requireIdToken(): Promise<string> {
-  let token = await currentUserIdToken();
+async function requireIdToken(assertOwner: () => void = () => {}, signal?: AbortSignal | null): Promise<string> {
+  let token = await currentUserIdToken(false, assertOwner, signal);
+  assertOwner();
   if (!token) {
-    await new Promise<void>((resolve) => {
-      const unsubscribe = onAuthStateChanged(auth, () => {
-        unsubscribe();
+    await new Promise<void>((resolve, reject) => {
+      // The auth observer may fire synchronously before it returns its unsubscribe function.
+      // eslint-disable-next-line prefer-const
+      let unsubscribe: (() => void) | undefined;
+      let settled = false;
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        unsubscribe?.();
+      };
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
         resolve();
-      });
-      setTimeout(() => {
-        unsubscribe();
-        resolve();
-      }, 2500);
+      };
+      const onAbort = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(abortError(signal!));
+      };
+      const timer = setTimeout(finish, 2500);
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) { onAbort(); return; }
+      unsubscribe = onAuthStateChanged(auth, finish);
+      if (settled) unsubscribe();
     });
-    token = await currentUserIdToken();
+    assertOwner();
+    token = await currentUserIdToken(false, assertOwner, signal);
+    assertOwner();
   }
   if (!token) throw new Error('User not authenticated');
   return token;
@@ -108,13 +151,14 @@ function parseRetryAfterSeconds(body: any, headers: Headers): number {
 }
 
 /** Throws a typed error for any non-OK /api response. Never returns. */
-async function throwForResponse(response: Response): Promise<never> {
+async function throwForResponse(response: Response, assertActive: () => void): Promise<never> {
   let body: any = null;
   try {
     body = await response.json();
   } catch {
     body = null;
   }
+  assertActive();
   if (response.status === 429) {
     throw new RateLimitError(
       parseRetryAfterSeconds(body, response.headers),
@@ -129,10 +173,21 @@ async function throwForResponse(response: Response): Promise<never> {
  * Returns the raw Response (throws on non-OK), so callers keep using
  * `response.json()` / `response.blob()` exactly as before.
  */
+export type ApiRequestOwner = { uid: string; isCurrent: () => boolean };
+
 export async function apiFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
+  owner?: ApiRequestOwner,
 ): Promise<Response> {
+  const signal = init.signal !== undefined ? init.signal : input instanceof Request ? input.signal : undefined;
+  const assertOwner = () => {
+    if (signal?.aborted) throw signal.reason ?? new DOMException('Request aborted', 'AbortError');
+    if (owner && (auth.currentUser?.uid !== owner.uid || !owner.isCurrent())) {
+      throw new DOMException('Request owner is no longer current', 'AbortError');
+    }
+  };
+  assertOwner();
   const rawUrl = extractRequestUrl(input);
 
   // Only same-origin /api/* requests are authenticated — everything else passes through untouched.
@@ -143,16 +198,31 @@ export async function apiFetch(
   // The request may be replayed once after a token refresh, so clone Request bodies up front.
   const request: RequestInfo | URL = input instanceof Request ? input.clone() : input;
 
-  const token = await requireIdToken();
+  const token = await requireIdToken(assertOwner, signal);
+  assertOwner();
   const headers = buildApiHeaders(input, init, token);
 
-  let response = await fetch(request, { ...init, headers });
+  const fetchAttempt = async () => {
+    assertOwner();
+    try {
+      const result = await fetch(request instanceof Request ? request.clone() : request, { ...init, headers });
+      assertOwner();
+      return result;
+    } catch (error) {
+      assertOwner();
+      throw error;
+    }
+  };
+  let response = await fetchAttempt();
+  assertOwner();
   if (response.status === 401) {
     // Force-refresh the ID token exactly once, then replay the original request.
-    const refreshed = await currentUserIdToken(true);
+    const refreshed = await currentUserIdToken(true, assertOwner, signal);
+    assertOwner();
     if (refreshed) {
       headers.set('Authorization', `Bearer ${refreshed}`);
-      response = await fetch(request, { ...init, headers });
+      response = await fetchAttempt();
+      assertOwner();
     }
     if (response.status === 401) {
       window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
@@ -161,7 +231,7 @@ export async function apiFetch(
   }
 
   if (!response.ok) {
-    return throwForResponse(response);
+    return throwForResponse(response, assertOwner);
   }
   return response;
 }

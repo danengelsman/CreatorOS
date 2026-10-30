@@ -8,195 +8,221 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root';
-import { Route as IndexRouteImport } from './routes/index';
-import { Route as AuthRouteImport } from './routes/_auth';
-import { Route as LoginRouteImport } from './routes/login';
-import { Route as ResetPasswordRouteImport } from './routes/reset-password';
-import { Route as AuthAnalyzerRouteImport } from './routes/_auth.analyzer';
-import { Route as AuthBrandRouteImport } from './routes/_auth.brand';
-import { Route as AuthCommunityRouteImport } from './routes/_auth.community';
-import { Route as AuthCreateRouteImport } from './routes/_auth.create';
-import { Route as AuthDashboardRouteImport } from './routes/_auth.dashboard';
-import { Route as AuthFirstDollarRouteImport } from './routes/_auth.first-dollar';
-import { Route as AuthHelpRouteImport } from './routes/_auth.help';
-import { Route as AuthHubRouteImport } from './routes/_auth.hub';
-import { Route as AuthIdeasRouteImport } from './routes/_auth.ideas';
-import { Route as AuthProfileRouteImport } from './routes/_auth.profile';
-import { Route as AuthPromptsRouteImport } from './routes/_auth.prompts';
-import { Route as AuthReportsRouteImport } from './routes/_auth.reports';
-import { Route as AuthRepurposeRouteImport } from './routes/_auth.repurpose';
-import { Route as AuthRetentionRouteImport } from './routes/_auth.retention';
-import { Route as AuthRoadmapRouteImport } from './routes/_auth.roadmap';
-import { Route as AuthSupportRouteImport } from './routes/_auth.support';
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/_auth'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as AuthAnalyzerRouteImport } from './routes/_auth.analyzer'
+import { Route as AuthBrandRouteImport } from './routes/_auth.brand'
+import { Route as AuthCommunityRouteImport } from './routes/_auth.community'
+import { Route as AuthCreateRouteImport } from './routes/_auth.create'
+import { Route as AuthDashboardRouteImport } from './routes/_auth.dashboard'
+import { Route as AuthFirstDollarRouteImport } from './routes/_auth.first-dollar'
+import { Route as AuthHelpRouteImport } from './routes/_auth.help'
+import { Route as AuthHubRouteImport } from './routes/_auth.hub'
+import { Route as AuthIdeasRouteImport } from './routes/_auth.ideas'
+import { Route as AuthProfileRouteImport } from './routes/_auth.profile'
+import { Route as AuthPromptsRouteImport } from './routes/_auth.prompts'
+import { Route as AuthReportsRouteImport } from './routes/_auth.reports'
+import { Route as AuthRepurposeRouteImport } from './routes/_auth.repurpose'
+import { Route as AuthRetentionRouteImport } from './routes/_auth.retention'
+import { Route as AuthRoadmapRouteImport } from './routes/_auth.roadmap'
+import { Route as AuthStudioRouteImport } from './routes/_auth.studio'
+import { Route as AuthSupportRouteImport } from './routes/_auth.support'
+import { Route as AuthStudioIndexRouteImport } from './routes/_auth.studio.index'
+import { Route as AuthStudioProjectIdRouteImport } from './routes/_auth.studio.$projectId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/_auth',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AuthAnalyzerRoute = AuthAnalyzerRouteImport.update({
   id: '/analyzer',
   path: '/analyzer',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthBrandRoute = AuthBrandRouteImport.update({
   id: '/brand',
   path: '/brand',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthCommunityRoute = AuthCommunityRouteImport.update({
   id: '/community',
   path: '/community',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthCreateRoute = AuthCreateRouteImport.update({
   id: '/create',
   path: '/create',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthDashboardRoute = AuthDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthFirstDollarRoute = AuthFirstDollarRouteImport.update({
   id: '/first-dollar',
   path: '/first-dollar',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthHelpRoute = AuthHelpRouteImport.update({
   id: '/help',
   path: '/help',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthHubRoute = AuthHubRouteImport.update({
   id: '/hub',
   path: '/hub',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthIdeasRoute = AuthIdeasRouteImport.update({
   id: '/ideas',
   path: '/ideas',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthProfileRoute = AuthProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthPromptsRoute = AuthPromptsRouteImport.update({
   id: '/prompts',
   path: '/prompts',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthReportsRoute = AuthReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthRepurposeRoute = AuthRepurposeRouteImport.update({
   id: '/repurpose',
   path: '/repurpose',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthRetentionRoute = AuthRetentionRouteImport.update({
   id: '/retention',
   path: '/retention',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
 const AuthRoadmapRoute = AuthRoadmapRouteImport.update({
   id: '/roadmap',
   path: '/roadmap',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
+const AuthStudioRoute = AuthStudioRouteImport.update({
+  id: '/studio',
+  path: '/studio',
+  getParentRoute: () => AuthRoute,
+} as any)
 const AuthSupportRoute = AuthSupportRouteImport.update({
   id: '/support',
   path: '/support',
   getParentRoute: () => AuthRoute,
-} as any);
+} as any)
+const AuthStudioIndexRoute = AuthStudioIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthStudioRoute,
+} as any)
+const AuthStudioProjectIdRoute = AuthStudioProjectIdRouteImport.update({
+  id: '/$projectId',
+  path: '/$projectId',
+  getParentRoute: () => AuthStudioRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute;
-  '/login': typeof LoginRoute;
-  '/reset-password': typeof ResetPasswordRoute;
-  '/analyzer': typeof AuthAnalyzerRoute;
-  '/brand': typeof AuthBrandRoute;
-  '/community': typeof AuthCommunityRoute;
-  '/create': typeof AuthCreateRoute;
-  '/dashboard': typeof AuthDashboardRoute;
-  '/first-dollar': typeof AuthFirstDollarRoute;
-  '/help': typeof AuthHelpRoute;
-  '/hub': typeof AuthHubRoute;
-  '/ideas': typeof AuthIdeasRoute;
-  '/profile': typeof AuthProfileRoute;
-  '/prompts': typeof AuthPromptsRoute;
-  '/reports': typeof AuthReportsRoute;
-  '/repurpose': typeof AuthRepurposeRoute;
-  '/retention': typeof AuthRetentionRoute;
-  '/roadmap': typeof AuthRoadmapRoute;
-  '/support': typeof AuthSupportRoute;
+  '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/analyzer': typeof AuthAnalyzerRoute
+  '/brand': typeof AuthBrandRoute
+  '/community': typeof AuthCommunityRoute
+  '/create': typeof AuthCreateRoute
+  '/dashboard': typeof AuthDashboardRoute
+  '/first-dollar': typeof AuthFirstDollarRoute
+  '/help': typeof AuthHelpRoute
+  '/hub': typeof AuthHubRoute
+  '/ideas': typeof AuthIdeasRoute
+  '/profile': typeof AuthProfileRoute
+  '/prompts': typeof AuthPromptsRoute
+  '/reports': typeof AuthReportsRoute
+  '/repurpose': typeof AuthRepurposeRoute
+  '/retention': typeof AuthRetentionRoute
+  '/roadmap': typeof AuthRoadmapRoute
+  '/studio': typeof AuthStudioRouteWithChildren
+  '/support': typeof AuthSupportRoute
+  '/studio/$projectId': typeof AuthStudioProjectIdRoute
+  '/studio/': typeof AuthStudioIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute;
-  '/login': typeof LoginRoute;
-  '/reset-password': typeof ResetPasswordRoute;
-  '/analyzer': typeof AuthAnalyzerRoute;
-  '/brand': typeof AuthBrandRoute;
-  '/community': typeof AuthCommunityRoute;
-  '/create': typeof AuthCreateRoute;
-  '/dashboard': typeof AuthDashboardRoute;
-  '/first-dollar': typeof AuthFirstDollarRoute;
-  '/help': typeof AuthHelpRoute;
-  '/hub': typeof AuthHubRoute;
-  '/ideas': typeof AuthIdeasRoute;
-  '/profile': typeof AuthProfileRoute;
-  '/prompts': typeof AuthPromptsRoute;
-  '/reports': typeof AuthReportsRoute;
-  '/repurpose': typeof AuthRepurposeRoute;
-  '/retention': typeof AuthRetentionRoute;
-  '/roadmap': typeof AuthRoadmapRoute;
-  '/support': typeof AuthSupportRoute;
+  '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/analyzer': typeof AuthAnalyzerRoute
+  '/brand': typeof AuthBrandRoute
+  '/community': typeof AuthCommunityRoute
+  '/create': typeof AuthCreateRoute
+  '/dashboard': typeof AuthDashboardRoute
+  '/first-dollar': typeof AuthFirstDollarRoute
+  '/help': typeof AuthHelpRoute
+  '/hub': typeof AuthHubRoute
+  '/ideas': typeof AuthIdeasRoute
+  '/profile': typeof AuthProfileRoute
+  '/prompts': typeof AuthPromptsRoute
+  '/reports': typeof AuthReportsRoute
+  '/repurpose': typeof AuthRepurposeRoute
+  '/retention': typeof AuthRetentionRoute
+  '/roadmap': typeof AuthRoadmapRoute
+  '/support': typeof AuthSupportRoute
+  '/studio/$projectId': typeof AuthStudioProjectIdRoute
+  '/studio': typeof AuthStudioIndexRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  '/': typeof IndexRoute;
-  '/_auth': typeof AuthRouteWithChildren;
-  '/login': typeof LoginRoute;
-  '/reset-password': typeof ResetPasswordRoute;
-  '/_auth/analyzer': typeof AuthAnalyzerRoute;
-  '/_auth/brand': typeof AuthBrandRoute;
-  '/_auth/community': typeof AuthCommunityRoute;
-  '/_auth/create': typeof AuthCreateRoute;
-  '/_auth/dashboard': typeof AuthDashboardRoute;
-  '/_auth/first-dollar': typeof AuthFirstDollarRoute;
-  '/_auth/help': typeof AuthHelpRoute;
-  '/_auth/hub': typeof AuthHubRoute;
-  '/_auth/ideas': typeof AuthIdeasRoute;
-  '/_auth/profile': typeof AuthProfileRoute;
-  '/_auth/prompts': typeof AuthPromptsRoute;
-  '/_auth/reports': typeof AuthReportsRoute;
-  '/_auth/repurpose': typeof AuthRepurposeRoute;
-  '/_auth/retention': typeof AuthRetentionRoute;
-  '/_auth/roadmap': typeof AuthRoadmapRoute;
-  '/_auth/support': typeof AuthSupportRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/_auth': typeof AuthRouteWithChildren
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/_auth/analyzer': typeof AuthAnalyzerRoute
+  '/_auth/brand': typeof AuthBrandRoute
+  '/_auth/community': typeof AuthCommunityRoute
+  '/_auth/create': typeof AuthCreateRoute
+  '/_auth/dashboard': typeof AuthDashboardRoute
+  '/_auth/first-dollar': typeof AuthFirstDollarRoute
+  '/_auth/help': typeof AuthHelpRoute
+  '/_auth/hub': typeof AuthHubRoute
+  '/_auth/ideas': typeof AuthIdeasRoute
+  '/_auth/profile': typeof AuthProfileRoute
+  '/_auth/prompts': typeof AuthPromptsRoute
+  '/_auth/reports': typeof AuthReportsRoute
+  '/_auth/repurpose': typeof AuthRepurposeRoute
+  '/_auth/retention': typeof AuthRetentionRoute
+  '/_auth/roadmap': typeof AuthRoadmapRoute
+  '/_auth/studio': typeof AuthStudioRouteWithChildren
+  '/_auth/support': typeof AuthSupportRoute
+  '/_auth/studio/$projectId': typeof AuthStudioProjectIdRoute
+  '/_auth/studio/': typeof AuthStudioIndexRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
+  fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
@@ -216,8 +242,11 @@ export interface FileRouteTypes {
     | '/repurpose'
     | '/retention'
     | '/roadmap'
-    | '/support';
-  fileRoutesByTo: FileRoutesByTo;
+    | '/studio'
+    | '/support'
+    | '/studio/$projectId'
+    | '/studio/'
+  fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
@@ -237,7 +266,9 @@ export interface FileRouteTypes {
     | '/repurpose'
     | '/retention'
     | '/roadmap'
-    | '/support';
+    | '/support'
+    | '/studio/$projectId'
+    | '/studio'
   id:
     | '__root__'
     | '/'
@@ -259,178 +290,217 @@ export interface FileRouteTypes {
     | '/_auth/repurpose'
     | '/_auth/retention'
     | '/_auth/roadmap'
-    | '/_auth/support';
-  fileRoutesById: FileRoutesById;
+    | '/_auth/studio'
+    | '/_auth/support'
+    | '/_auth/studio/$projectId'
+    | '/_auth/studio/'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute;
-  AuthRoute: typeof AuthRouteWithChildren;
-  LoginRoute: typeof LoginRoute;
-  ResetPasswordRoute: typeof ResetPasswordRoute;
+  IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/': {
-      id: '/';
-      path: '/';
-      fullPath: '/';
-      preLoaderRoute: typeof IndexRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_auth': {
-      id: '/_auth';
-      path: '';
-      fullPath: '/';
-      preLoaderRoute: typeof AuthRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/_auth'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
-      id: '/login';
-      path: '/login';
-      fullPath: '/login';
-      preLoaderRoute: typeof LoginRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
-      id: '/reset-password';
-      path: '/reset-password';
-      fullPath: '/reset-password';
-      preLoaderRoute: typeof ResetPasswordRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_auth/analyzer': {
-      id: '/_auth/analyzer';
-      path: '/analyzer';
-      fullPath: '/analyzer';
-      preLoaderRoute: typeof AuthAnalyzerRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/analyzer'
+      path: '/analyzer'
+      fullPath: '/analyzer'
+      preLoaderRoute: typeof AuthAnalyzerRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/brand': {
-      id: '/_auth/brand';
-      path: '/brand';
-      fullPath: '/brand';
-      preLoaderRoute: typeof AuthBrandRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/brand'
+      path: '/brand'
+      fullPath: '/brand'
+      preLoaderRoute: typeof AuthBrandRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/community': {
-      id: '/_auth/community';
-      path: '/community';
-      fullPath: '/community';
-      preLoaderRoute: typeof AuthCommunityRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/community'
+      path: '/community'
+      fullPath: '/community'
+      preLoaderRoute: typeof AuthCommunityRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/create': {
-      id: '/_auth/create';
-      path: '/create';
-      fullPath: '/create';
-      preLoaderRoute: typeof AuthCreateRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/create'
+      path: '/create'
+      fullPath: '/create'
+      preLoaderRoute: typeof AuthCreateRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/dashboard': {
-      id: '/_auth/dashboard';
-      path: '/dashboard';
-      fullPath: '/dashboard';
-      preLoaderRoute: typeof AuthDashboardRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthDashboardRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/first-dollar': {
-      id: '/_auth/first-dollar';
-      path: '/first-dollar';
-      fullPath: '/first-dollar';
-      preLoaderRoute: typeof AuthFirstDollarRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/first-dollar'
+      path: '/first-dollar'
+      fullPath: '/first-dollar'
+      preLoaderRoute: typeof AuthFirstDollarRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/help': {
-      id: '/_auth/help';
-      path: '/help';
-      fullPath: '/help';
-      preLoaderRoute: typeof AuthHelpRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof AuthHelpRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/hub': {
-      id: '/_auth/hub';
-      path: '/hub';
-      fullPath: '/hub';
-      preLoaderRoute: typeof AuthHubRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/hub'
+      path: '/hub'
+      fullPath: '/hub'
+      preLoaderRoute: typeof AuthHubRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/ideas': {
-      id: '/_auth/ideas';
-      path: '/ideas';
-      fullPath: '/ideas';
-      preLoaderRoute: typeof AuthIdeasRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/ideas'
+      path: '/ideas'
+      fullPath: '/ideas'
+      preLoaderRoute: typeof AuthIdeasRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/profile': {
-      id: '/_auth/profile';
-      path: '/profile';
-      fullPath: '/profile';
-      preLoaderRoute: typeof AuthProfileRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthProfileRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/prompts': {
-      id: '/_auth/prompts';
-      path: '/prompts';
-      fullPath: '/prompts';
-      preLoaderRoute: typeof AuthPromptsRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/prompts'
+      path: '/prompts'
+      fullPath: '/prompts'
+      preLoaderRoute: typeof AuthPromptsRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/reports': {
-      id: '/_auth/reports';
-      path: '/reports';
-      fullPath: '/reports';
-      preLoaderRoute: typeof AuthReportsRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthReportsRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/repurpose': {
-      id: '/_auth/repurpose';
-      path: '/repurpose';
-      fullPath: '/repurpose';
-      preLoaderRoute: typeof AuthRepurposeRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/repurpose'
+      path: '/repurpose'
+      fullPath: '/repurpose'
+      preLoaderRoute: typeof AuthRepurposeRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/retention': {
-      id: '/_auth/retention';
-      path: '/retention';
-      fullPath: '/retention';
-      preLoaderRoute: typeof AuthRetentionRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/retention'
+      path: '/retention'
+      fullPath: '/retention'
+      preLoaderRoute: typeof AuthRetentionRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/roadmap': {
-      id: '/_auth/roadmap';
-      path: '/roadmap';
-      fullPath: '/roadmap';
-      preLoaderRoute: typeof AuthRoadmapRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/roadmap'
+      path: '/roadmap'
+      fullPath: '/roadmap'
+      preLoaderRoute: typeof AuthRoadmapRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_auth/studio': {
+      id: '/_auth/studio'
+      path: '/studio'
+      fullPath: '/studio'
+      preLoaderRoute: typeof AuthStudioRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/support': {
-      id: '/_auth/support';
-      path: '/support';
-      fullPath: '/support';
-      preLoaderRoute: typeof AuthSupportRouteImport;
-      parentRoute: typeof AuthRoute;
-    };
+      id: '/_auth/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof AuthSupportRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_auth/studio/': {
+      id: '/_auth/studio/'
+      path: '/'
+      fullPath: '/studio/'
+      preLoaderRoute: typeof AuthStudioIndexRouteImport
+      parentRoute: typeof AuthStudioRoute
+    }
+    '/_auth/studio/$projectId': {
+      id: '/_auth/studio/$projectId'
+      path: '/$projectId'
+      fullPath: '/studio/$projectId'
+      preLoaderRoute: typeof AuthStudioProjectIdRouteImport
+      parentRoute: typeof AuthStudioRoute
+    }
   }
 }
 
+interface AuthStudioRouteChildren {
+  AuthStudioProjectIdRoute: typeof AuthStudioProjectIdRoute
+  AuthStudioIndexRoute: typeof AuthStudioIndexRoute
+}
+
+const AuthStudioRouteChildren: AuthStudioRouteChildren = {
+  AuthStudioProjectIdRoute: AuthStudioProjectIdRoute,
+  AuthStudioIndexRoute: AuthStudioIndexRoute,
+}
+
+const AuthStudioRouteWithChildren = AuthStudioRoute._addFileChildren(
+  AuthStudioRouteChildren,
+)
+
 interface AuthRouteChildren {
-  AuthAnalyzerRoute: typeof AuthAnalyzerRoute;
-  AuthBrandRoute: typeof AuthBrandRoute;
-  AuthCommunityRoute: typeof AuthCommunityRoute;
-  AuthCreateRoute: typeof AuthCreateRoute;
-  AuthDashboardRoute: typeof AuthDashboardRoute;
-  AuthFirstDollarRoute: typeof AuthFirstDollarRoute;
-  AuthHelpRoute: typeof AuthHelpRoute;
-  AuthHubRoute: typeof AuthHubRoute;
-  AuthIdeasRoute: typeof AuthIdeasRoute;
-  AuthProfileRoute: typeof AuthProfileRoute;
-  AuthPromptsRoute: typeof AuthPromptsRoute;
-  AuthReportsRoute: typeof AuthReportsRoute;
-  AuthRepurposeRoute: typeof AuthRepurposeRoute;
-  AuthRetentionRoute: typeof AuthRetentionRoute;
-  AuthRoadmapRoute: typeof AuthRoadmapRoute;
-  AuthSupportRoute: typeof AuthSupportRoute;
+  AuthAnalyzerRoute: typeof AuthAnalyzerRoute
+  AuthBrandRoute: typeof AuthBrandRoute
+  AuthCommunityRoute: typeof AuthCommunityRoute
+  AuthCreateRoute: typeof AuthCreateRoute
+  AuthDashboardRoute: typeof AuthDashboardRoute
+  AuthFirstDollarRoute: typeof AuthFirstDollarRoute
+  AuthHelpRoute: typeof AuthHelpRoute
+  AuthHubRoute: typeof AuthHubRoute
+  AuthIdeasRoute: typeof AuthIdeasRoute
+  AuthProfileRoute: typeof AuthProfileRoute
+  AuthPromptsRoute: typeof AuthPromptsRoute
+  AuthReportsRoute: typeof AuthReportsRoute
+  AuthRepurposeRoute: typeof AuthRepurposeRoute
+  AuthRetentionRoute: typeof AuthRetentionRoute
+  AuthRoadmapRoute: typeof AuthRoadmapRoute
+  AuthStudioRoute: typeof AuthStudioRouteWithChildren
+  AuthSupportRoute: typeof AuthSupportRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
@@ -449,17 +519,18 @@ const AuthRouteChildren: AuthRouteChildren = {
   AuthRepurposeRoute: AuthRepurposeRoute,
   AuthRetentionRoute: AuthRetentionRoute,
   AuthRoadmapRoute: AuthRoadmapRoute,
+  AuthStudioRoute: AuthStudioRouteWithChildren,
   AuthSupportRoute: AuthSupportRoute,
-};
+}
 
-const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren);
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
-};
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()

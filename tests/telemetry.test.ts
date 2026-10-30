@@ -2,17 +2,18 @@ import { describe, it, expect } from 'vitest';
 import { calculateOneLever } from '../src/services/telemetry';
 
 describe('calculateOneLever telemetry navigation paths', () => {
-  it('returns /create for new users with no projects', () => {
+  it('returns /studio for new users with no projects', () => {
     const signal = calculateOneLever({ brandCompleted: true }, []);
     expect(signal).not.toBeNull();
     expect(signal?.id).toBe('onboarding-lever');
-    expect(signal?.action.path).toBe('/create');
+    expect(signal?.action.path).toBe('/studio');
   });
 
-  it('returns /retention when retention dip is detected', () => {
+  it('opens the relevant project for a retention signal', () => {
     const projects = [
       {
         id: 'proj-1',
+        type: 'content',
         title: 'Low Retention Video',
         data: { retentionScore: 35 },
       },
@@ -20,13 +21,15 @@ describe('calculateOneLever telemetry navigation paths', () => {
     const signal = calculateOneLever({ brandCompleted: true }, projects);
     expect(signal).not.toBeNull();
     expect(signal?.id).toBe('retention-signal');
-    expect(signal?.action.path).toBe('/retention');
+    expect(signal?.action.path).toBe('/studio/proj-1');
+    expect(signal?.action.params?.inspector).toBe('retention');
   });
 
   it('returns /brand when brand is not completed', () => {
     const projects = [
       {
         id: 'proj-1',
+        type: 'content',
         title: 'Normal Video',
         data: { retentionScore: 80 },
       },
@@ -37,10 +40,11 @@ describe('calculateOneLever telemetry navigation paths', () => {
     expect(signal?.action.path).toBe('/brand');
   });
 
-  it('returns /repurpose for growth momentum when healthy', () => {
+  it('opens the relevant project for growth momentum', () => {
     const projects = [
       {
         id: 'proj-1',
+        type: 'content',
         title: 'High Performing Video',
         data: { retentionScore: 80 },
       },
@@ -48,7 +52,17 @@ describe('calculateOneLever telemetry navigation paths', () => {
     const signal = calculateOneLever({ brandCompleted: true }, projects);
     expect(signal).not.toBeNull();
     expect(signal?.id).toBe('growth-signal');
-    expect(signal?.action.path).toBe('/repurpose');
+    expect(signal?.action.path).toBe('/studio/proj-1');
+    expect(signal?.action.params?.inspector).toBe('repurpose');
+  });
+
+  it('ignores newer non-content projects when choosing the active video', () => {
+    const signal = calculateOneLever({ brandCompleted: true }, [
+      { id: 'strategy', type: 'strategy', data: { retentionScore: 10 } },
+      { id: 'video', type: 'content', data: { retentionScore: 30 } },
+    ]);
+    expect(signal?.action.path).toBe('/studio/video');
+    expect(signal?.action.params?.inspector).toBe('retention');
   });
 
   it('ensures no signal paths start with /dashboard/', () => {

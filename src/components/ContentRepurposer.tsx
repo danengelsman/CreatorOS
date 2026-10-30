@@ -5,23 +5,25 @@ import { repurposeContent } from '../services/gemini';
 import { motion, AnimatePresence } from 'motion/react';
 import { getFriendlyError } from '../lib/friendlyError';
 
-export default function ContentRepurposer() {
-  const [inputContent, setInputContent] = useState('');
+export default function ContentRepurposer({ currentContent }: { currentContent?: string }) {
+  const [localInput, setInputContent] = useState('');
+  const inputContent = currentContent ?? localInput;
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [results, setResults] = useState<any>(null);
+  const [resultInput, setResultInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     if (!inputContent.trim()) return;
 
     setIsGenerating(true);
-    setResults(null);
     setErrorMsg('');
 
     try {
       const repurposed = await repurposeContent(inputContent);
       setResults(repurposed);
+      setResultInput(inputContent);
     } catch (err: any) {
       console.error(err);
       setErrorMsg(getFriendlyError(err));
@@ -48,6 +50,8 @@ export default function ContentRepurposer() {
         </label>
         <textarea
           value={inputContent}
+          readOnly={currentContent !== undefined}
+          aria-label="Original content"
           onChange={(e) => setInputContent(e.target.value)}
           className="ios-input h-48 w-full resize-none p-4"
           placeholder="Paste your successful long-form content here..."
@@ -77,6 +81,7 @@ export default function ContentRepurposer() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-10"
           >
+            {resultInput !== inputContent && <p role="status">The script changed since these drafts were generated. Generate again for the current draft.</p>}
             {results.platforms.map((platformData: any, pIndex: number) => (
               <section key={`platform-${pIndex}`}>
                 <div

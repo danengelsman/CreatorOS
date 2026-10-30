@@ -14,6 +14,8 @@ interface AutoPublishModalProps {
   setPublishTime: (time: string) => void;
   autoPublishEnabled: boolean;
   setAutoPublishEnabled: (enabled: boolean) => void;
+  error: string;
+  isScheduling: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -26,6 +28,8 @@ export default function AutoPublishModal({
   setPublishTime,
   autoPublishEnabled,
   setAutoPublishEnabled,
+  error,
+  isScheduling,
   onClose,
   onConfirm,
 }: AutoPublishModalProps) {
@@ -94,6 +98,7 @@ export default function AutoPublishModal({
             </label>
             <input
               type="time"
+              disabled={isScheduling}
               value={publishTime}
               onChange={(e) => setPublishTime(e.target.value)}
               className="w-full bg-[var(--bg-secondary)] border border-[var(--separator)] rounded-xl px-4 py-3 text-[15px] outline-none font-bold text-[var(--label-primary)] focus:border-[var(--accent)] transition-colors"
@@ -111,6 +116,9 @@ export default function AutoPublishModal({
               </p>
             </div>
             <button
+              aria-label="Enable Auto-Publish"
+              aria-pressed={autoPublishEnabled}
+              disabled={isScheduling}
               onClick={() => setAutoPublishEnabled(!autoPublishEnabled)}
               className={cn(
                 'w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer',
@@ -127,6 +135,7 @@ export default function AutoPublishModal({
           </div>
         </div>
 
+        {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
         {/* Action Buttons */}
         <div className="flex gap-3 pt-2">
           <button
@@ -137,6 +146,7 @@ export default function AutoPublishModal({
           </button>
           <button
             onClick={onConfirm}
+            disabled={isScheduling}
             className="flex-1 py-3.5 rounded-xl font-bold text-[14px] bg-[var(--accent)] text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
           >
             <Check size={16} /> Schedule
