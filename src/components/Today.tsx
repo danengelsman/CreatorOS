@@ -1,4 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  isWorkspaceTokenCurrent,
+  useWorkspaceStore,
+  type WorkspaceToken,
+} from '@/store/workspaceStore';
 import { ArrowRight, CheckCircle, CircleNotch, Target } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
 import { JOURNEY_STEPS, type FirstDollarJourney, type JourneyAction } from '../firstDollarJourney';
@@ -8,13 +14,26 @@ import {
   watchFirstDollarJourney,
 } from '../services/firstDollarJourney';
 
-export default function Today({
-  user,
-  setActiveTab,
-}: {
+type TodayProps = {
   user: { uid: string };
   setActiveTab: (tab: string) => void;
-}) {
+};
+
+export default function Today(props: TodayProps) {
+  const auth = useAuth();
+  const token = auth.workspaceToken;
+  const current = useWorkspaceStore((state) => isWorkspaceTokenCurrent(state, token));
+  if (!token || !current || token.uid !== props.user?.uid || token.uid !== auth.user?.uid) return null;
+  return <TodaySession key={`${token.uid}:${token.generation}`} {...props} token={token} />;
+}
+
+function TodaySession({ user, setActiveTab, token }: TodayProps & { token: WorkspaceToken }) {
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  const isCurrent = () => mounted.current && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token);
   const [journey, setJourney] = useState<FirstDollarJourney | null>(null);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
@@ -31,21 +50,21 @@ export default function Today({
     setError('');
     ensureFirstDollarJourney(user.uid)
       .then((result) => {
-        if (!active) return;
+        if (!active || !isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)) return;
         setJourney(result);
         setLoading(false);
         unsubscribe = watchFirstDollarJourney(
           user.uid,
           (updated) => {
-            if (active) setJourney(updated);
+            if (active && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)) setJourney(updated);
           },
           (reason) => {
-            if (active) setError(`Could not sync your journey: ${reason.message}`);
+            if (active && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)) setError(`Could not sync your journey: ${reason.message}`);
           },
         );
       })
       .catch((reason) => {
-        if (active) {
+        if (active && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)) {
           setLoading(false);
           setError(
             `Could not load your journey. Check your connection and try again. ${reason.message}`,
@@ -56,7 +75,7 @@ export default function Today({
       active = false;
       unsubscribe();
     };
-  }, [user.uid, retry]);
+  }, [user.uid, retry, token]);
 
   const currentStep = journey?.currentStep;
   const savedAnswer = currentStep ? journey?.answers[currentStep] || '' : '';
@@ -65,12 +84,13 @@ export default function Today({
   }, [currentStep, savedAnswer]);
 
   const act = async (action: JourneyAction) => {
-    if (!journey || busy) return;
+    if (!journey || busy || !isCurrent()) return;
     setBusy(true);
     setError('');
     setNotice('');
     try {
       const updated = await updateFirstDollarJourney(user.uid, action);
+      if (!isCurrent()) return;
       setJourney(updated);
       if (action.type === 'save')
         setNotice('Answer saved. Mark the task complete when you are ready.');
@@ -81,11 +101,12 @@ export default function Today({
             : 'Task complete. Here is your next action.',
         );
     } catch (reason) {
+      if (!isCurrent()) return;
       setError(
         `Nothing was marked complete. ${reason instanceof Error ? reason.message : 'Try again.'}`,
       );
     } finally {
-      setBusy(false);
+      if (isCurrent()) setBusy(false);
     }
   };
 
