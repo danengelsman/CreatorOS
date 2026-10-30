@@ -43,12 +43,17 @@ function TodaySession({ user, setActiveTab, token }: TodayProps & { token: Works
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
+    // A render can be committed after its workspace generation has already changed.
+    // Once dispatched, SDK work cannot be recalled or bound to a credential by this guard.
+    if (!isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)) return;
     let active = true;
     let unsubscribe = () => {};
     setLoading(true);
     setJourney(null);
     setError('');
-    ensureFirstDollarJourney(user.uid)
+    ensureFirstDollarJourney(user.uid, () =>
+      active && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token),
+    )
       .then((result) => {
         if (!active || !isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)) return;
         setJourney(result);
@@ -89,7 +94,7 @@ function TodaySession({ user, setActiveTab, token }: TodayProps & { token: Works
     setError('');
     setNotice('');
     try {
-      const updated = await updateFirstDollarJourney(user.uid, action);
+      const updated = await updateFirstDollarJourney(user.uid, action, isCurrent);
       if (!isCurrent()) return;
       setJourney(updated);
       if (action.type === 'save')

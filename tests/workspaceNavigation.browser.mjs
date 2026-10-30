@@ -15,6 +15,7 @@ import {RouterProvider} from '@tanstack/react-router';
 import {router} from './src/router';
 import {useWorkspaceStore} from './src/store/workspaceStore';
 window.switchAccount = uid => { const token=useWorkspaceStore.getState().changeAccount(uid); window.setAuth({user:{uid}, userData:{}, workspaceToken:token}); };
+window.transitionBeforeEffects = () => { for (const uid of window.beforeEffectsSwitch) window.switchAccount(uid); };
 window.initialToken=useWorkspaceStore.getState().changeAccount('A');
 router.update({context:{auth:{isAuthenticated:true}}});
 window.router=router;
@@ -24,11 +25,11 @@ createRoot(document.getElementById('root')).render(<Provider><RouterProvider rou
 const mocks = {
  auth: `import React,{createContext,useContext,useState} from 'react'; const C=createContext(null); export function Provider({children}){const [v,set]=useState({user:{uid:'A'},userData:{},workspaceToken:window.initialToken});window.setAuth=set;return <C.Provider value={v}>{children}</C.Provider>} export const useAuth=()=>useContext(C);`,
  shell: `import React from 'react'; export default function Shell({children}){return <main>{children}</main>}`,
- dashboard: `import React from 'react'; import Today from './src/components/Today'; export default function Dashboard({user,setActiveTab}){return <Today user={user} setActiveTab={setActiveTab}/>}`,
+ dashboard: `import React,{useLayoutEffect} from 'react'; import Today from './src/components/Today'; export default function Dashboard({user,setActiveTab}){useLayoutEffect(()=>{if(window.beforeEffectsSwitch&&!window.switchedBeforeEffects){window.switchedBeforeEffects=true;window.transitionBeforeEffects()}},[]);return <Today user={user} setActiveTab={setActiveTab}/>}`,
  profile: `import React from 'react'; export default function Profile(){return <h1>Profile page</h1>}`,
  firebase: `export const db={};export const serverTimestamp=()=>0;export const handleFirestoreError=()=>{};export const OperationType={WRITE:'write'};`,
  firestore: `export const collection=()=>({});export const addDoc=async()=>({});`,
- journey: `const initial=uid=>({uid,version:1,currentStep:'direction',status:'in_progress',answers:{direction:uid+' current'},completedSteps:[]}); export const ensureFirstDollarJourney=async uid=>initial(uid);export const watchFirstDollarJourney=()=>()=>{};export const updateFirstDollarJourney=(uid,action)=>new Promise((resolve,reject)=>{window.pending={uid,action,resolve,reject}});`,
+ journey: `const initial=uid=>({uid,version:1,currentStep:'direction',status:'in_progress',answers:{direction:uid+' current'},completedSteps:[]}); export const ensureFirstDollarJourney=async uid=>{(window.ensureCalls??=[]).push(uid);return initial(uid)};export const watchFirstDollarJourney=()=>()=>{};export const updateFirstDollarJourney=(uid,action)=>new Promise((resolve,reject)=>{window.pending={uid,action,resolve,reject}});`,
  stubroute: `import {createFileRoute} from '@tanstack/react-router'; export const Route=createFileRoute('/unused')({component:()=>null});`,
 };
 const kept = new Set(['__root','_auth','_auth.help','_auth.help_.$topic','_auth.community','_auth.profile','_auth.dashboard','_auth.first-dollar']);
@@ -54,7 +55,21 @@ try {
  page.setDefaultTimeout(10000);
  await page.route('**/*',r=>r.request().url().startsWith('https://local.test/')?r.fulfill({contentType:'text/html',body:'<div id="root"></div>'}):r.abort());
  const open=async url=>{await page.goto('https://local.test'+url);await page.addScriptTag({content:bundle.outputFiles[0].text});};
- if(process.env.TEST_CASE !== 'race'){
+ if(!process.env.TEST_CASE || process.env.TEST_CASE === 'pre-effect'){
+  for (const route of ['/dashboard','/first-dollar']) {
+   for (const switches of [['B'], ['B','A']]) {
+    await page.goto('https://local.test'+route);
+    await page.evaluate(switches=>{window.beforeEffectsSwitch=switches},switches);
+    await page.addScriptTag({content:bundle.outputFiles[0].text});
+    const expected=switches[switches.length-1];
+    await page.waitForFunction(expected=>document.querySelector('#today-answer')?.value===expected+' current',expected);
+    assert.equal(await page.evaluate(()=>window.switchedBeforeEffects),true);
+    assert.deepEqual(await page.evaluate(()=>window.ensureCalls),[expected],`${route}: stale rendered generation must not dispatch`);
+    console.log(`PASS ${route}: A to ${switches.join(' to ')} before passive effect`);
+   }
+  }
+ }
+ if(process.env.TEST_CASE !== 'race' && process.env.TEST_CASE !== 'pre-effect'){
   await open('/help');
   const link=page.getByRole('link',{name:/Getting Started/});
   await link.focus(); await page.keyboard.press('Enter');
@@ -79,7 +94,7 @@ try {
   assert.equal(new URL(page.url()).pathname,'/profile');
   console.log('PASS navigation keyboard, reload, back and profile');
  }
- if(process.env.TEST_CASE !== 'navigation'){
+ if(process.env.TEST_CASE !== 'navigation' && process.env.TEST_CASE !== 'pre-effect'){
   for (const route of ['/dashboard','/first-dollar']) {
   await open(route);
   const answer=page.locator('#today-answer'); await answer.waitFor();
