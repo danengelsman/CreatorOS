@@ -111,6 +111,11 @@ function RouterWrapper() {
       ) {
         throw new Error('Profile fields must be at most 1000 characters.');
       }
+      if (kit?.name != null && (typeof kit.name !== 'string' || kit.name.length > 99)) {
+        throw new Error(
+          'The generated brand name must be at most 99 characters. Generate the kit again to try a shorter name.',
+        );
+      }
       await ensureFirstDollarJourney(auth.user.uid);
       if (!isCurrent()) return;
       const userRef = doc(db, 'users', auth.user.uid);

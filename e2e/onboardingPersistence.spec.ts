@@ -25,7 +25,7 @@ const mocks: Record<string, string> = {
         if (window.test.missingSummary) return { message: 'Interview complete', isComplete: true };
         return { message: 'Interview complete', isComplete: true, summary: window.test.summary || { niche: 'Gardening', audience: 'Beginners', vibe: 'Calm' } };
       }
-      if (url.endsWith('/generate-brand')) return { name: 'Garden', tagline: 'Grow together' };
+      if (url.endsWith('/generate-brand')) return window.test.kit || { name: 'Garden', tagline: 'Grow together' };
       return { sparks: [] };
     };
   `,
@@ -192,6 +192,42 @@ test('stale brand completion cannot replace another tab profile', async ({ page,
     summary: '',
   });
   expect(await other.evaluate(() => localStorage.getItem('projects/brand_A'))).toBeNull();
+});
+
+test('oversized generated name keeps the kit and permits regeneration without partial writes', async ({
+  page,
+}) => {
+  await mount(page);
+  await interview(page);
+  await page.evaluate(() => {
+    (window as any).test.kit = {
+      name: 'x'.repeat(100),
+      tagline: 'Grow together',
+      marker: 'original',
+    };
+  });
+  await page.getByRole('button', { name: 'Build my channel style first' }).click();
+  await expect(page.getByRole('alert')).toContainText('99 characters');
+  expect(await answers(page)).toEqual({ summary: '__onboarding_in_progress__' });
+  expect(await page.evaluate(() => localStorage.getItem('projects/brand_A'))).toBeNull();
+  await page.getByRole('button', { name: 'Continue to Today' }).click();
+  await expect(page.getByRole('alert')).toContainText('99 characters');
+  await page.evaluate(() => {
+    (window as any).test.kit = {
+      name: 'x'.repeat(99),
+      tagline: 'Grow together',
+      marker: 'regenerated',
+    };
+  });
+  await page.getByRole('button', { name: 'Build my channel style first' }).click();
+  await expect(page.getByText('Router ready')).toBeVisible();
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('projects/brand_A')!).data),
+  ).toEqual({
+    name: 'x'.repeat(99),
+    tagline: 'Grow together',
+    marker: 'regenerated',
+  });
 });
 
 test('failed brand completion can continue with the exact generated kit', async ({ page }) => {
