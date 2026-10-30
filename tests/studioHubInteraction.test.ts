@@ -50,7 +50,7 @@ describe('StudioHub retry interaction', () => {
   it('retains the handoff on a definite failure and retries the same project', async () => {
     const idea = { title: 'Original', description: 'Keep this' };
     const clear = vi.fn(); const open = vi.fn();
-    const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, onClearSelectedIdea: clear, onOpenProject: open };
+    const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea }, onClearSelectedIdea: clear, onOpenProject: open };
     const render = () => { h.index = 0; return StudioHubContent(props); };
     h.failBeforeWrite = true;
     button(render(), 'Create from selected idea').props.onClick();
@@ -67,7 +67,7 @@ describe('StudioHub retry interaction', () => {
   it('refuses retry under another account and retains the original seed for the original account', async () => {
     const idea = { title: 'Private idea' };
     const clear = vi.fn(); const open = vi.fn();
-    const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, onClearSelectedIdea: clear, onOpenProject: open };
+    const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea }, onClearSelectedIdea: clear, onOpenProject: open };
     const render = () => { h.index = 0; return StudioHubContent(props); };
     h.failAfterWrite = true;
     button(render(), 'Create from selected idea').props.onClick();
@@ -88,7 +88,7 @@ describe('StudioHub retry interaction', () => {
   it('preserves an ambiguous selected idea failure across close, retries the same ID without overwriting, and clears the handoff only after success', async () => {
     const idea = { title: 'Original', description: 'Keep this' };
     const clear = vi.fn(); const open = vi.fn();
-    const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, onClearSelectedIdea: clear, onOpenProject: open };
+    const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea }, onClearSelectedIdea: clear, onOpenProject: open };
     const render = () => { h.index = 0; return StudioHubContent(props); };
     button(render(), 'New project').props.onClick();
     h.failAfterWrite = true;
@@ -127,7 +127,7 @@ it('ambiguous create after remount reconciles instead of duplicating', async () 
 it('remounts and quarantines stale inputs across account switches', () => {
   const idea = { title: 'Private idea' }; const brand = { name: 'Private brand' };
   const open = vi.fn(); const clear = vi.fn();
-  const props = { user: { uid: 'owner' }, brand, projects: [{ userId: 'owner', name: 'Private project' }], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, onClearSelectedIdea: clear, onOpenProject: open };
+  const props = { user: { uid: 'owner' }, brand, projects: [{ userId: 'owner', name: 'Private project' }], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea }, onClearSelectedIdea: clear, onOpenProject: open };
   const render = () => { h.index = 0; return StudioHub(props)!; };
   const original = render();
   expect(original.props.selectedIdea).toBe(idea);

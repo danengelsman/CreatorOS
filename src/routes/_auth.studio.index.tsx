@@ -44,7 +44,8 @@ function StudioHome() {
         isProjectsLoading={isProjectsLoading}
         projectsLoadError={projectsLoadError}
         selectedIdea={selectedIdea}
-        onClearSelectedIdea={() => state.clearSelectedIdea(token, selectedIdea, receipt)}
+        selectedIdeaReceipt={receipt}
+        onClearSelectedIdea={(seed, originalReceipt) => state.clearSelectedIdea(token, seed, originalReceipt)}
         onOpenProject={(projectId) => {
           if (isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)) {
             void navigate({ to: '/studio/$projectId', params: { projectId }, search: { inspector } });

@@ -7,6 +7,12 @@ import ViralTemplatesLibrary from '../ViralTemplatesLibrary';
 import { contentProjects, getPipelineColumn, isScheduleManaged, makeProjectDraft, type PipelineColumn, type StarterKind, type StudioStage } from './studioHubHelpers';
 import { createProjectIfAbsent, updateStudioStage } from './studioHubPersistence';
 import { clearPending, readPending, writePending, type PendingCreate } from './studioHubRecovery';
+import type { selectSelectedIdeaReceipt } from '../../store/ownedWorkspaceStore';
+
+type IdeaReceipt = NonNullable<ReturnType<typeof selectSelectedIdeaReceipt>>;
+// Receipt objects are capabilities, not serializable identities. Keep them only
+// for this page lifetime and associate them with the durable operation ID.
+const handoffs = new Map<string, { operationId: string; seed: any; receipt: IdeaReceipt }>();
 
 type Props = {
   user: any;
@@ -16,7 +22,8 @@ type Props = {
   projectsLoadError: boolean;
   onOpenProject: (id: string) => void;
   selectedIdea?: any;
-  onClearSelectedIdea?: () => void;
+  selectedIdeaReceipt?: IdeaReceipt | null;
+  onClearSelectedIdea?: (seed: any, receipt: IdeaReceipt) => void;
   isCurrentOwner?: () => boolean;
 };
 
@@ -54,11 +61,11 @@ export default function StudioHub(props: Props) {
     brand={state.blockedBrands.has(props.brand) ? null : props.brand}
     isCurrentOwner={() => mounted.current && boundary.current.generation === generation && (props.isCurrentOwner?.() ?? true)}
     onOpenProject={(id) => { if (mounted.current && boundary.current.generation === generation) props.onOpenProject(id); }}
-    onClearSelectedIdea={() => { if (mounted.current && boundary.current.generation === generation) props.onClearSelectedIdea?.(); }}
+    onClearSelectedIdea={(seed, receipt) => { if (mounted.current && boundary.current.generation === generation) props.onClearSelectedIdea?.(seed, receipt); }}
   />;
 }
 
-export function StudioHubContent({ user, brand, projects, isProjectsLoading, projectsLoadError, onOpenProject, selectedIdea, onClearSelectedIdea, isCurrentOwner }: Props) {
+export function StudioHubContent({ user, brand, projects, isProjectsLoading, projectsLoadError, onOpenProject, selectedIdea, selectedIdeaReceipt, onClearSelectedIdea, isCurrentOwner }: Props) {
   const [showNew, setShowNew] = useState(false);
   const [mode, setMode] = useState<StarterKind>('blank');
   const [visited, setVisited] = useState<StarterKind[]>(['blank']);
@@ -70,7 +77,7 @@ export function StudioHubContent({ user, brand, projects, isProjectsLoading, pro
   });
   const [pending, setPending] = useState<PendingCreate | null>(recovery.pending);
   const [storageBlocked, setStorageBlocked] = useState(recovery.error);
-  const handoffSeed = useRef<any>(null);
+
   const [savedId, setSavedId] = useState<string | null>(null);
   const [statusErrors, setStatusErrors] = useState<Record<string, string>>({});
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
@@ -79,8 +86,7 @@ export function StudioHubContent({ user, brand, projects, isProjectsLoading, pro
   const statusLocks = useRef(new Set<string>());
   const dialogRef = useRef<HTMLDialogElement>(null);
   const newButtonRef = useRef<HTMLButtonElement>(null);
-  const selectedIdeaRef = useRef(selectedIdea);
-  useEffect(() => { selectedIdeaRef.current = selectedIdea; }, [selectedIdea]);
+
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -124,7 +130,8 @@ export function StudioHubContent({ user, brand, projects, isProjectsLoading, pro
         const ref = doc(collection(db, 'projects'));
         operation = { version: 1, owner: user.uid, id: ref.id, operationId: crypto.randomUUID(), draft, kind };
         writePending(operation); // Must be durable and verified before any transaction starts.
-        if (handoff) handoffSeed.current = seed;
+        if (handoff && selectedIdeaReceipt) handoffs.set(operation.owner, { operationId: operation.operationId, seed, receipt: selectedIdeaReceipt });
+        else handoffs.delete(operation.owner);
       }
       setPending(operation);
     } catch (error) {
@@ -144,9 +151,10 @@ export function StudioHubContent({ user, brand, projects, isProjectsLoading, pro
       setSavedId(operation.id);
       try { clearPending(operation); setPending(null); }
       catch { setStorageBlocked(true); setCreateError('Project saved, but its recovery record could not be cleared. Enable browser storage before creating another project.'); }
-      // A reselected equal idea is not proof of the original handoff.
-      if (handoffSeed.current && selectedIdeaRef.current === handoffSeed.current) {
-        try { onClearSelectedIdea?.(); }
+      const handoff = handoffs.get(operation.owner);
+      if (handoff?.operationId === operation.operationId) {
+        handoffs.delete(operation.owner);
+        try { onClearSelectedIdea?.(handoff.seed, handoff.receipt); }
         catch (error) { console.error('Project saved but selected idea could not be cleared:', error); }
       }
       try {
@@ -170,7 +178,7 @@ export function StudioHubContent({ user, brand, projects, isProjectsLoading, pro
   const abandonPending = () => {
     if (!pending || !(isCurrentOwner?.() ?? true)) return;
     if (!window.confirm('The previous save may still finish. Starting over may create a duplicate project. Abandon this recovery and start over?')) return;
-    try { clearPending(pending); setPending(null); setCreateError(''); handoffSeed.current = null; }
+    try { clearPending(pending); setPending(null); setCreateError(''); if (handoffs.get(pending.owner)?.operationId === pending.operationId) handoffs.delete(pending.owner); }
     catch { setStorageBlocked(true); setCreateError('Browser storage is unavailable. Enable it and reload to recover this project.'); }
   };
 
