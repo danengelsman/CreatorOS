@@ -10,6 +10,7 @@ import { rememberAuthReturn } from './lib/authReturn';
 import { ensureFirstDollarJourney } from './services/firstDollarJourney';
 import { db, serverTimestamp } from '@/firebase';
 import { doc, runTransaction } from 'firebase/firestore';
+import { isWorkspaceTokenCurrent, useWorkspaceStore } from '@/store/workspaceStore';
 import {
   ONBOARDING_IN_PROGRESS,
   OnboardingConflictError,
@@ -20,6 +21,11 @@ import {
 function RouterWrapper() {
   const auth = useAuth();
   const showOnboarding = auth.showOnboarding;
+  // Capture the generation from this render, not the mutable current account.
+  const token = auth.workspaceToken;
+  const uid = auth.user?.uid;
+  const isCurrent = () =>
+    !!uid && token?.uid === uid && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token);
 
   // Signed-out transition: pre-router, App.tsx swapped the tree inline to the
   // login view when onAuthStateChanged fired with null. The router's _auth
@@ -49,15 +55,15 @@ function RouterWrapper() {
   // Do not turn an unscoped API event into Firebase signOut or navigation.
   // Either can affect a different account after the initiating request ends.
 
-  // Ensure first dollar journey when user is authenticated and not showing onboarding
+  // Check the render's generation before dispatch and on every transaction retry.
   useEffect(() => {
-    if (auth.user && !auth.isAuthLoading && !auth.authError && !showOnboarding) {
-      // Call ensureFirstDollarJourney to make sure the journey exists
-      ensureFirstDollarJourney(auth.user.uid).catch((err) => {
-        console.error('Failed to ensure first dollar journey:', err);
-      });
-    }
-  }, [auth.user, auth.isAuthLoading, auth.authError, showOnboarding]);
+    if (!uid || auth.isAuthLoading || auth.authError || showOnboarding || !isCurrent()) return;
+    let active = true;
+    ensureFirstDollarJourney(uid, () => active && isCurrent()).catch((err) => {
+      if (active && isCurrent()) console.error('Failed to ensure first dollar journey:', err);
+    });
+    return () => { active = false; };
+  }, [uid, token, auth.isAuthLoading, auth.authError, showOnboarding]);
 
   if (auth.isAuthLoading) {
     return <LoadingScreen />;
@@ -88,9 +94,6 @@ function RouterWrapper() {
   // during onboarding — matches the pre-router App.tsx behavior where the
   // banner was visible behind the onboarding modal.
   if (showOnboarding && auth.user) {
-    // Capture at render time, not when a delayed child operation calls back:
-    // A -> B -> A must not revive the first A session's work.
-    const isCurrent = auth.captureAccount(auth.user.uid);
     const handleOnboardingComplete = async (
       answers?: OnboardingAnswers,
       kit?: OnboardingBrandKit,
@@ -102,7 +105,7 @@ function RouterWrapper() {
       ) {
         throw new Error('Profile fields must be at most 1000 characters.');
       }
-      await ensureFirstDollarJourney(auth.user.uid);
+      await ensureFirstDollarJourney(auth.user.uid, isCurrent);
       if (!isCurrent()) return;
       const userRef = doc(db, 'users', auth.user.uid);
       const brandRef = doc(db, 'projects', `brand_${auth.user.uid}`);
