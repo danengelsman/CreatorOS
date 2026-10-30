@@ -59,7 +59,7 @@ describe('actual inspector request pathways', () => {
     const owner = { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) };
     const delayed = deferred<Response>(); const started = deferred<void>(); fetchMock.mockImplementation(() => { started.resolve(); return delayed.promise; });
     h.index = 0; const tree = Profile({ user: h.user, userData: {}, brand: null, owner } as any);
-    const pending = button(tree, 'Sign out of all devices').props.onClick(); await started.promise;
+    const pending = button(tree, 'Revoke sessions on all devices').props.onClick(); await started.promise;
     expect(fetchMock.mock.calls[0][1].credentials).toBe('omit');
     useWorkspaceStore.getState().changeAccount('B'); useWorkspaceStore.getState().changeAccount('A');
     delayed.resolve(response(200)); await pending;
@@ -116,7 +116,7 @@ describe('owner boundaries beyond the first 401', () => {
     const owner = { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) };
     const delayed = deferred<Response>(); const started = deferred<void>(); fetchMock.mockImplementation(() => { started.resolve(); return delayed.promise; });
     h.index = 0; const tree = Profile({ user: h.user, userData: {}, brand: null, owner } as any);
-    const pending = button(tree, 'Sign out of all devices').props.onClick(); await started.promise;
+    const pending = button(tree, 'Revoke sessions on all devices').props.onClick(); await started.promise;
     useWorkspaceStore.getState().changeAccount('B'); h.user = { uid: 'B', getIdToken: vi.fn(async () => 'B-token') };
     delayed.resolve(response(status)); await pending;
     expect(h.signOut).not.toHaveBeenCalled(); expect(h.expired).not.toHaveBeenCalled(); expect(fetchMock).toHaveBeenCalledTimes(1); expect(h.user.getIdToken).not.toHaveBeenCalled();
@@ -126,15 +126,55 @@ describe('owner boundaries beyond the first 401', () => {
     const owner = { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) };
     h.index = 0; const tree = Profile({ user: h.user, userData: {}, brand: null, owner } as any);
     useWorkspaceStore.getState().changeAccount('B'); h.user = null;
-    await button(tree, 'Sign out of all devices').props.onClick(); button(tree, 'Sign Out').props.onClick();
+    await button(tree, 'Revoke sessions on all devices').props.onClick();
     expect(fetchMock).not.toHaveBeenCalled(); expect(h.signOut).not.toHaveBeenCalled();
   });
-  it('revokes and signs out the current owner', async () => {
+  it('revokes the current owner without starting SDK sign out and reports its limits', async () => {
     const token = useWorkspaceStore.getState().changeAccount('A')!;
     const owner = { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) };
     fetchMock.mockResolvedValue(response(200));
     h.index = 0; const tree = Profile({ user: h.user, userData: {}, brand: null, owner } as any);
-    await button(tree, 'Sign out of all devices').props.onClick();
-    expect(fetchMock).toHaveBeenCalledTimes(1); expect(h.signOut).toHaveBeenCalledTimes(1);
+    await button(tree, 'Revoke sessions on all devices').props.onClick();
+    expect(fetchMock).toHaveBeenCalledTimes(1); expect(h.signOut).not.toHaveBeenCalled();
+    h.index = 0; const updated = Profile({ user: h.user, userData: {}, brand: null, owner } as any);
+    expect(text(updated)).toContain('Refresh tokens revoked');
+    expect(text(updated)).toContain('already issued');
+    expect(button(updated, 'Revoke sessions on all devices').props.disabled).toBe(false);
+  });
+  it('does not trigger global sign out on a current-owner revocation 401', async () => {
+    const token = useWorkspaceStore.getState().changeAccount('A')!;
+    const owner = { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) };
+    fetchMock.mockResolvedValue(response(401));
+    h.index = 0; const tree = Profile({ user: h.user, userData: {}, brand: null, owner } as any);
+    await button(tree, 'Revoke sessions on all devices').props.onClick();
+    expect(fetchMock).toHaveBeenCalledTimes(1); expect(h.expired).not.toHaveBeenCalled();
+    expect(h.user.getIdToken).toHaveBeenCalledTimes(1);
+    expect(h.signOut).not.toHaveBeenCalled();
+  });
+  it('only issues one revocation on rapid repeated clicks and re-enables the action', async () => {
+    const token = useWorkspaceStore.getState().changeAccount('A')!;
+    const owner = { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) };
+    const delayed = deferred<Response>(); const started = deferred<void>();
+    fetchMock.mockImplementation(() => { started.resolve(); return delayed.promise; });
+    const render = () => { h.index = 0; return Profile({ user: h.user, userData: {}, brand: null, owner } as any); };
+    const click = button(render(), 'Revoke sessions on all devices').props.onClick;
+    const first = click(); const second = click(); await started.promise; await second;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(button(render(), 'Revoke sessions on all devices').props.disabled).toBe(true);
+    delayed.resolve(response(200)); await first;
+    expect(button(render(), 'Revoke sessions on all devices').props.disabled).toBe(false);
+  });
+  it('does not initiate a sign out that could clear B after a delayed SDK operation', async () => {
+    const token = useWorkspaceStore.getState().changeAccount('A')!;
+    const owner = { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) };
+    const delayedSignOut = deferred<void>();
+    h.signOut.mockImplementation(async () => { await delayedSignOut.promise; h.user = null; });
+    fetchMock.mockResolvedValue(response(200));
+    h.index = 0; const tree = Profile({ user: h.user, userData: {}, brand: null, owner } as any);
+    const pending = button(tree, 'Revoke sessions on all devices').props.onClick();
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    useWorkspaceStore.getState().changeAccount('B'); h.user = { uid: 'B', getIdToken: vi.fn(async () => 'B-token') };
+    delayedSignOut.resolve(); await pending;
+    expect(h.signOut).not.toHaveBeenCalled(); expect(h.user.uid).toBe('B');
   });
 });

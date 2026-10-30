@@ -179,6 +179,7 @@ export async function apiFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
   owner?: ApiRequestOwner,
+  options?: { suppressAuthExpiredEvent?: boolean; retryUnauthorized?: boolean },
 ): Promise<Response> {
   const signal = init.signal !== undefined ? init.signal : input instanceof Request ? input.signal : undefined;
   const assertOwner = () => {
@@ -216,8 +217,9 @@ export async function apiFetch(
   let response = await fetchAttempt();
   assertOwner();
   if (response.status === 401) {
-    // Force-refresh the ID token exactly once, then replay the original request.
-    const refreshed = await currentUserIdToken(true, assertOwner, signal);
+    // Owner-bound revocation opts out: a forced SDK refresh can itself initiate
+    // an unscoped asynchronous sign-out, and must not replay the destructive request.
+    const refreshed = options?.retryUnauthorized === false ? null : await currentUserIdToken(true, assertOwner, signal);
     assertOwner();
     if (refreshed) {
       headers.set('Authorization', `Bearer ${refreshed}`);
@@ -225,7 +227,7 @@ export async function apiFetch(
       assertOwner();
     }
     if (response.status === 401) {
-      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+      if (!options?.suppressAuthExpiredEvent) window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
       throw new AuthExpiredError();
     }
   }
@@ -249,11 +251,12 @@ export async function exchangeSessionCookie(): Promise<void> {
 /**
  * Phase A — "Sign out of all devices": revokes every refresh token server-side
  * (POST /api/auth/revoke-all). Owner-bound requests leave the revoked cookie
- * in the browser to avoid clearing a newer account's cookie. Pair with a
- * client `logout()` so the current tab returns to the login view.
+ * in the browser to avoid clearing a newer account's cookie. Does not sign
+ * out the client: Firebase signOut is not conditional on the captured user.
  */
 export async function revokeAllSessions(owner?: ApiRequestOwner): Promise<void> {
   // A delayed response must not clear a newer account's shared cookie.
   // Revocation invalidates the old cookie server-side; owned calls ignore Set-Cookie.
-  await apiFetch('/api/auth/revoke-all', { method: 'POST', ...(owner ? { credentials: 'omit' as const } : {}) }, owner);
+  // Don't fire the global sign-out event or force-refresh/replay on a 401.
+  await apiFetch('/api/auth/revoke-all', { method: 'POST', ...(owner ? { credentials: 'omit' as const } : {}) }, owner, { suppressAuthExpiredEvent: !!owner, retryUnauthorized: !owner });
 }
