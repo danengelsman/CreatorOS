@@ -1,7 +1,7 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ slots: [] as any[], index: 0, writes: [] as any[], docs: new Map<string, any>(), failAfterWrite: false, nextId: 0 }));
+const h = vi.hoisted(() => ({ slots: [] as any[], index: 0, writes: [] as any[], docs: new Map<string, any>(), failAfterWrite: false, failBeforeWrite: false, nextId: 0 }));
 vi.mock('react', async (importOriginal) => {
   const real = await importOriginal<typeof import('react')>();
   const useState = (initial: any) => {
@@ -20,6 +20,7 @@ vi.mock('firebase/firestore', () => ({
   doc: () => ({ id: `project-${++h.nextId}` }),
   serverTimestamp: () => 'timestamp',
   runTransaction: async (_db: any, callback: any) => {
+    if (h.failBeforeWrite) { h.failBeforeWrite = false; throw new Error('offline'); }
     await callback({
       get: async (ref: any) => ({ exists: () => h.docs.has(ref.id), data: () => h.docs.get(ref.id) }),
       set: (ref: any, value: any) => { h.writes.push({ id: ref.id, value }); h.docs.set(ref.id, value); },
@@ -44,8 +45,25 @@ function button(tree: any, label: string) {
   return result;
 }
 
-beforeEach(() => { h.slots = []; h.index = 0; h.writes = []; h.docs.clear(); h.failAfterWrite = false; h.nextId = 0; vi.spyOn(console, 'error').mockImplementation(() => {}); });
+beforeEach(() => { h.slots = []; h.index = 0; h.writes = []; h.docs.clear(); h.failAfterWrite = false; h.failBeforeWrite = false; h.nextId = 0; vi.spyOn(console, 'error').mockImplementation(() => {}); });
 describe('StudioHub retry interaction', () => {
+  it('retains the handoff on a definite failure and retries the same project', async () => {
+    const idea = { title: 'Original', description: 'Keep this' };
+    const clear = vi.fn(); const open = vi.fn();
+    const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, onClearSelectedIdea: clear, onOpenProject: open };
+    const render = () => { h.index = 0; return StudioHubContent(props); };
+    h.failBeforeWrite = true;
+    button(render(), 'Create from selected idea').props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(h.writes).toHaveLength(0);
+    expect(clear).not.toHaveBeenCalled();
+    button(render(), 'Retry saving selected project').props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(h.nextId).toBe(1);
+    expect(h.writes).toHaveLength(1);
+    expect(clear).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith('project-1');
+  });
   it('refuses retry under another account and retains the original seed for the original account', async () => {
     const idea = { title: 'Private idea' };
     const clear = vi.fn(); const open = vi.fn();
@@ -89,6 +107,21 @@ describe('StudioHub retry interaction', () => {
     expect(open).toHaveBeenCalledWith('project-1');
     expect(clear).toHaveBeenCalledTimes(1);
   });
+});
+
+it.fails('known bug: ambiguous create after remount should reconcile instead of duplicating', async () => {
+  const idea = { title: 'Original', description: 'Keep this' };
+  const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, onClearSelectedIdea: vi.fn(), onOpenProject: vi.fn() };
+  const render = () => { h.index = 0; return StudioHubContent(props); };
+  h.failAfterWrite = true;
+  button(render(), 'Create from selected idea').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(h.writes).toHaveLength(1);
+  expect(props.onClearSelectedIdea).not.toHaveBeenCalled();
+  h.slots = []; // remount loses the pending ID and retry state
+  button(render(), 'Create from selected idea').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(h.writes).toHaveLength(1);
 });
 
 it('remounts and quarantines stale inputs across account switches', () => {
