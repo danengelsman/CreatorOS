@@ -372,16 +372,15 @@ describe('POST /api/auth/revoke-all', () => {
     expect(adminState.revokeRefreshTokens).not.toHaveBeenCalled();
   });
 
-  it('revokes refresh tokens and clears the session cookie for an authenticated user', async () => {
+  it('revokes refresh tokens without clearing a potentially newer browser cookie', async () => {
     const res = await postJson('/api/auth/revoke-all', {}, 'valid.user-revoke');
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(adminState.revokeRefreshTokens).toHaveBeenCalledWith('user-revoke');
-    const setCookie = res.headers.get('set-cookie') || '';
-    expect(setCookie).toContain('creatoros_session=');
-    expect(setCookie).toContain('Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+    expect(res.headers.get('set-cookie')).toBeNull();
+    expect(body.message).not.toContain('Signed out everywhere');
   });
 
   it('500s when revocation fails, without clearing the cookie silently', async () => {

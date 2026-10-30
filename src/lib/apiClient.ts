@@ -250,13 +250,13 @@ export async function exchangeSessionCookie(): Promise<void> {
 
 /**
  * Phase A — "Sign out of all devices": revokes every refresh token server-side
- * (POST /api/auth/revoke-all). Owner-bound requests leave the revoked cookie
+ * (POST /api/auth/revoke-all). Owner-bound requests leave the existing cookie
  * in the browser to avoid clearing a newer account's cookie. Does not sign
  * out the client: Firebase signOut is not conditional on the captured user.
  */
 export async function revokeAllSessions(owner?: ApiRequestOwner): Promise<void> {
   // A delayed response must not clear a newer account's shared cookie.
-  // Revocation invalidates the old cookie server-side; owned calls ignore Set-Cookie.
+  // Firebase may still accept a same-second cookie until expiry; do not promise otherwise.
   // Don't fire the global sign-out event or force-refresh/replay on a 401.
   await apiFetch('/api/auth/revoke-all', { method: 'POST', ...(owner ? { credentials: 'omit' as const } : {}) }, owner, { suppressAuthExpiredEvent: !!owner, retryUnauthorized: !owner });
 }

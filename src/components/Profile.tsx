@@ -400,9 +400,10 @@ export default function Profile({
             )}
             <p className="mt-2 text-[12px] text-[var(--label-tertiary)] leading-relaxed">
               Revokes refresh tokens for this account, including this browser and other devices.
-              An already issued ID token can remain usable for up to an hour. Revoked session
-              cookies are rejected by the server, but this browser's cookie remains until it expires
-              or is replaced. Firebase may sign this browser out when a revoked refresh fails.
+              An already issued ID token can remain usable for up to an hour. A session cookie
+              authenticated in the same second as revocation may remain usable until expiration
+              (up to 14 days). Cookies remain in this browser until expiration or replacement.
+              Firebase may sign this browser out when a revoked refresh fails.
               To sign out now, use Logout in the navigation. Avoid switching accounts during
               revocation, token refresh or sign-out: Firebase does not scope sign-out to one account.
             </p>

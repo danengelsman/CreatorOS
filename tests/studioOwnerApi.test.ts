@@ -139,6 +139,8 @@ describe('owner boundaries beyond the first 401', () => {
     h.index = 0; const updated = Profile({ user: h.user, userData: {}, brand: null, owner } as any);
     expect(text(updated)).toContain('Refresh tokens revoked');
     expect(text(updated)).toContain('already issued');
+    expect(text(updated)).toContain('same second');
+    expect(text(updated)).toContain('until expiration');
     expect(button(updated, 'Revoke sessions on all devices').props.disabled).toBe(false);
   });
   it('does not trigger global sign out on a current-owner revocation 401', async () => {

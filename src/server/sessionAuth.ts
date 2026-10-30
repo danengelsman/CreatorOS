@@ -7,16 +7,13 @@ import type { Auth } from 'firebase-admin/auth';
  * POST /api/auth/session  exchanges a fresh Firebase ID token (Bearer) for a
  *   Firebase session cookie (admin.auth().createSessionCookie). No Identity
  *   Platform features involved — createSessionCookie is core Auth.
- * POST /api/auth/revoke-all (requires authenticateUser) revokes every refresh
- *   token for the user (admin.auth().revokeRefreshTokens) and clears the
- *   cookie, killing every signed-in session.
- *
- * Session semantics: the cookie lives SESSION_MAX_AGE_SECONDS (14 days) and is
- * NOT renewed by traffic — that is the deliberate ABSOLUTE session timeout.
- * verifySessionCookie(..., true) on the authenticateUser path makes revocation
- * effective immediately for cookie-based requests.
- * (ID-token Bearer requests keep the SDK default: an ID token already issued
- * stays valid up to its 1h lifetime even after revocation.)
+ * POST /api/auth/revoke-all (requires authenticateUser) revokes refresh tokens.
+ * It does not clear the shared browser cookie: a delayed response could clear
+ * a different account's cookie. Cookies may remain until their 14-day expiry.
+ * verifySessionCookie(..., true) checks Firebase's revocation timestamp, but
+ * Firebase compares whole seconds using <, so a cookie authenticated in the
+ * same second as revocation can remain valid until expiry. Already issued
+ * bearer ID tokens are not revocation-checked and may last up to an hour.
  *
  * Handlers are factories taking the admin Auth instance so unit tests can
  * drive them with a mocked admin (see tests/serverAuth.test.ts).
@@ -44,13 +41,6 @@ function sessionCookieOptions() {
 
 export function setSessionCookie(res: Response, cookieValue: string) {
   res.cookie(SESSION_COOKIE_NAME, cookieValue, sessionCookieOptions());
-}
-
-export function clearSessionCookie(res: Response) {
-  res.clearCookie(SESSION_COOKIE_NAME, {
-    ...sessionCookieOptions(),
-    maxAge: undefined,
-  });
 }
 
 /**
@@ -90,7 +80,7 @@ export function createSessionExchangeHandler(adminAuth: Auth) {
 /**
  * POST /api/auth/revoke-all — mounted behind authenticateUser, so req.user is
  * always a verified token when reached. Revokes all refresh tokens for the
- * user and clears this device's session cookie.
+ * user. Never mutate the shared browser cookie in this response.
  */
 export function createRevokeAllHandler(adminAuth: Auth) {
   return async (req: Request, res: Response) => {
@@ -101,10 +91,9 @@ export function createRevokeAllHandler(adminAuth: Auth) {
 
     try {
       await adminAuth.revokeRefreshTokens(uid);
-      clearSessionCookie(res);
       return res.status(200).json({
         ok: true,
-        message: 'Signed out everywhere. Please sign in again on any device you still trust.',
+        message: 'Refresh tokens revoked. Existing credentials may remain valid until expiration.',
       });
     } catch (error) {
       console.error('Revoke-all failed:', error);

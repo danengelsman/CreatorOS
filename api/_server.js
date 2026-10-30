@@ -444,12 +444,6 @@ function sessionCookieOptions() {
 function setSessionCookie(res, cookieValue) {
   res.cookie(SESSION_COOKIE_NAME, cookieValue, sessionCookieOptions());
 }
-function clearSessionCookie(res) {
-  res.clearCookie(SESSION_COOKIE_NAME, {
-    ...sessionCookieOptions(),
-    maxAge: void 0
-  });
-}
 function createSessionExchangeHandler(adminAuth) {
   return async (req, res) => {
     const authHeader = req.headers.authorization;
@@ -481,10 +475,9 @@ function createRevokeAllHandler(adminAuth) {
     }
     try {
       await adminAuth.revokeRefreshTokens(uid);
-      clearSessionCookie(res);
       return res.status(200).json({
         ok: true,
-        message: "Signed out everywhere. Please sign in again on any device you still trust."
+        message: "Refresh tokens revoked. Existing credentials may remain valid until expiration."
       });
     } catch (error) {
       console.error("Revoke-all failed:", error);
