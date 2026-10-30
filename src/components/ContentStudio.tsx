@@ -31,7 +31,8 @@ import CustomVideoPlayer from './CustomVideoPlayer';
 import ScenePlanner from './ScenePlanner';
 import RetentionHookLab from './RetentionHookLab';
 import ContentRepurposer from './ContentRepurposer';
-import { canAddRecoveryWrite, recoveryPendingWrites, projectBaseline, savedBaseline, sameBaseline, sameDraft, studioUpdate, trustedServerSnapshot, type StudioBaseline, type StudioDraft } from './studio/studioDraft';
+import { canAddRecoveryWrite, projectBaseline, savedBaseline, sameBaseline, sameDraft, studioUpdate, trustedServerSnapshot, type StudioBaseline, type StudioDraft } from './studio/studioDraft';
+import { claimRecovery, ownsRecovery, persistRecovery, readRecovery, releaseRecovery } from './studio/studioMemoryRecovery';
 import localforage from 'localforage';
 import Confetti from './Confetti';
 import ContentEditorView from './ContentEditorView';
@@ -72,36 +73,25 @@ export default function Create({
   const [studioTab, setStudioTab] = useState<
     'editor' | 'ideas' | 'templates' | 'retention' | 'planner' | 'calendar'
   >('editor');
-  const storageKey = canvasMode ? `studio-draft:${user?.uid}:${selectedProject?.id}` : '';
+  const recoveryUid: string = user?.uid || '';
+  const recoveryProject: string = selectedProject?.id || '';
+  const recoveryLease = useRef({});
+
+  const storageKey = canvasMode && recoveryUid && recoveryProject ? `studio-draft:${recoveryUid}:${recoveryProject}` : '';
   const [initial] = useState(() => {
     const baseline: StudioBaseline = selectedProject
       ? projectBaseline(selectedProject)
       : { title: '', body: '', platform: 'youtube', name: null };
-    if (storageKey) {
-      try {
-        const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
-        if (
-          saved &&
-          ['title', 'body', 'platform'].every(
-            (key) =>
-              typeof saved.draft?.[key] === 'string' && typeof saved.baseline?.[key] === 'string',
-          )
-        ) {
-          const pending = recoveryPendingWrites(saved);
-          return { draft: saved.draft as StudioDraft, baseline: saved.baseline as StudioBaseline, pending };
-        }
-      } catch {
-        /* Storage may be unavailable. The editor still works. */
-      }
-    }
-    return { draft: baseline, baseline, pending: [] as StudioDraft[] };
+    const recovery = storageKey ? readRecovery(recoveryUid, recoveryProject) : undefined;
+    if (recovery?.record) return { draft: recovery.record.draft, baseline: recovery.record.baseline, pending: recovery.record.pendingWrites, memoryOnly: recovery.memoryOnly };
+    return { draft: baseline, baseline, pending: [] as StudioDraft[], memoryOnly: !!recovery?.memoryOnly };
   });
   const [baseline, setBaseline] = useState<StudioBaseline>(initial.baseline);
   const [title, setTitle] = useState(canvasMode ? initial.draft.title : '');
   const [body, setBody] = useState(canvasMode ? initial.draft.body : '');
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [inspector, setInspector] = useState<'retention' | 'planner' | 'repurpose'>(initialInspector);
-  const [storageError, setStorageError] = useState(false);
+  const [storageError, setStorageError] = useState(initial.memoryOnly);
   const [verificationError, setVerificationError] = useState(false);
   const [conflict, setConflict] = useState(canvasMode && initial.baseline.name === undefined);
   const [saveError, setSaveError] = useState(
@@ -185,21 +175,19 @@ export default function Create({
     return () => { cancelled = true; };
   }, [canvasMode, projectSignature, dirty, isSaving, user?.uid]);
   useLayoutEffect(() => {
+    if (!storageKey) return;
+    const lease = recoveryLease.current;
+    claimRecovery(recoveryUid, recoveryProject, lease);
+    return () => releaseRecovery(recoveryUid, recoveryProject, lease);
+  }, [storageKey, recoveryUid, recoveryProject]);
+  useLayoutEffect(() => {
     if (!storageKey) {
       onDirtyChange?.({ dirty, saving: isSaving, storageError: false });
       return;
     }
-    let unavailable = false;
-    try {
-      if (dirty || pendingSave.current.length > 0)
-        sessionStorage.setItem(
-          storageKey,
-          JSON.stringify({ draft: { title, body, platform }, baseline, pending: pendingSave.current[0] || null, pendingWrites: pendingSave.current }),
-        );
-      else sessionStorage.removeItem(storageKey);
-    } catch {
-      unavailable = true;
-    }
+    if ((isCurrentOwner && !isCurrentOwner()) || !ownsRecovery(recoveryUid, recoveryProject, recoveryLease.current)) return;
+    const unavailable = persistRecovery(recoveryUid, recoveryProject, recoveryLease.current,
+      dirty ? { draft: { title, body, platform }, baseline, pending: pendingSave.current[0] || null, pendingWrites: pendingSave.current } : null);
     setStorageError(unavailable);
     onDirtyChange?.({ dirty, saving: isSaving, storageError: unavailable });
   }, [storageKey, dirty, title, body, platform, baseline, isSaving]);
@@ -371,9 +359,8 @@ export default function Create({
           // Record every unresolved write before starting it; an earlier result may
           // be observed while a retry is still in flight or after a reload.
           pendingSave.current = [...previousPending, savedDraft];
-          try {
-            sessionStorage.setItem(storageKey, JSON.stringify({ draft: savedDraft, baseline, pending: pendingSave.current[0], pendingWrites: pendingSave.current }));
-          } catch {
+          if ((!isCurrentOwner || isCurrentOwner()) && ownsRecovery(recoveryUid, recoveryProject, recoveryLease.current) &&
+            persistRecovery(recoveryUid, recoveryProject, recoveryLease.current, { draft: savedDraft, baseline, pending: pendingSave.current[0], pendingWrites: pendingSave.current })) {
             setStorageError(true);
             onDirtyChange?.({ dirty, saving: true, storageError: true });
           }
@@ -535,7 +522,9 @@ export default function Create({
       {canvasMode && (
         <div role="status" className="text-sm text-[var(--label-secondary)]">
           {dirty ? (storageError ? 'Unsaved changes.' : 'Unsaved changes — draft kept in this browser tab.') : 'No unsaved changes.'}
-          {storageError && ' Browser draft recovery is unavailable; copy your current draft before leaving.'}
+          {storageError && (dirty
+            ? ' Browser draft recovery is unavailable. This draft is in memory only and will be lost on reload or closing this tab; copy it now.'
+            : ' Browser storage could not be cleared. An older local draft may reappear after reloading this tab.') }
           {verificationError && ' Could not verify the latest project update. Current editor content was kept.'}
           {conflict && (baseline.name === undefined
             ? ' This older local draft remains in the editor; its original project name could not be verified.'

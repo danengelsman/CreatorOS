@@ -185,5 +185,160 @@ try {
   await page.getByRole('button',{name:'Editor',exact:true}).click(); assert.equal(await page.getByLabel('Project script').inputValue(),'Original');
   assert.deepEqual(await page.evaluate(()=>window.writes),[]); await page.close();
  }
+ {
+  const page=await browser.newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote});Storage.prototype.setItem=()=>{throw Error('quota')};});
+  await page.getByLabel('Project script').fill('Memory-only private A');
+  await page.evaluate(()=>window.listeners[0].error(Error('permission-denied')));
+  await page.getByRole('button',{name:'Copy draft'}).waitFor();
+  await page.evaluate(()=>window.switchAccount('B'));
+  await page.waitForFunction(()=>window.listeners.length===2);
+  await page.evaluate(()=>window.listeners[1].error(Error('permission-denied')));
+  await page.getByText('Unable to load project').waitFor();
+  assert.equal(await page.getByLabel('Recovered draft').count(),0);
+  assert.doesNotMatch(await page.locator('body').innerText(),/Memory-only private A/);
+  await page.evaluate(()=>window.switchAccount('A'));
+  await page.waitForFunction(()=>window.listeners.length===3);
+  await page.evaluate(()=>window.listeners[2].error(Error('permission-denied')));
+  const recovered=page.getByLabel('Recovered draft'); await recovered.waitFor();
+  assert.match(await recovered.inputValue(),/Memory-only private A/);
+  assert.match(await page.locator('body').innerText(),/reload|close/i);
+  await page.close();
+ }
+ // A newer memory-only draft must supersede the older storage-backed record.
+ // A successful save must clear recovery rather than resurrecting that old copy.
+ for (const unavailable of ['missing','denied']) {
+  const page=await browser.newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote});});
+  const input=page.getByLabel('Project script'); await input.fill('Older stored A');
+  await page.evaluate(()=>{window.oldSet=Storage.prototype.setItem;Storage.prototype.setItem=()=>{throw Error('quota')};});
+  await input.fill('Newer memory A');
+  await page.getByText(/only and will be lost on reload/).first().waitFor();
+  await page.evaluate(()=>window.switchAccount('B')); await page.waitForFunction(()=>window.listeners.length===2);
+  await page.evaluate(()=>{window.remote={userId:'B',type:'content',name:'B',data:{title:'B',body:'B only',platform:'youtube'}};window.listeners[1].next({id:'p1',exists:()=>true,data:()=>window.remote})});
+  await input.waitFor(); assert.equal(await input.inputValue(),'B only'); await input.fill('Private B');
+  await page.evaluate(()=>window.switchAccount('A')); await page.waitForFunction(()=>window.listeners.length===3);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[2].next({id:'p1',exists:()=>true,data:()=>window.remote})});
+  await input.waitFor(); assert.equal(await input.inputValue(),'Newer memory A');
+  await input.fill('New edit saved A');
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await page.waitForFunction(()=>window.writes.length===1);
+  await page.waitForFunction(()=>document.querySelector('[role=status]')?.textContent.includes('No unsaved'));
+  assert.equal(await page.evaluate(()=>window.remote.data.body),'New edit saved A');
+  await page.evaluate(()=>window.switchAccount('B')); await page.waitForFunction(()=>window.listeners.length===4);
+  await page.evaluate(()=>window.listeners[3].error(Error('denied')));
+  const recovered=page.getByLabel('Recovered draft'); await recovered.waitFor(); assert.match(await recovered.inputValue(),/Private B/);
+  await page.evaluate(()=>window.switchAccount('A')); await page.waitForFunction(()=>window.listeners.length===5);
+  await page.evaluate(unavailable=>{if(unavailable==='missing') window.listeners[4].next({exists:()=>false}); else window.listeners[4].error(Error('denied'))},unavailable);
+  await page.getByText(unavailable==='missing'?'Project not found':'Unable to load project').waitFor();
+  assert.equal(await recovered.count(),0);
+  await page.close();
+ }
+ // An old in-flight save resolving after A → B → A must not overwrite the new
+ // generation's recovery, or clear its unresolved save record.
+ {
+  const page=await browser.newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote});Storage.prototype.setItem=()=>{throw Error('quota')};window.holdSave=true;});
+  const input=page.getByLabel('Project script'); await input.fill('Old in-flight A');
+  await page.getByRole('button',{name:'Save',exact:true}).click(); await page.waitForFunction(()=>typeof window.releaseSave==='function');
+  await page.evaluate(()=>window.switchAccount('B')); await page.waitForFunction(()=>window.listeners.length===2);
+  await page.evaluate(()=>window.listeners[1].error(Error('denied'))); await page.getByText('Unable to load project').waitFor();
+  assert.equal(await page.getByLabel('Recovered draft').count(),0);
+  await page.evaluate(()=>window.switchAccount('A')); await page.waitForFunction(()=>window.listeners.length===3);
+  await page.evaluate(()=>window.listeners[2].next({id:'p1',exists:()=>true,data:()=>window.remote}));
+  await input.waitFor(); assert.equal(await input.inputValue(),'Old in-flight A'); await input.fill('New generation A');
+  await page.evaluate(()=>window.releaseSave()); await page.waitForTimeout(100);
+  assert.deepEqual(await page.evaluate(()=>window.writes),[]);
+  await page.evaluate(()=>window.switchAccount('B')); await page.waitForFunction(()=>window.listeners.length===4);
+  await page.evaluate(()=>window.listeners[3].error(Error('denied')));
+  await page.evaluate(()=>window.switchAccount('A')); await page.waitForFunction(()=>window.listeners.length===5);
+  await page.evaluate(()=>window.listeners[4].next({exists:()=>false}));
+  const recovered=page.getByLabel('Recovered draft'); await recovered.waitFor(); assert.match(await recovered.inputValue(),/New generation A/);
+  assert.match(await page.locator('body').innerText(),/Project not found/);
+  await page.close();
+ }
+ // A failed remove after a confirmed save must shadow old storage until reload.
+ {
+  const page=await browser.newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote})});
+  const input=page.getByLabel('Project script'); await input.fill('Stale stored draft');
+  await page.evaluate(()=>{Storage.prototype.setItem=()=>{throw Error('quota')};Storage.prototype.removeItem=()=>{throw Error('denied')};});
+  await input.fill('Actually saved'); await page.getByRole('button',{name:'Save',exact:true}).click();
+  await page.getByText(/An older local draft may reappear/).waitFor();
+  assert.match(await page.evaluate(()=>sessionStorage.getItem('studio-draft:A:p1')),/Stale stored draft/);
+  await page.evaluate(()=>window.switchAccount('B')); await page.waitForFunction(()=>window.listeners.length===2);
+  await page.evaluate(()=>window.listeners[1].error(Error('denied'))); await page.getByText('Unable to load project').waitFor();
+  await page.evaluate(()=>window.switchAccount('A')); await page.waitForFunction(()=>window.listeners.length===3);
+  await page.evaluate(()=>window.listeners[2].next({exists:()=>false})); await page.getByText('Project not found').waitFor();
+  assert.equal(await page.getByLabel('Recovered draft').count(),0);
+  await page.close();
+ }
+ // A read failure, even when setItem succeeds, requires memory escrow too.
+ {
+  const page=await browser.newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote});Storage.prototype.getItem=()=>{throw Error('denied')};});
+  await page.getByLabel('Project script').fill('Read blocked A');
+  await page.getByText(/only and will be lost on reload/).first().waitFor();
+  await page.evaluate(()=>window.switchAccount('B')); await page.waitForFunction(()=>window.listeners.length===2);
+  await page.evaluate(()=>window.listeners[1].error(Error('denied'))); await page.getByText('Unable to load project').waitFor();
+  assert.equal(await page.getByLabel('Recovered draft').count(),0);
+  await page.evaluate(()=>window.switchAccount('A')); await page.waitForFunction(()=>window.listeners.length===3);
+  await page.evaluate(()=>window.listeners[2].next({exists:()=>false}));
+  const recovered=page.getByLabel('Recovered draft'); await recovered.waitFor(); assert.match(await recovered.inputValue(),/Read blocked A/);
+  await page.close();
+ }
+ // A failed initial read must not overwrite an unseen storage-backed draft.
+ {
+  const page=await browser.newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1');
+  await page.evaluate(()=>{
+   sessionStorage.setItem('studio-draft:A:p1',JSON.stringify({draft:{title:'Title',body:'Unseen saved draft',platform:'youtube'},baseline:{title:'Title',body:'Original',platform:'youtube',name:'Title'}}));
+   window.originalGet=Storage.prototype.getItem; Storage.prototype.getItem=()=>{throw Error('read denied')};
+  });
+  await page.addScriptTag({content:bundle.outputFiles[0].text}); await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>{window.remote={userId:'A',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[0].next({id:'p1',exists:()=>true,data:()=>window.remote})});
+  const input=page.getByLabel('Project script'); await input.fill('New memory draft');
+  await page.getByText(/only and will be lost on reload/).first().waitFor();
+  await page.evaluate(()=>{Storage.prototype.getItem=window.originalGet}); await input.fill('Newer memory draft');
+  assert.match(await page.evaluate(()=>sessionStorage.getItem('studio-draft:A:p1')),/Unseen saved draft/);
+  await page.evaluate(()=>window.switchAccount('B')); await page.waitForFunction(()=>window.listeners.length===2);
+  await page.evaluate(()=>window.listeners[1].error(Error('denied'))); await page.getByText('Unable to load project').waitFor();
+  assert.equal(await page.getByLabel('Recovered draft').count(),0);
+  await page.evaluate(()=>window.switchAccount('A')); await page.waitForFunction(()=>window.listeners.length===3);
+  await page.evaluate(()=>window.listeners[2].next({exists:()=>false}));
+  const recovered=page.getByLabel('Recovered draft'); await recovered.waitFor(); assert.match(await recovered.inputValue(),/Newer memory draft/);
+  await page.close();
+ }
+ // Colons in IDs cannot make two account/project pairs share a stored draft.
+ {
+  const page=await browser.newPage();
+  await page.route('https://studio.test/**',route=>route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
+  await page.goto('https://studio.test/studio/p1'); await page.addScriptTag({content:bundle.outputFiles[0].text});
+  await page.waitForFunction(()=>window.listeners.length===1);
+  await page.evaluate(()=>window.switchAccount('A:p1')); await page.waitForFunction(()=>window.listeners.length===2);
+  await page.evaluate(()=>{window.remote={userId:'A:p1',type:'content',name:'Title',data:{title:'Title',body:'Original',platform:'youtube'}};window.listeners[1].next({id:'p1',exists:()=>true,data:()=>window.remote})});
+  await page.getByLabel('Project script').fill('Delimiter private');
+  await page.evaluate(()=>window.switchAccount('A')); await page.waitForFunction(()=>window.listeners.length===3);
+  await page.evaluate(()=>window.router.navigate({to:'/studio/p1:p1'})); await page.waitForFunction(()=>window.listeners.length===4);
+  await page.evaluate(()=>window.listeners[3].next({exists:()=>false})); await page.getByText('Project not found').waitFor();
+  assert.equal(await page.getByLabel('Recovered draft').count(),0);
+  await page.close();
+ }
  console.log('Studio route recovery and template roundtrip passed');
 } finally {await browser.close()}
