@@ -16,8 +16,10 @@ import { defineConfig, devices } from '@playwright/test';
  * e2e/smoke_tests.spec.ts for the pattern.
  */
 const EMULATOR_PROJECT_ID = 'demo-creatoros';
-const FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
-const FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
+const FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099';
+const FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080';
+const appUrl = process.env.APP_URL || 'http://localhost:3000';
+const reuseExistingServer = !process.env.CI && process.env.E2E_REUSE_SERVERS !== '0';
 
 export default defineConfig({
   testDir: './e2e',
@@ -35,7 +37,7 @@ export default defineConfig({
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'html',
   globalSetup: './e2e/global-setup.ts',
   use: {
-    baseURL: process.env.APP_URL || 'http://localhost:3000',
+    baseURL: appUrl,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -68,7 +70,7 @@ export default defineConfig({
       // slower Windows machines.
       command: `npx firebase emulators:start --project ${EMULATOR_PROJECT_ID} --only auth,firestore`,
       url: `http://${FIREBASE_AUTH_EMULATOR_HOST}/`,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: reuseExistingServer,
       timeout: 240 * 1000,
       stdout: 'pipe',
       env: {
@@ -79,7 +81,7 @@ export default defineConfig({
     {
       command: 'npm run dev',
       url: 'http://localhost:3000',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: reuseExistingServer,
       timeout: 120 * 1000,
       env: {
         FIREBASE_AUTH_EMULATOR_HOST,
