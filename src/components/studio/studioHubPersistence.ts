@@ -1,5 +1,6 @@
 import { runTransaction, serverTimestamp, type DocumentReference, type Firestore } from 'firebase/firestore';
 import { isPublished, isScheduleManaged, type StudioStage } from './studioHubHelpers';
+import { prepareStudioOwnerFence } from './studioOwnerFence';
 
 type ProjectDraft = { userId: string; type: 'content'; [key: string]: unknown };
 
@@ -15,9 +16,8 @@ export async function createProjectIfAbsent(db: Firestore, ref: DocumentReferenc
       }
       return;
     }
-    // A staged or dispatched commit cannot be recalled after an account switch.
-    // The captured reference and draft remain A's; the shared SDK may obtain the
-    // current account's credentials at RPC time, so this is not credential fencing.
+    // Project creates require request.auth.uid == draft.userId, even for an
+    // admin. Already-dispatched A commits and A→B→A are not lifecycle fenced.
     tx.set(ref, { ...draft, studioCreateId: operationId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
   });
 }
@@ -34,6 +34,8 @@ export async function updateStudioStage(db: Firestore, ref: DocumentReference, u
       throw new Error('Published projects are managed outside Studio workflow.');
     }
     if (isScheduleManaged(project)) throw new Error('This project is scheduled or has auto-publish enabled. Manage it in Calendar.');
+    const stageFence = await prepareStudioOwnerFence(tx, db, userId, isCurrent);
+    stageFence();
     tx.update(ref, { studioStage: stage, updatedAt: serverTimestamp() });
   });
 }
