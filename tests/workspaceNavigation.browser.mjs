@@ -1,5 +1,6 @@
 // Run offline: node tests/workspaceNavigation.browser.mjs
 // Real route tree and route components; auth, shell, dashboard/profile and journey I/O are deterministic doubles.
+/* global process, console, URL, window, document */
 import { build } from 'esbuild';
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
