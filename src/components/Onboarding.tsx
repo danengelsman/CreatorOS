@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { loadOnboardingRecovery, saveOnboardingRecovery, clearOnboardingRecovery } from '@/lib/onboardingRecovery';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   PaperPlaneRight as Send,
@@ -120,21 +121,35 @@ export const cacheNicheToBrandProfile = async (
 };
 
 export default function Onboarding({ onComplete, isCurrent, user }: OnboardingProps) {
-  const [phase, setPhase] = useState<'welcome' | 'interview' | 'success' | 'generating'>('welcome');
-  const [messages, setMessages] = useState<Message[]>([
+  const [recovery] = useState(() => loadOnboardingRecovery(user.uid));
+  const recoveredMessages = recovery?.pendingReply ? recovery.messages.slice(0, -1) : recovery?.messages;
+  const recoveredInput = recovery?.pendingReply && recovery.messages.at(-1)?.role === 'user'
+    ? recovery.messages.at(-1)?.content || '' : recovery?.inputValue || '';
+  const [phase, setPhase] = useState<'welcome' | 'interview' | 'success' | 'generating'>(recovery?.phase || 'welcome');
+  const [messages, setMessages] = useState<Message[]>(recoveredMessages || [
     {
       role: 'assistant',
       content:
         "Welcome! Let's build your perfect Creator Profile together. To start, what topic or niche excites you the most for your channel?",
     },
   ]);
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState(recoveredInput);
   const [isAiTyping, setIsAiTyping] = useState(false);
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [summary, setSummary] = useState<Summary | null>(recovery?.summary || null);
   const [transitionBusy, setTransitionBusy] = useState(false);
   const [transitionError, setTransitionError] = useState('');
   const [inputError, setInputError] = useState('');
-  const pendingKit = useRef<OnboardingBrandKit | null>(null);
+  const pendingKit = useRef<OnboardingBrandKit | null>(recovery?.pendingKit || null);
+  const [storageError, setStorageError] = useState(false);
+  const completed = useRef(false);
+  useLayoutEffect(() => {
+    if (!isCurrent() || completed.current) return;
+    const saved = saveOnboardingRecovery(user.uid, {
+      phase: phase === 'generating' ? 'success' : phase, messages, inputValue, summary,
+      pendingKit: pendingKit.current, pendingReply: isAiTyping,
+    });
+    setStorageError(!saved);
+  }, [user.uid, phase, messages, inputValue, summary, isAiTyping, isCurrent]);
   const useExistingProfile = useRef(false);
   const requestController = useRef(new AbortController());
   const requestOnboarding = async (url: string, options: RequestInit) => {
@@ -179,6 +194,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
         useExistingProfile.current ? undefined : answers,
         pendingKit.current || undefined,
       );
+      if (isCurrent()) { completed.current = true; clearOnboardingRecovery(user.uid); }
     } catch (error) {
       if (error instanceof OnboardingConflictError) {
         pendingKit.current = null;
@@ -209,7 +225,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
   useEffect(() => {
     let isMounted = true;
     const restorePersistedNiche = async () => {
-      if (!user?.uid) return;
+      if (!user?.uid || recovery) return;
       try {
         const brandRef = doc(db, 'projects', `brand_${user.uid}`);
         const snap = await getDoc(brandRef);
@@ -367,7 +383,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
     cacheNicheToBrandProfile(user, spark, isCurrent);
 
     // Smoothly dismiss the sparks card after brief affirmation
-    setTimeout(() => {
+    const dismissTimer = setTimeout(() => {
       setShowSparks(false);
     }, 1000);
 
@@ -398,6 +414,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
     } catch (error) {
       if (!isCurrent()) return;
       if (error instanceof AuthExpiredError) {
+        clearTimeout(dismissTimer);
         setMessages(messages);
         setShowSparks(true);
         setInputError('Sign in again, then select your idea to retry.');
@@ -526,6 +543,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
       }
       // Keep the generated kit for an exact retry if journey or transaction fails.
       pendingKit.current = kit;
+      saveOnboardingRecovery(user.uid, { phase: 'success', messages, inputValue, summary, pendingKit: kit, pendingReply: false });
       await onComplete(
         {
           niche: summary?.niche || '',
@@ -535,6 +553,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
         },
         kit,
       );
+      if (isCurrent()) { completed.current = true; clearOnboardingRecovery(user.uid); }
     } catch (error) {
       if (!isCurrent()) return;
       if (error instanceof OnboardingConflictError) {
@@ -632,6 +651,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
 
         {/* Right Side: Interactive Panel */}
         <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-secondary)] relative h-full overflow-y-auto">
+          {storageError && <p role="alert" className="p-3 text-sm text-red-300">Browser draft storage is unavailable. Your answers can survive sign-in in this tab, but copy them before reloading or closing it.</p>}
           <AnimatePresence mode="wait">
             {/* WELCOME PHASE */}
             {phase === 'welcome' && (

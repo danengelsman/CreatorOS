@@ -17,7 +17,16 @@ Revoking refresh tokens checks session cookies against Firebase's revocation tim
 but the SDK can accept a cookie authenticated in the same second until its
 expiration. Existing bearer ID tokens can also remain valid until expiration.
 The UI displays an account-generation-scoped recovery prompt on persistent API
-401s, including during onboarding. The prompt does not itself call signOut or
+401s **only while the initiating Firebase user and workspace generation remain
+current**. It does not reliably appear when a Firebase token refresh itself
+fails with an invalidated-token error: the SDK may sign the user out before
+`getIdToken()` rejects, so the API owner guard returns `AbortError` instead of
+dispatching the event. The auth observer may then navigate to login. Studio's
+existing session draft recovery is conditional on browser storage working;
+onboarding interview answers are not generally persisted. This is an open
+recovery regression, not a guarantee that unsaved work survives.
+
+When it does appear, the prompt does not itself call signOut or
 navigate to a login page. Password and Google recovery use Firebase's
 reauthentication API for the captured user, not a global sign-in. Requests started
 without an established account do not adopt a later sign-in.

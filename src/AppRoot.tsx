@@ -6,6 +6,7 @@ import LoadingScreen from './components/LoadingScreen';
 import Onboarding from './components/Onboarding';
 import VerificationBanner from './components/VerificationBanner';
 import SessionExpired from './components/SessionExpired';
+import { rememberAuthReturn } from './lib/authReturn';
 import { ensureFirstDollarJourney } from './services/firstDollarJourney';
 import { db, serverTimestamp } from '@/firebase';
 import { doc, runTransaction } from 'firebase/firestore';
@@ -33,6 +34,7 @@ function RouterWrapper() {
     }
     if (hadUser.current && !auth.isAuthLoading && !auth.authError) {
       hadUser.current = false;
+      rememberAuthReturn(window.location.pathname + window.location.search + window.location.hash);
       router.navigate({ to: '/login' });
     }
   }, [auth.user, auth.isAuthLoading, auth.authError]);
@@ -173,7 +175,7 @@ function RouterWrapper() {
 
     return (
       <>
-        <Onboarding onComplete={handleOnboardingComplete} isCurrent={isCurrent} user={auth.user} />
+        <Onboarding key={auth.workspaceToken?.generation} onComplete={handleOnboardingComplete} isCurrent={isCurrent} user={auth.user} />
         <VerificationBanner user={auth.user} />
       </>
     );
