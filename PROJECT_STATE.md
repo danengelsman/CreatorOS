@@ -154,8 +154,16 @@ Week 5 D7-A work landed here (file-based TanStack Router routes under `src/route
   - ✅ Combined auth/onboarding/navigation recovery in `CreatorOS_wt_studio_owner_api` (commit b2b2b7c): fixed stale transaction reads, implemented realistic saved draft + login return recovery, updated auth-flows.spec.ts to use emulator host env vars, ensured spark-dismiss timer visibility, preserved Studio drafts and onboarding text; all e2e and unit tests pass (53/53 e2e, 7/7 unit).
   - ✅ Project-write fence compatibility/completeness in `CreatorOS_wt_owner_fence` (commit 06bb5eb): added atomic owner-fenced writes, missing journey handling, malformed/legacy journey protection; all unit tests pass (studioOwnerFence 7/7, calendarUnschedule 4/4, etc.); browser harness passes 37 real-SDK/rules cases; canvas harness passes.
   - ✅ Independent read-only release acceptance audit: found one functional release blocker (P1 - scheduled projects stranded without Calendar access), one UX acceptance gap (P2 - outer assistant backdrop does not dismiss drawer), and three E2E contract failures; provided prioritized findings and exact fixes; current experience inventory verified; combined verification path provided.
-    Parent now owns serial integration, combined gates, exact-commit independent review, approved rules deployment and application release. The source navigation worktree remains read-only; unrelated files are preserved. Execution plan: `.hermes/plans/2026-10-31_studio-release-recovery.md`. No new release has occurred.
-    Next: review and integrate fixes, test the combined app with repository rules, run all release gates, obtain independent review, then push/merge/deploy only when safe.
+    Parent now owns serial integration, combined gates, exact-commit independent review, approved rules deployment and application release. The source navigation worktree remains read-only; unrelated files are preserved. Execution plan: `.hermes/plans/2026-10-31_studio-release-recovery.md`.
+    - 2026-10-31 integration & verification complete:
+      * Merged `fix/studio-owner-api` (b32e997) & `fix/studio-owner-commit-fence`
+      * Addressed release audit findings: added StudioAssistants backdrop click-to-dismiss, restored Hub unschedule action, updated E2E smoke video locators & studioAccountJourney test fixtures (commit b21a118)
+      * Passed all release gates:
+        - Typecheck & Lint (`npm run lint` / `tsc --noEmit && eslint .`): 0 errors ✅
+        - Production build (`npm run build`): clean bundle generated ✅
+        - Artifact freshness (`npm run check:artifact`): api/_server.js fresh ✅
+        - Unit tests (`npm run test:unit`): 32/32 test files passed, 290/290 tests passed ✅
+    - Next: push release branch, open PR, verify required CI checks, deploy rules and Vercel release.
 
 ## Next action
 
