@@ -113,7 +113,7 @@ test.describe.serial('Phase A email/password auth flows', () => {
     // Firestore parity: users/{uid} exists with accountProvider 'password',
     // written through the SAME rules path as Google sign-ins.
     const signIn = await fetch(
-      'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=e2e-local-check',
+      `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099'}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=e2e-local-check`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,7 +123,7 @@ test.describe.serial('Phase A email/password auth flows', () => {
     expect(signIn.ok).toBe(true);
     const { idToken, localId } = (await signIn.json()) as { idToken: string; localId: string };
     const doc = await fetch(
-      `http://127.0.0.1:8080/v1/projects/demo-creatoros/databases/(default)/documents/users/${localId}`,
+      `http://${process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080'}/v1/projects/demo-creatoros/databases/(default)/documents/users/${localId}`,
       { headers: { Authorization: `Bearer ${idToken}` } },
     );
     expect(doc.ok).toBe(true);
@@ -132,7 +132,7 @@ test.describe.serial('Phase A email/password auth flows', () => {
     expect(docBody?.fields?.email?.stringValue).toBe(email);
   });
 
-  test('sign out of all devices: server revocation lands the user back on login', async ({
+  test('revocation reports its limits without explicitly signing this browser out', async ({
     page,
   }) => {
     await mockApiSurface(page);
@@ -146,18 +146,15 @@ test.describe.serial('Phase A email/password auth flows', () => {
     await expect(page.locator('header button').first()).toBeVisible();
     await expect(page.locator('text=Build Your Channel Style')).toHaveCount(0);
 
-    // Profile (Settings) → Sign out of all devices. This call goes to the REAL
-    // dev server (not mocked): verifyIdToken + revokeRefreshTokens against the
-    // emulator, then a client sign-out. D7-A: drawer entries are router Links.
+    // The local dev server revokes against the emulator. The UI does not
+    // explicitly call signOut; an eventual SDK refresh may still sign it out.
     await page.locator('header button').first().click();
     await page.getByRole('link', { name: 'Profile', exact: true }).first().click();
     await expect(page.locator('[data-testid="sign-out-all-devices"]')).toBeVisible();
     await page.locator('[data-testid="sign-out-all-devices"]').click();
 
-    // Signed out everywhere → back on the public landing/login surface.
-    await expect(page.locator('button:has-text("Sign In")').first()).toBeVisible({
-      timeout: 30_000,
-    });
-    await expect(page.locator('[data-testid="sign-out-all-devices"]')).toHaveCount(0);
+    await expect(page.getByRole('status')).toContainText('Refresh tokens revoked', { timeout: 30_000 });
+    await expect(page.getByText(/same second as revocation may remain usable until expiration/)).toBeVisible();
+    await expect(page.locator('[data-testid="sign-out-all-devices"]')).toBeVisible();
   });
 });

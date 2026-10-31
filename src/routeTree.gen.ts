@@ -30,6 +30,7 @@ import { Route as AuthRetentionRouteImport } from './routes/_auth.retention'
 import { Route as AuthRoadmapRouteImport } from './routes/_auth.roadmap'
 import { Route as AuthStudioRouteImport } from './routes/_auth.studio'
 import { Route as AuthSupportRouteImport } from './routes/_auth.support'
+import { Route as AuthHelpTopicRouteImport } from './routes/_auth.help_.$topic'
 import { Route as AuthStudioIndexRouteImport } from './routes/_auth.studio.index'
 import { Route as AuthStudioProjectIdRouteImport } from './routes/_auth.studio.$projectId'
 
@@ -137,6 +138,11 @@ const AuthSupportRoute = AuthSupportRouteImport.update({
   path: '/support',
   getParentRoute: () => AuthRoute,
 } as any)
+const AuthHelpTopicRoute = AuthHelpTopicRouteImport.update({
+  id: '/help_/$topic',
+  path: '/help/$topic',
+  getParentRoute: () => AuthRoute,
+} as any)
 const AuthStudioIndexRoute = AuthStudioIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -169,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/roadmap': typeof AuthRoadmapRoute
   '/studio': typeof AuthStudioRouteWithChildren
   '/support': typeof AuthSupportRoute
+  '/help/$topic': typeof AuthHelpTopicRoute
   '/studio/$projectId': typeof AuthStudioProjectIdRoute
   '/studio/': typeof AuthStudioIndexRoute
 }
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/retention': typeof AuthRetentionRoute
   '/roadmap': typeof AuthRoadmapRoute
   '/support': typeof AuthSupportRoute
+  '/help/$topic': typeof AuthHelpTopicRoute
   '/studio/$projectId': typeof AuthStudioProjectIdRoute
   '/studio': typeof AuthStudioIndexRoute
 }
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/_auth/roadmap': typeof AuthRoadmapRoute
   '/_auth/studio': typeof AuthStudioRouteWithChildren
   '/_auth/support': typeof AuthSupportRoute
+  '/_auth/help_/$topic': typeof AuthHelpTopicRoute
   '/_auth/studio/$projectId': typeof AuthStudioProjectIdRoute
   '/_auth/studio/': typeof AuthStudioIndexRoute
 }
@@ -244,6 +253,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/studio'
     | '/support'
+    | '/help/$topic'
     | '/studio/$projectId'
     | '/studio/'
   fileRoutesByTo: FileRoutesByTo
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/retention'
     | '/roadmap'
     | '/support'
+    | '/help/$topic'
     | '/studio/$projectId'
     | '/studio'
   id:
@@ -292,6 +303,7 @@ export interface FileRouteTypes {
     | '/_auth/roadmap'
     | '/_auth/studio'
     | '/_auth/support'
+    | '/_auth/help_/$topic'
     | '/_auth/studio/$projectId'
     | '/_auth/studio/'
   fileRoutesById: FileRoutesById
@@ -452,6 +464,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSupportRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_auth/help_/$topic': {
+      id: '/_auth/help_/$topic'
+      path: '/help/$topic'
+      fullPath: '/help/$topic'
+      preLoaderRoute: typeof AuthHelpTopicRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/studio/': {
       id: '/_auth/studio/'
       path: '/'
@@ -501,6 +520,7 @@ interface AuthRouteChildren {
   AuthRoadmapRoute: typeof AuthRoadmapRoute
   AuthStudioRoute: typeof AuthStudioRouteWithChildren
   AuthSupportRoute: typeof AuthSupportRoute
+  AuthHelpTopicRoute: typeof AuthHelpTopicRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
@@ -521,6 +541,7 @@ const AuthRouteChildren: AuthRouteChildren = {
   AuthRoadmapRoute: AuthRoadmapRoute,
   AuthStudioRoute: AuthStudioRouteWithChildren,
   AuthSupportRoute: AuthSupportRoute,
+  AuthHelpTopicRoute: AuthHelpTopicRoute,
 }
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)

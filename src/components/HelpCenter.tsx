@@ -13,6 +13,7 @@ import {
   Plus,
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Link } from '@tanstack/react-router';
 
 import { db, serverTimestamp, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
@@ -92,14 +93,7 @@ const FAQS = [
   },
 ];
 
-export default function Support({
-  user,
-  navigate,
-}: {
-  user: any;
-  navigate?: (path: string) => void;
-}) {
-  const [, setActiveSection] = useState(HELP_SECTIONS[0].id);
+export default function Support({ user }: { user: any }) {
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSupportForm, setShowSupportForm] = useState(false);
@@ -172,12 +166,10 @@ export default function Support({
         <span className="ios-label">Documentation</span>
         <div className="bg-[var(--bg-tertiary)] ios-card overflow-hidden divide-y divide-[var(--separator)]">
           {HELP_SECTIONS.map((section) => (
-            <div
+            <Link
               key={section.id}
-              onClick={() => {
-                setActiveSection(section.id);
-                if (navigate) navigate(`/help/${section.id}`);
-              }}
+              to="/help/$topic"
+              params={{ topic: section.id }}
               className="p-4 flex items-center justify-between ios-card-clickable transition-colors"
             >
               <div className="flex items-center gap-3">
@@ -198,7 +190,7 @@ export default function Support({
                 </div>
               </div>
               <ChevronRight size={18} strokeWidth={1.5} className="text-[var(--label-tertiary)]" />
-            </div>
+            </Link>
           ))}
         </div>
       </section>

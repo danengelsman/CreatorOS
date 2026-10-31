@@ -235,8 +235,8 @@ async function startServer() {
   // Firebase Auth Middleware
   // Phase A: accepts a Firebase session cookie (creatoros_session, minted by
   // POST /api/auth/session) OR the original Bearer ID token. Cookies are
-  // verified with checkRevoked so "Sign out of all devices" takes effect
-  // immediately; Bearer tokens keep the SDK default (valid up to their 1h TTL).
+  // verified with checkRevoked, but same-second revocation may not invalidate
+  // a cookie until expiry. Bearer tokens keep the SDK default (up to 1h TTL).
   const authenticateUser = async (req: any, res: any, next: any) => {
     const authHeader = req.headers.authorization;
     const sessionToken = extractSessionToken(req);

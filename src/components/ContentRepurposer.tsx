@@ -4,8 +4,12 @@ import { repurposeContent } from '../services/gemini';
 
 import { motion, AnimatePresence } from 'motion/react';
 import { getFriendlyError } from '../lib/friendlyError';
+import { auth } from '../firebase';
+import type { ApiRequestOwner } from '../lib/apiClient';
+import { useBoundRequestOwner } from '../hooks/useBoundRequestOwner';
 
-export default function ContentRepurposer({ currentContent }: { currentContent?: string }) {
+export default function ContentRepurposer({ currentContent, owner: inputOwner }: { currentContent?: string; owner?: ApiRequestOwner }) {
+  const owner = useBoundRequestOwner(inputOwner);
   const [localInput, setInputContent] = useState('');
   const inputContent = currentContent ?? localInput;
   const [isGenerating, setIsGenerating] = useState(false);
@@ -15,20 +19,22 @@ export default function ContentRepurposer({ currentContent }: { currentContent?:
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleGenerate = async () => {
-    if (!inputContent.trim()) return;
+    if (!inputContent.trim() || !owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
 
     setIsGenerating(true);
     setErrorMsg('');
 
     try {
-      const repurposed = await repurposeContent(inputContent);
+      const repurposed = await repurposeContent(inputContent, owner);
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       setResults(repurposed);
       setResultInput(inputContent);
     } catch (err: any) {
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       console.error(err);
       setErrorMsg(getFriendlyError(err));
     } finally {
-      setIsGenerating(false);
+      if (auth.currentUser?.uid === owner.uid && owner.isCurrent()) setIsGenerating(false);
     }
   };
 

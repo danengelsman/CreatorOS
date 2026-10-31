@@ -29,6 +29,7 @@ export const runTransaction = async (_db, fn) => {
   if (window.test.retryTransaction) {
     window.test.retryTransaction = false;
     writes = [];
+    if (window.test.holdRetry) await new Promise(resolve => window.test.releaseRetry = resolve);
     result = await fn({ get: getDoc, set: (...args) => writes.push(args) });
   }
   for (const args of writes) await setDoc(...args);
@@ -52,6 +53,7 @@ function Consumer() {
   return null;
 }
 window.test.authEvent = async uid => { await act(async () => { window.test.auth(uid ? { uid, email: uid + '@example.test' } : null); }); };
+window.test.batchedSwitch = async () => { await act(async () => { window.test.auth({uid:'B'}); window.test.auth({uid:'A'}); }); };
 window.test.lookup = async (uid, exists = true, data = {}) => { await act(async () => { const lookup = window.test.lookups.find(x => x.key === 'users/' + uid && !x.done); lookup.done = true; lookup.resolve({ exists: () => exists, data: () => data }); }); };
 window.test.rejectLookup = async uid => { await act(async () => { const lookup = window.test.lookups.find(x => x.key === 'users/' + uid && !x.done); lookup.done = true; lookup.reject(new Error('lookup failed')); }); };
 window.test.rejectWrite = async uid => { await act(async () => { window.test.writes.find(x => x.key === 'users/' + uid).reject(new Error('write failed')); }); };
@@ -124,6 +126,7 @@ test.beforeAll(async () => {
 });
 test.beforeEach(async ({ page: testPage }) => {
   page = testPage;
+  await page.route('**/*', route => route.abort());
   await page.setContent('<div id="root"></div>');
   await page.addScriptTag({ content: bundle });
   if (test.info().title.includes('initial observer timeout')) await page.clock.install();
@@ -397,4 +400,22 @@ test('a transaction retried after another session completes cannot recreate the 
   expect(await page.evaluate(() => (window as any).test.writes)).toEqual([
     { key: 'users/A', data: { lastLogin: 1 } },
   ]);
+});
+
+test('stale transaction retry starts no read after batched A-B-A', async () => {
+  await page.evaluate(() => {
+    (window as any).test.retryTransaction = true;
+    (window as any).test.holdRetry = true;
+  });
+  await call('authEvent', 'A');
+  await call('lookup', 'A', false);
+  await expect.poll(() => page.evaluate(() => typeof (window as any).test.releaseRetry)).toBe('function');
+  await call('batchedSwitch');
+  const before = await page.evaluate(() => (window as any).test.lookups.length);
+  await page.evaluate(() => (window as any).test.releaseRetry());
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => (window as any).test.lookups.length)).toBe(before);
+  expect(await page.evaluate(() => (window as any).test.writes)).toEqual([]);
+  await call('lookup', 'A', false);
+  expect(await state()).toMatchObject({ uid: 'A', showOnboarding: true, authError: false });
 });

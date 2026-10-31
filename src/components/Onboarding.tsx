@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { loadOnboardingRecovery, saveOnboardingRecovery, clearOnboardingRecovery } from '@/lib/onboardingRecovery';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   PaperPlaneRight as Send,
@@ -10,13 +11,19 @@ import {
 } from '@phosphor-icons/react';
 import BrandIcon from './BrandIcon';
 import { cn } from '../lib/utils';
-import { db, serverTimestamp, handleFirestoreError, OperationType, apiFetch } from '../firebase';
+import { AuthExpiredError } from '../lib/apiClient';
+import {
+  db,
+  serverTimestamp,
+  handleFirestoreError,
+  OperationType,
+  apiFetch,
+} from '../firebase';
 import { doc, getDoc, runTransaction } from 'firebase/firestore';
 import Confetti from './Confetti';
 import {
   ONBOARDING_IN_PROGRESS,
   OnboardingConflictError,
-  validateOnboardingBrandName,
   type OnboardingAnswers,
   type OnboardingBrandKit,
 } from '@/lib/onboardingState';
@@ -76,7 +83,9 @@ export const cacheNicheToBrandProfile = async (
     const brandRef = doc(db, 'projects', `brand_${user.uid}`);
     const userRef = doc(db, 'users', user.uid);
     await runTransaction(db, async (transaction) => {
+      if (!isCurrent()) return;
       const profile = await transaction.get(userRef);
+      if (!isCurrent()) return;
       const brand = await transaction.get(brandRef);
       if (!isCurrent() || !profile.exists()) return;
       const answers = profile.data().onboardingAnswers;
@@ -114,21 +123,36 @@ export const cacheNicheToBrandProfile = async (
 };
 
 export default function Onboarding({ onComplete, isCurrent, user }: OnboardingProps) {
-  const [phase, setPhase] = useState<'welcome' | 'interview' | 'success' | 'generating'>('welcome');
-  const [messages, setMessages] = useState<Message[]>([
+  const activityRevision = useRef(0);
+  const [recovery] = useState(() => loadOnboardingRecovery(user.uid));
+  const recoveredMessages = recovery?.pendingReply ? recovery.messages.slice(0, -1) : recovery?.messages;
+  const recoveredInput = recovery?.pendingReply && recovery.messages.at(-1)?.role === 'user'
+    ? recovery.messages.at(-1)?.content || '' : recovery?.inputValue || '';
+  const [phase, setPhase] = useState<'welcome' | 'interview' | 'success' | 'generating'>(recovery?.phase || 'welcome');
+  const [messages, setMessages] = useState<Message[]>(recoveredMessages || [
     {
       role: 'assistant',
       content:
         "Welcome! Let's build your perfect Creator Profile together. To start, what topic or niche excites you the most for your channel?",
     },
   ]);
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState(recoveredInput);
   const [isAiTyping, setIsAiTyping] = useState(false);
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [summary, setSummary] = useState<Summary | null>(recovery?.summary || null);
   const [transitionBusy, setTransitionBusy] = useState(false);
   const [transitionError, setTransitionError] = useState('');
   const [inputError, setInputError] = useState('');
-  const pendingKit = useRef<OnboardingBrandKit | null>(null);
+  const pendingKit = useRef<OnboardingBrandKit | null>(recovery?.pendingKit || null);
+  const [storageError, setStorageError] = useState(false);
+  const completed = useRef(false);
+  useLayoutEffect(() => {
+    if (!isCurrent() || completed.current || phase === 'welcome') return;
+    const saved = saveOnboardingRecovery(user.uid, {
+      phase: summary || phase === 'generating' ? 'success' : phase, messages, inputValue, summary,
+      pendingKit: pendingKit.current, pendingReply: isAiTyping,
+    });
+    setStorageError(!saved);
+  }, [user.uid, phase, messages, inputValue, summary, isAiTyping, isCurrent]);
   const useExistingProfile = useRef(false);
   const requestController = useRef(new AbortController());
   const requestOnboarding = async (url: string, options: RequestInit) => {
@@ -147,8 +171,8 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
   // Phase 1: every "go to Today" path funnels through onComplete, which
   // ensures the journey doc before resolving. A failure here keeps the
   // onboarding open with a retry-able error instead of stranding the user.
-  const continueToToday = async (withoutKit = false) => {
-    if (transitionBusy) return;
+  const continueToToday = async () => {
+    if (transitionBusy || !isCurrent()) return;
     setTransitionBusy(true);
     setTransitionError('');
     try {
@@ -168,10 +192,14 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
               summary: '',
             }
           : undefined;
-      const kit = withoutKit ? undefined : pendingKit.current || undefined;
-      if (answers && kit) answers.summary = kit.tagline || '';
-      await onComplete(useExistingProfile.current ? undefined : answers, kit);
+      if (answers && pendingKit.current) answers.summary = pendingKit.current.tagline || '';
+      await onComplete(
+        useExistingProfile.current ? undefined : answers,
+        pendingKit.current || undefined,
+      );
+      if (isCurrent()) { completed.current = true; clearOnboardingRecovery(user.uid); }
     } catch (error) {
+      if (!isCurrent()) return;
       if (error instanceof OnboardingConflictError) {
         pendingKit.current = null;
         useExistingProfile.current = true;
@@ -180,7 +208,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
         `Your journey could not be saved. Please try again. ${error instanceof Error ? error.message : ''}`,
       );
     } finally {
-      setTransitionBusy(false);
+      if (isCurrent()) setTransitionBusy(false);
     }
   };
 
@@ -200,12 +228,15 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
   // Automatically restore previously cached niche from brand profile if user refreshed
   useEffect(() => {
     let isMounted = true;
+    const revision = activityRevision.current;
     const restorePersistedNiche = async () => {
-      if (!user?.uid) return;
+      if (!user?.uid || recovery || !isMounted || !isCurrent()) return;
       try {
         const brandRef = doc(db, 'projects', `brand_${user.uid}`);
+        if (!isMounted || !isCurrent()) return;
         const snap = await getDoc(brandRef);
-        if (snap.exists() && isMounted && isCurrent()) {
+        if (!isMounted || !isCurrent() || activityRevision.current !== revision) return;
+        if (snap.exists()) {
           const projectData = snap.data();
           if (projectData.status === 'draft' && projectData.draft?.niche) {
             const draft = projectData.draft;
@@ -230,7 +261,8 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
           }
         }
       } catch (error) {
-        console.warn('Could not restore cached branding project draft:', error);
+        if (isMounted && isCurrent())
+          console.warn('Could not restore cached branding project draft:', error);
       }
     };
     restorePersistedNiche();
@@ -301,6 +333,10 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
       }
     } catch (err) {
       if (!isCurrent()) return;
+      if (err instanceof AuthExpiredError) {
+        setShowSparks(false);
+        return;
+      }
       console.warn('Sparks fetch error:', err);
       setSparksData({
         museMessage:
@@ -355,7 +391,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
     cacheNicheToBrandProfile(user, spark, isCurrent);
 
     // Smoothly dismiss the sparks card after brief affirmation
-    setTimeout(() => {
+    const dismissTimer = setTimeout(() => {
       setShowSparks(false);
     }, 1000);
 
@@ -385,6 +421,13 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
       }
     } catch (error) {
       if (!isCurrent()) return;
+      if (error instanceof AuthExpiredError) {
+        clearTimeout(dismissTimer);
+        setMessages(messages);
+        setShowSparks(true);
+        setInputError('Sign in again, then select your idea to retry.');
+        return;
+      }
       console.warn(
         'Network issue during onboarding chat after selecting spark, using local fallback:',
         error,
@@ -440,6 +483,12 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
       }
     } catch (error) {
       if (!isCurrent()) return;
+      if (error instanceof AuthExpiredError) {
+        setMessages(messages);
+        setInputValue(userText);
+        setInputError('Sign in again, then send your reply to retry.');
+        return;
+      }
       console.warn('Network issue during onboarding chat, using local fallback:', error);
       const userCount = updatedMessages.filter((m) => m.role === 'user').length;
       if (userCount === 1) {
@@ -500,10 +549,9 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
           'The generated tagline exceeds 1000 characters. Please retry or continue without it.',
         );
       }
-      // Reject unusable results before replacing a previously retryable kit.
-      validateOnboardingBrandName(kit);
       // Keep the generated kit for an exact retry if journey or transaction fails.
       pendingKit.current = kit;
+      saveOnboardingRecovery(user.uid, { phase: 'success', messages, inputValue, summary, pendingKit: kit, pendingReply: false });
       await onComplete(
         {
           niche: summary?.niche || '',
@@ -513,6 +561,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
         },
         kit,
       );
+      if (isCurrent()) { completed.current = true; clearOnboardingRecovery(user.uid); }
     } catch (error) {
       if (!isCurrent()) return;
       if (error instanceof OnboardingConflictError) {
@@ -521,7 +570,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
       }
       console.error('Error generating brand kit during onboarding:', error);
       setTransitionError(
-        `Could not finish the brand kit. Choose an option below to retry or continue. ${error instanceof Error ? error.message : ''}`,
+        `Could not finish the brand kit. You can still go to Today. ${error instanceof Error ? error.message : ''}`,
       );
       setPhase('success');
     }
@@ -532,7 +581,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
   const progressPercent = Math.min(100, Math.round((userMessagesCount / 3) * 100));
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 overflow-hidden">
+    <div onClickCapture={() => { activityRevision.current++; }} onChangeCapture={() => { activityRevision.current++; }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 overflow-hidden">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -610,6 +659,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
 
         {/* Right Side: Interactive Panel */}
         <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-secondary)] relative h-full overflow-y-auto">
+          {storageError && <p role="alert" className="p-3 text-sm text-red-300">Browser draft storage is unavailable. Your answers can survive sign-in in this tab, but copy them before reloading or closing it.</p>}
           <AnimatePresence mode="wait">
             {/* WELCOME PHASE */}
             {phase === 'welcome' && (
@@ -641,7 +691,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
                   </button>
 
                   <button
-                    onClick={() => continueToToday()}
+                    onClick={continueToToday}
                     disabled={transitionBusy}
                     className="ios-button ios-button-tinted w-full h-14 mt-3 text-[15px] font-medium text-[var(--label-secondary)] border-0 bg-transparent"
                   >
@@ -682,7 +732,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
                   <button
                     type="button"
                     disabled={transitionBusy}
-                    onClick={() => continueToToday()}
+                    onClick={continueToToday}
                     className="text-xs font-semibold text-[var(--accent)] hover:underline"
                   >
                     {transitionBusy ? 'Opening…' : 'Go to Today'}
@@ -883,31 +933,13 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
 
                 <div className="pt-2">
                   <button
-                    onClick={() => continueToToday()}
+                    onClick={continueToToday}
                     disabled={transitionBusy}
                     className="ios-button ios-button-filled w-full h-14 text-[17px] font-semibold"
                   >
-                    {transitionBusy
-                      ? 'Opening Today…'
-                      : transitionError && !pendingKit.current && !useExistingProfile.current
-                        ? 'Continue to Today without a brand kit'
-                        : 'Continue to Today'}
+                    {transitionBusy ? 'Opening Today…' : 'Continue to Today'}
                     <ChevronRight size={22} strokeWidth={2} className="ml-2" />
                   </button>
-                  {pendingKit.current && !useExistingProfile.current && (
-                    <>
-                      <p className="mt-3 text-sm text-[var(--label-secondary)]">
-                        Continue to Today retries saving your previously generated brand kit.
-                      </p>
-                      <button
-                        onClick={() => continueToToday(true)}
-                        disabled={transitionBusy}
-                        className="ios-button ios-button-tinted w-full h-12 mt-3 text-sm font-semibold"
-                      >
-                        Continue without brand kit
-                      </button>
-                    </>
-                  )}
                   <button
                     onClick={handleBuildBrandKit}
                     disabled={transitionBusy || useExistingProfile.current}

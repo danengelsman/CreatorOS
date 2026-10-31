@@ -13,7 +13,7 @@ export const Route = createFileRoute('/_auth/community')({
         <Community
           user={auth.user}
           userData={auth.userData}
-          setActiveTab={(tab) => navigate({ to: `/_auth/${tab}` as any })}
+          setActiveTab={(tab) => navigate({ to: `/${tab}` as any })}
         />
       </LayoutShell>
     );

@@ -335,6 +335,25 @@ describe('POST /api/auth/session (session-cookie exchange)', () => {
 });
 
 describe('authenticateUser with the session cookie', () => {
+  it('uses the bearer identity instead of a different account cookie', async () => {
+    fsState.listIntegrations.mockResolvedValue([]);
+    const res = await fetch(`${baseUrl}/api/accounts`, {
+      headers: { Authorization: 'Bearer valid.bearer-user', Cookie: 'creatoros_session=valid.session-cookie' },
+    });
+    expect(res.status).toBe(200);
+    expect(fsState.listIntegrations).toHaveBeenCalledWith('bearer-user');
+    expect(adminState.verifySessionCookie).not.toHaveBeenCalled();
+  });
+
+  it('does not fall back to a cookie for an invalid bearer', async () => {
+    const res = await fetch(`${baseUrl}/api/accounts`, {
+      headers: { Authorization: 'Bearer invalid', Cookie: 'creatoros_session=valid.session-cookie' },
+    });
+    expect(res.status).toBe(401);
+    expect(adminState.verifySessionCookie).not.toHaveBeenCalled();
+    expect(fsState.listIntegrations).not.toHaveBeenCalled();
+  });
+
   it('serves the route from a valid creatoros_session cookie (revocation-checked)', async () => {
     fsState.listIntegrations.mockResolvedValue([]);
 
@@ -372,16 +391,15 @@ describe('POST /api/auth/revoke-all', () => {
     expect(adminState.revokeRefreshTokens).not.toHaveBeenCalled();
   });
 
-  it('revokes refresh tokens and clears the session cookie for an authenticated user', async () => {
+  it('revokes refresh tokens without clearing a potentially newer browser cookie', async () => {
     const res = await postJson('/api/auth/revoke-all', {}, 'valid.user-revoke');
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(adminState.revokeRefreshTokens).toHaveBeenCalledWith('user-revoke');
-    const setCookie = res.headers.get('set-cookie') || '';
-    expect(setCookie).toContain('creatoros_session=');
-    expect(setCookie).toContain('Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+    expect(res.headers.get('set-cookie')).toBeNull();
+    expect(body.message).not.toContain('Signed out everywhere');
   });
 
   it('500s when revocation fails, without clearing the cookie silently', async () => {

@@ -732,6 +732,7 @@ export default function Create({
       ) : studioTab === 'templates' ? (
         <ViralTemplatesLibrary
           brand={brand}
+          owner={{ uid: user?.uid || '', isCurrent: () => !!user?.uid && (isCurrentOwner?.() ?? false) }}
           onSelectTemplate={(template) => {
             const nextPlatform = templatePlatform(template.platform);
             if (!nextPlatform) {
@@ -754,6 +755,7 @@ export default function Create({
         />
       ) : studioTab === 'retention' ? (
         <RetentionHookLab
+          owner={{ uid: user?.uid || '', isCurrent: () => !!user?.uid && (isCurrentOwner?.() ?? false) }}
           initialText={body}
           showToast={showToast}
           brand={brand}
@@ -765,6 +767,7 @@ export default function Create({
         />
       ) : studioTab === 'planner' ? (
         <ScenePlanner
+          owner={{ uid: user?.uid || '', isCurrent: () => !!user?.uid && (isCurrentOwner?.() ?? false) }}
           initialScript={body}
           initialTitle={title}
           showToast={showToast}
@@ -870,6 +873,7 @@ export default function Create({
                 </div>
                 <div hidden={inspector !== 'retention'}>
                   <RetentionHookLab
+                    owner={{ uid: user?.uid || '', isCurrent: () => !!user?.uid && (isCurrentOwner?.() ?? false) }}
                     currentText={body}
                     brand={brand}
                     showToast={showToast}
@@ -880,6 +884,7 @@ export default function Create({
                 </div>
                 <div hidden={inspector !== 'planner'}>
                   <ScenePlanner
+                    owner={{ uid: user?.uid || '', isCurrent: () => !!user?.uid && (isCurrentOwner?.() ?? false) }}
                     currentScript={body}
                     currentTitle={title}
                     showToast={showToast}
@@ -887,7 +892,7 @@ export default function Create({
                   />
                 </div>
                 <div hidden={inspector !== 'repurpose'}>
-                  <ContentRepurposer currentContent={body} />
+                  <ContentRepurposer currentContent={body} owner={{ uid: user?.uid || '', isCurrent: () => !!user?.uid && (isCurrentOwner?.() ?? false) }} />
                 </div>
               </div>
             </aside>

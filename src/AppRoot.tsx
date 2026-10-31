@@ -5,13 +5,15 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoadingScreen from './components/LoadingScreen';
 import Onboarding from './components/Onboarding';
 import VerificationBanner from './components/VerificationBanner';
+import SessionExpired from './components/SessionExpired';
+import { rememberAuthReturn } from './lib/authReturn';
 import { ensureFirstDollarJourney } from './services/firstDollarJourney';
-import { db, logout, serverTimestamp } from '@/firebase';
+import { db, serverTimestamp } from '@/firebase';
 import { doc, runTransaction } from 'firebase/firestore';
+import { isWorkspaceTokenCurrent, useWorkspaceStore } from '@/store/workspaceStore';
 import {
   ONBOARDING_IN_PROGRESS,
   OnboardingConflictError,
-  validateOnboardingBrandName,
   type OnboardingAnswers,
   type OnboardingBrandKit,
 } from '@/lib/onboardingState';
@@ -19,6 +21,11 @@ import {
 function RouterWrapper() {
   const auth = useAuth();
   const showOnboarding = auth.showOnboarding;
+  // Capture the generation from this render, not the mutable current account.
+  const token = auth.workspaceToken;
+  const uid = auth.user?.uid;
+  const isCurrent = () =>
+    !!uid && token?.uid === uid && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token);
 
   // Signed-out transition: pre-router, App.tsx swapped the tree inline to the
   // login view when onAuthStateChanged fired with null. The router's _auth
@@ -33,6 +40,7 @@ function RouterWrapper() {
     }
     if (hadUser.current && !auth.isAuthLoading && !auth.authError) {
       hadUser.current = false;
+      rememberAuthReturn(window.location.pathname + window.location.search + window.location.hash);
       router.navigate({ to: '/login' });
     }
   }, [auth.user, auth.isAuthLoading, auth.authError]);
@@ -44,30 +52,20 @@ function RouterWrapper() {
     }
   }, [auth.user, auth.isAuthLoading, auth.authError]);
 
-  // Handle auth expired event
-  useEffect(() => {
-    const handleAuthExpired = () => {
-      console.warn('Session expired — signing out.');
-      logout()
-        .catch((err) => console.error('Forced sign-out failed:', err))
-        .finally(() => {
-          // Navigate to login page
-          window.location.href = '/login';
-        });
-    };
-    window.addEventListener('creatoros:auth-expired', handleAuthExpired);
-    return () => window.removeEventListener('creatoros:auth-expired', handleAuthExpired);
-  }, []);
+  // Do not turn an unscoped API event into Firebase signOut or navigation.
+  // Either can affect a different account after the initiating request ends.
 
-  // Ensure first dollar journey when user is authenticated and not showing onboarding
+  // Check the render's generation before dispatch and on every transaction retry.
   useEffect(() => {
-    if (auth.user && !auth.isAuthLoading && !auth.authError && !showOnboarding) {
-      // Call ensureFirstDollarJourney to make sure the journey exists
-      ensureFirstDollarJourney(auth.user.uid).catch((err) => {
-        console.error('Failed to ensure first dollar journey:', err);
-      });
-    }
-  }, [auth.user, auth.isAuthLoading, auth.authError, showOnboarding]);
+    if (!uid || auth.isAuthLoading || auth.authError || showOnboarding || !isCurrent()) return;
+    let active = true;
+    ensureFirstDollarJourney(uid, () => active && isCurrent()).catch((err) => {
+      if (active && isCurrent()) console.error('Failed to ensure first dollar journey:', err);
+    });
+    return () => {
+      active = false;
+    };
+  }, [uid, token, auth.isAuthLoading, auth.authError, showOnboarding]);
 
   if (auth.isAuthLoading) {
     return <LoadingScreen />;
@@ -98,9 +96,6 @@ function RouterWrapper() {
   // during onboarding — matches the pre-router App.tsx behavior where the
   // banner was visible behind the onboarding modal.
   if (showOnboarding && auth.user) {
-    // Capture at render time, not when a delayed child operation calls back:
-    // A -> B -> A must not revive the first A session's work.
-    const isCurrent = auth.captureAccount(auth.user.uid);
     const handleOnboardingComplete = async (
       answers?: OnboardingAnswers,
       kit?: OnboardingBrandKit,
@@ -112,15 +107,20 @@ function RouterWrapper() {
       ) {
         throw new Error('Profile fields must be at most 1000 characters.');
       }
-      if (kit) validateOnboardingBrandName(kit);
-      await ensureFirstDollarJourney(auth.user.uid);
+      await ensureFirstDollarJourney(auth.user.uid, isCurrent);
       if (!isCurrent()) return;
       const userRef = doc(db, 'users', auth.user.uid);
       const brandRef = doc(db, 'projects', `brand_${auth.user.uid}`);
       await runTransaction(db, async (transaction) => {
+        const assertCurrent = () => {
+          if (!isCurrent()) throw new Error('Account changed');
+        };
+        // Firestore can invoke this callback again after an account change.
+        assertCurrent();
         const snapshot = await transaction.get(userRef);
+        assertCurrent();
         const brandSnapshot = kit ? await transaction.get(brandRef) : null;
-        if (!isCurrent()) throw new Error('Account changed');
+        assertCurrent();
         if (!snapshot.exists()) throw new Error('Account profile no longer exists');
         const previous = snapshot.data().onboardingAnswers;
         const inProgress =
@@ -141,8 +141,13 @@ function RouterWrapper() {
         }
         // Only an empty skip can be followed by an independent interview. Never
         // fill gaps in an existing interview from a different tab.
-        const merged =
-          inProgress || !hasExistingAnswers ? (answers ? { ...answers } : {}) : { ...existing };
+        const merged = inProgress
+          ? answers
+            ? { ...answers }
+            : {}
+          : !hasExistingAnswers
+            ? { ...existing, ...answers }
+            : { ...existing };
         if (kit && !conflict && answers && !merged.summary) merged.summary = answers.summary;
         if (kit) {
           const brand = brandSnapshot?.exists() ? brandSnapshot.data() : null;
@@ -186,7 +191,12 @@ function RouterWrapper() {
 
     return (
       <>
-        <Onboarding onComplete={handleOnboardingComplete} isCurrent={isCurrent} user={auth.user} />
+        <Onboarding
+          key={token?.generation}
+          onComplete={handleOnboardingComplete}
+          isCurrent={isCurrent}
+          user={auth.user}
+        />
         <VerificationBanner user={auth.user} />
       </>
     );
@@ -204,6 +214,7 @@ function RouterWrapper() {
 export default function AppRoot() {
   return (
     <AuthProvider>
+      <SessionExpired />
       <RouterWrapper />
     </AuthProvider>
   );

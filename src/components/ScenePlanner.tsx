@@ -18,8 +18,12 @@ import {
 import { cn } from '../lib/utils';
 import { generateScenePlan } from '../services/gemini';
 import { getFriendlyError } from '../lib/friendlyError';
+import { auth } from '../firebase';
+import type { ApiRequestOwner } from '../lib/apiClient';
+import { useBoundRequestOwner } from '../hooks/useBoundRequestOwner';
 
 interface ScenePlannerProps {
+  owner?: ApiRequestOwner;
   initialScript?: string;
   currentScript?: string;
   currentTitle?: string;
@@ -37,7 +41,9 @@ export default function ScenePlanner({
   showToast,
   onSendToVideoStudio,
   brand,
+  owner: inputOwner,
 }: ScenePlannerProps) {
+  const owner = useBoundRequestOwner(inputOwner);
   const [localScript, setScriptText] = useState(initialScript);
   const [localTitle, setTitleText] = useState(initialTitle);
   const scriptText = currentScript ?? localScript;
@@ -50,6 +56,7 @@ export default function ScenePlanner({
   const [error, setError] = useState('');
 
   const handleGeneratePlan = async () => {
+    if (!owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
     if (!scriptText.trim()) {
       showToast('Please enter or paste a video script first.');
       return;
@@ -57,18 +64,20 @@ export default function ScenePlanner({
     setError('');
     setIsGenerating(true);
     try {
-      const plan = await generateScenePlan(scriptText, titleText, brand);
+      const plan = await generateScenePlan(scriptText, titleText, brand, owner);
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       setScenePlan(plan?.video_plan || plan);
       setResultInput({ script: scriptText, title: titleText });
       setError('');
       showToast('Scene plan generated successfully!');
     } catch (err: any) {
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       console.error('Failed to generate scene plan:', err);
       const errMsg = getFriendlyError(err);
       setError(errMsg);
       showToast(errMsg);
     } finally {
-      setIsGenerating(false);
+      if (auth.currentUser?.uid === owner.uid && owner.isCurrent()) setIsGenerating(false);
     }
   };
 

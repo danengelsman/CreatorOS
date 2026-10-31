@@ -8,7 +8,7 @@ import {
   verifyResetCode,
   confirmResetPassword as firebaseConfirmResetPassword,
 } from '../firebase';
-import { exchangeSessionCookie } from '../lib/apiClient';
+
 import { validatePassword } from '../lib/passwordPolicy';
 import { getFriendlyError } from '../lib/friendlyError';
 import {
@@ -116,15 +116,9 @@ export default function Login({
     }
   }, [view, oobCode]);
 
-  /**
-   * Best-effort: mint the hardening session cookie (Phase A). The Bearer flow
-   * keeps working when this fails (e.g. offline), so it never blocks sign-in.
-   */
-  const mintSessionCookie = () => {
-    exchangeSessionCookie().catch((err) => {
-      console.warn('Session cookie exchange skipped:', err);
-    });
-  };
+  // Do not exchange a shared HttpOnly cookie here. A response can arrive after
+  // another account signs in, and JavaScript cannot prevent its Set-Cookie.
+  // The server still supports existing cookie clients; this UI uses Bearer auth.
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -132,7 +126,6 @@ export default function Login({
     try {
       const res = await loginWithGoogle();
       if (res?.user) {
-        mintSessionCookie();
         navigate?.('/dashboard');
       }
     } catch (error: any) {
@@ -231,7 +224,6 @@ export default function Login({
             console.warn('Verification email not sent:', err);
           });
         }
-        mintSessionCookie();
         navigate?.('/dashboard');
       } else {
         await loginWithEmail(email, password);
@@ -244,7 +236,6 @@ export default function Login({
         } catch {
           /* storage unavailable (private mode) — remember-email just no-ops */
         }
-        mintSessionCookie();
         navigate?.('/dashboard');
       }
     } catch (err: any) {

@@ -8,12 +8,17 @@ const require = createRequire(import.meta.url);
 // router/onboarding UI are replaced so pending work can be resolved precisely.
 const mocks: Record<string, string> = {
   firebase: `
-    export const auth = {}, db = {}, OperationType = { GET: 'get', WRITE: 'write', UPDATE: 'update' };
+    export const auth = { currentUser: { uid: 'A', getIdToken: async () => 'A-token' } }, db = {}, OperationType = { GET: 'get', WRITE: 'write', UPDATE: 'update' };
+    export const loginWithEmail = async () => { window.test.logins++; return { user: auth.currentUser }; };
+    export const registerWithEmail = loginWithEmail, loginWithGoogle = loginWithEmail;
+    export const sendResetEmail = async email => { window.test.resetEmails.push(email); }, sendVerificationEmail = async () => {};
+    export const verifyResetCode = async code => { window.test.verifiedCodes.push(code); return 'a@example.test'; };
+    export const confirmResetPassword = async (code, password) => { window.test.resets.push({ code, password }); };
     export const completeGoogleRedirect = async () => null;
     export const onAuthStateChanged = (_auth, cb) => { window.test.auth = cb; return () => {}; };
     export const handleFirestoreError = () => {};
     export const serverTimestamp = () => 1;
-    export const logout = async () => {};
+    export const logout = async () => { window.test.signouts++; };
   `,
   firestore: `
     export const doc = (_db, col, id) => ({ key: col + '/' + id });
@@ -65,12 +70,13 @@ const harness = `
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import AppRoot from './src/AppRoot';
+import Login from './src/components/Login';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { useWorkspaceStore, selectBrand, selectSelectedIdea } from './src/store/workspaceStore';
 import Brand from './src/components/BrandingEngine';
 import VideoIdeas from './src/components/VideoIdeas';
 window.IS_REACT_ACT_ENVIRONMENT = true;
-window.test = { lookups: [], listeners: [], generations: [], writes: [], profiles: [], journeys: [], navigations: [] };
+window.test = { lookups: [], listeners: [], generations: [], writes: [], profiles: [], journeys: [], navigations: [], signouts: 0, logins: 0, resetEmails: [], verifiedCodes: [], resets: [] };
 function View({ mode }) {
   const auth = useAuth(); const store = useWorkspaceStore();
   const token = auth.workspaceToken?.uid === auth.user?.uid ? auth.workspaceToken : null;
@@ -83,6 +89,7 @@ function View({ mode }) {
     : <Brand user={auth.user} key={token?.generation} brand={brand} setBrand={setBrand} />;
 }
 window.test.mount = async mode => { await act(async () => { createRoot(document.getElementById('root')).render(mode === 'onboarding' ? <AppRoot /> : <AuthProvider><View mode={mode} /></AuthProvider>); }); };
+window.test.mountLogin = async () => { await act(async () => { createRoot(document.getElementById('root')).render(<Login navigate={path => window.test.navigations.push(path)} />); }); };
 window.test.event = async uid => { await act(async () => { window.test.auth(uid ? { uid, email: uid + '@example.test' } : null); }); };
 window.test.lookup = async (uid, exists = true, data = {}) => { await act(async () => { const x = window.test.lookups.find(x => x.key === 'users/' + uid && !x.done); x.done = true; x.resolve({ exists: () => exists, data: () => data }); }); };
 window.test.rejectLookup = async uid => { await act(async () => { const x = window.test.lookups.find(x => x.key === 'users/' + uid && !x.done); x.done = true; x.reject(new Error('lookup failed')); }); };
@@ -174,6 +181,7 @@ test.beforeAll(async () => {
 });
 test.beforeEach(async ({ page: testPage }) => {
   page = testPage;
+  await page.route('**/*', route => route.abort());
   await page.setContent('<div id="root"></div>');
   await page.addScriptTag({ content: bundle });
 });
@@ -193,6 +201,91 @@ test('slow new account shows retry until late profile creation opens onboarding'
     { key: 'users/A', data: { email: 'A@example.test' } },
   ]);
   expect(await page.evaluate(() => (window as any).test.journeys)).toEqual([]);
+});
+
+test('an unscoped auth-expired event cannot sign out the current account', async () => {
+  await call('mount', 'onboarding');
+  await login('A');
+  await login('B');
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('creatoros:auth-expired')));
+  expect(await page.evaluate(() => (window as any).test.signouts)).toBe(0);
+  await expect(page.getByText('Router ready')).toBeVisible();
+});
+
+for (const method of ['email', 'register', 'google'] as const) test(`${method} login does not start a shared-cookie exchange`, async () => {
+  await page.route('**/*', route => route.abort());
+  await page.route('https://creator.test/**', route => route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }));
+  await page.goto('https://creator.test/login');
+  let exchanges = 0;
+  await page.route('**/api/auth/session', route => { exchanges++; return route.fulfill({ json: { ok: true } }); });
+  await page.addScriptTag({ content: bundle });
+  await call('mountLogin');
+  if (method === 'google') {
+    await page.getByRole('button', { name: 'Continue with Google' }).click();
+  } else {
+    if (method === 'register') await page.getByTestId('auth-view-toggle').click();
+    await page.getByPlaceholder('Email Address').fill('a@example.test');
+    await page.getByPlaceholder('Password', { exact: true }).fill('example-password');
+    if (method === 'register') await page.getByPlaceholder('Confirm Password').fill('example-password');
+    await page.getByRole('button', { name: method === 'register' ? 'Sign Up' : 'Sign In', exact: true }).first().click();
+  }
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => (window as any).test.logins)).toBe(1);
+  expect(await page.evaluate(() => (window as any).test.navigations)).toEqual(['/dashboard']);
+  expect(exchanges).toBe(0);
+});
+
+test('password reset request and confirmation remain usable without cookie exchange', async () => {
+  await page.route('https://creator.test/**', route => route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }));
+  await page.goto('https://creator.test/login');
+  let exchanges = 0;
+  await page.route('**/api/auth/session', route => { exchanges++; return route.fulfill({ json: { ok: true } }); });
+  await page.addScriptTag({ content: bundle });
+  await call('mountLogin');
+  await page.getByTestId('forgot-password-link').click();
+  await page.getByPlaceholder('Email Address').fill('a@example.test');
+  await page.getByRole('button', { name: 'Send Reset Link' }).click();
+  await expect(page.getByTestId('auth-info-box')).toContainText('If an account exists');
+  expect(await page.evaluate(() => (window as any).test.resetEmails)).toEqual(['a@example.test']);
+  await page.goto('https://creator.test/login?mode=resetPassword&oobCode=reset-code');
+  await page.addScriptTag({ content: bundle });
+  await call('mountLogin');
+  await page.getByPlaceholder('New Password', { exact: true }).fill('new-strong-password');
+  await page.getByPlaceholder('Confirm New Password').fill('new-strong-password');
+  await page.getByRole('button', { name: 'Update Password' }).click();
+  await expect(page.getByTestId('back-to-signin-after-reset')).toBeVisible();
+  expect(await page.evaluate(() => (window as any).test.verifiedCodes)).toEqual(['reset-code']);
+  expect(await page.evaluate(() => (window as any).test.resets)).toEqual([{ code: 'reset-code', password: 'new-strong-password' }]);
+  await page.getByTestId('back-to-signin-after-reset').click();
+  await page.getByPlaceholder('Email Address').fill('a@example.test');
+  await page.getByPlaceholder('Password', { exact: true }).fill('new-strong-password');
+  await page.getByRole('button', { name: 'Sign In', exact: true }).first().click();
+  await expect.poll(() => page.evaluate(() => (window as any).test.logins)).toBe(1);
+  expect(await page.evaluate(() => (window as any).test.navigations)).toEqual(['/dashboard']);
+  expect(exchanges).toBe(0);
+});
+
+test('a late exchange response overwrites a newer HttpOnly cookie in Chromium', async () => {
+  await page.route('**/*', route => route.abort());
+  await page.route('https://creator.test/**', route => route.fulfill({ contentType: 'text/html', body: '<div></div>' }));
+  await page.goto('https://creator.test/');
+  let release!: () => void;
+  let started!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const ready = new Promise<void>(resolve => { started = resolve; });
+  await page.route('**/exchange/*', async route => {
+    const account = route.request().url().endsWith('/A') ? 'A' : 'B';
+    if (account === 'A') { started(); await pending; }
+    await route.fulfill({ status: 200, headers: { 'set-cookie': `creatoros_session=${account}; HttpOnly; Secure; SameSite=Lax; Path=/` }, body: 'ok' });
+  });
+  await page.evaluate(() => { (window as any).oldExchange = fetch('/exchange/A'); });
+  await ready;
+  await page.evaluate(async () => { await fetch('/exchange/B'); });
+  expect((await page.context().cookies()).find(c => c.name === 'creatoros_session')?.value).toBe('B');
+  release();
+  await page.evaluate(async () => { await (window as any).oldExchange; });
+  const cookie = (await page.context().cookies()).find(c => c.name === 'creatoros_session');
+  expect(cookie).toMatchObject({ value: 'A', httpOnly: true });
 });
 
 test('profile lookup failure remains actionable without redirect or workspace', async () => {
