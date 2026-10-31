@@ -103,10 +103,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       armTimeout(event);
       try {
         if (currentUser) {
+          if (!isCurrent()) return;
           const userRef = doc(db, 'users', currentUser.uid);
           // A transaction prevents a delayed first-login create from replacing a
           // profile (or its completed onboarding) created by another session.
+          if (!isCurrent()) return;
           const needsOnboarding = await runTransaction(db, async (transaction) => {
+            // SDK retries can start after a different account generation.
+            if (!isCurrent()) return false;
             const userSnap = await transaction.get(userRef);
             if (!isCurrent()) return false;
             if (!userSnap.exists()) {

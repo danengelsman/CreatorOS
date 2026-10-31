@@ -113,7 +113,7 @@ test.describe.serial('Phase A email/password auth flows', () => {
     // Firestore parity: users/{uid} exists with accountProvider 'password',
     // written through the SAME rules path as Google sign-ins.
     const signIn = await fetch(
-      'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=e2e-local-check',
+      `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099'}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=e2e-local-check`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,7 +123,7 @@ test.describe.serial('Phase A email/password auth flows', () => {
     expect(signIn.ok).toBe(true);
     const { idToken, localId } = (await signIn.json()) as { idToken: string; localId: string };
     const doc = await fetch(
-      `http://127.0.0.1:8080/v1/projects/demo-creatoros/databases/(default)/documents/users/${localId}`,
+      `http://${process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080'}/v1/projects/demo-creatoros/databases/(default)/documents/users/${localId}`,
       { headers: { Authorization: `Bearer ${idToken}` } },
     );
     expect(doc.ok).toBe(true);

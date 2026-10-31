@@ -123,6 +123,7 @@ export const cacheNicheToBrandProfile = async (
 };
 
 export default function Onboarding({ onComplete, isCurrent, user }: OnboardingProps) {
+  const activityRevision = useRef(0);
   const [recovery] = useState(() => loadOnboardingRecovery(user.uid));
   const recoveredMessages = recovery?.pendingReply ? recovery.messages.slice(0, -1) : recovery?.messages;
   const recoveredInput = recovery?.pendingReply && recovery.messages.at(-1)?.role === 'user'
@@ -145,9 +146,9 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
   const [storageError, setStorageError] = useState(false);
   const completed = useRef(false);
   useLayoutEffect(() => {
-    if (!isCurrent() || completed.current) return;
+    if (!isCurrent() || completed.current || phase === 'welcome') return;
     const saved = saveOnboardingRecovery(user.uid, {
-      phase: phase === 'generating' ? 'success' : phase, messages, inputValue, summary,
+      phase: summary || phase === 'generating' ? 'success' : phase, messages, inputValue, summary,
       pendingKit: pendingKit.current, pendingReply: isAiTyping,
     });
     setStorageError(!saved);
@@ -227,13 +228,14 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
   // Automatically restore previously cached niche from brand profile if user refreshed
   useEffect(() => {
     let isMounted = true;
+    const revision = activityRevision.current;
     const restorePersistedNiche = async () => {
       if (!user?.uid || recovery || !isMounted || !isCurrent()) return;
       try {
         const brandRef = doc(db, 'projects', `brand_${user.uid}`);
         if (!isMounted || !isCurrent()) return;
         const snap = await getDoc(brandRef);
-        if (!isMounted || !isCurrent()) return;
+        if (!isMounted || !isCurrent() || activityRevision.current !== revision) return;
         if (snap.exists()) {
           const projectData = snap.data();
           if (projectData.status === 'draft' && projectData.draft?.niche) {
@@ -579,7 +581,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
   const progressPercent = Math.min(100, Math.round((userMessagesCount / 3) * 100));
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 overflow-hidden">
+    <div onClickCapture={() => { activityRevision.current++; }} onChangeCapture={() => { activityRevision.current++; }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 overflow-hidden">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
