@@ -199,7 +199,7 @@ test.describe('CreatorOS End-to-End System Smoke Tests', () => {
     // Verify the simulated custom video player has rendered the completed video.
     // The completed video appears in BOTH the Gemini Preview panel and Video
     // History; scope to the preview player so the assertion isn't ambiguous.
-    const previewSection = page.locator('section').filter({ hasText: 'Gemini Preview' });
+    const previewSection = page.getByText('Gemini Preview', { exact: true }).locator('xpath=ancestor::section[1]');
     const videoContainer = previewSection.locator('video');
     await expect(videoContainer).toBeVisible();
     await expect(page.locator('video')).toHaveCount(2); // preview + history entry

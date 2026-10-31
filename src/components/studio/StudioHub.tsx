@@ -224,7 +224,32 @@ export function StudioHubContent({ user, brand, projects, isProjectsLoading, pro
                   <button type="button" onClick={() => onOpenProject(project.id)} className={`flex w-full items-start justify-between gap-3 rounded-md text-left font-semibold hover:text-[var(--accent)] ${focus}`}><span className="break-words">{project.name || project.data?.title || 'Untitled Content'}</span><ArrowRight size={18} className="shrink-0" /></button>
                   <p className="mt-2 text-xs text-[var(--label-secondary)]">Status: {typeof project.status === 'string' && project.status.trim() ? project.status : 'Draft'}</p>
                   {project.studioStage === 'complete' && <span className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--bg-tertiary)] text-[var(--label-secondary)]">Ready</span>}
-                  {column.id === 'published' ? <p className="mt-3 text-xs text-[var(--label-secondary)]">Publication status is managed outside the Studio workflow.</p> : isScheduleManaged(project) ? <p className="mt-3 text-xs text-[var(--label-secondary)]">This project is scheduled or has auto-publish enabled. Manage it in Calendar before changing its stage here.</p> : <div className="mt-3 flex flex-wrap gap-2" aria-label={`Change stage for ${project.name || 'Untitled Content'}`}>
+                  {column.id === 'published' ? <p className="mt-3 text-xs text-[var(--label-secondary)]">Publication status is managed outside the Studio workflow.</p> : isScheduleManaged(project) ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <p className="w-full text-xs text-[var(--label-secondary)]">This project is scheduled or has auto-publish enabled. Manage it in Calendar before changing its stage here.</p>
+                      <button
+                        type="button"
+                        disabled={updating[project.id]}
+                        onClick={async () => {
+                          try {
+                            setUpdating((prev) => ({ ...prev, [project.id]: true }));
+                            setStatusErrors((prev) => ({ ...prev, [project.id]: '' }));
+                            const { unscheduleProject } = await import('../calendar/calendarPersistence');
+                            const { doc } = await import('firebase/firestore');
+                            const { db } = await import('../../firebase');
+                            await unscheduleProject(db, doc(db, 'projects', project.id), user.uid, project);
+                          } catch (err: any) {
+                            setStatusErrors((prev) => ({ ...prev, [project.id]: err?.message || 'Failed to unschedule project.' }));
+                          } finally {
+                            setUpdating((prev) => ({ ...prev, [project.id]: false }));
+                          }
+                        }}
+                        className={`${button} border border-[var(--separator)] disabled:opacity-50 text-xs`}
+                      >
+                        Unschedule
+                      </button>
+                    </div>
+                  ) : <div className="mt-3 flex flex-wrap gap-2" aria-label={`Change stage for ${project.name || 'Untitled Content'}`}>
                     {project.studioStage !== 'ideation' && <button type="button" disabled={updating[project.id]} onClick={() => void changeStatus(project, 'ideation')} className={`${button} border border-[var(--separator)] disabled:opacity-50`}>Move to ideation</button>}
                     {project.studioStage !== 'production' && <button type="button" disabled={updating[project.id]} onClick={() => void changeStatus(project, 'production')} className={`${button} border border-[var(--separator)] disabled:opacity-50`}>Move to production</button>}
                     {project.studioStage !== 'complete' && <button type="button" disabled={updating[project.id]} onClick={() => void changeStatus(project, 'complete')} className={`${button} border border-[var(--separator)] disabled:opacity-50`}>Mark ready</button>}

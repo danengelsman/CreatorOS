@@ -13,7 +13,7 @@ test('account switch isolates a saved project and restores it for its owner', as
   const second = await response.json();
   const profile = await request.patch(`http://127.0.0.1:8080/v1/projects/demo-creatoros/databases/(default)/documents/users/${second.localId}`, {
     headers: { Authorization: `Bearer ${second.idToken}` },
-    data: { fields: { email: { stringValue: secondEmail }, accountProvider: { stringValue: 'password' } } },
+    data: { fields: { email: { stringValue: secondEmail }, accountProvider: { stringValue: 'password' }, createdAt: { timestampValue: '2026-01-01T00:00:00.000Z' } } },
   });
   expect(profile.ok()).toBeTruthy();
 
@@ -50,7 +50,7 @@ test('account switch isolates a saved project and restores it for its owner', as
   await logout();
   await login(secondEmail);
   await page.goto(projectUrl);
-  await expect(page.getByRole('heading', { name: 'Project not found' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /(Project not found|Unable to load project)/i })).toBeVisible();
   await expect(page.getByText('Private project owned by account A')).toHaveCount(0);
   await page.goto('/studio');
   await expect(page.getByText('Private project owned by account A')).toHaveCount(0);

@@ -74,6 +74,11 @@ export default function StudioAssistants({ user, initialAssistant }: StudioAssis
       <span id={hintId} className="sr-only">When an assistant button is focused, press V for Video Analyzer or P for Co-Pilot.</span>
 
       <dialog ref={dialogRef} aria-labelledby={titleId} onClose={onClose}
+        onClick={(e) => {
+          if (e.target === dialogRef.current) {
+            dialogRef.current?.close();
+          }
+        }}
         className="studio-assistants-drawer fixed inset-y-0 right-0 left-auto m-0 h-[100dvh] max-h-none w-full max-w-none overflow-hidden border-0 bg-[var(--bg-primary)] p-0 text-[var(--label-primary)] shadow-2xl backdrop:bg-black/60 sm:w-[min(48rem,100vw)] open:flex open:flex-col">
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-[var(--separator)] px-4 py-4 sm:px-6">
           <div>

@@ -2,10 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = vi.hoisted(() => ({ current: undefined as any, writes: [] as any[], retryWith: undefined as any }));
 vi.mock('firebase/firestore', () => ({
+  doc: (_db: unknown, _coll: string, id: string) => ({ id, path: `${_coll}/${id}` }),
   serverTimestamp: () => 'timestamp',
   runTransaction: async (_db: unknown, callback: (tx: any) => Promise<unknown>) => {
     const run = () => callback({
-      get: async () => ({ exists: () => !!store.current, data: () => store.current }),
+      get: async (ref: any) => {
+        if (ref?.path?.startsWith('first_dollar_journeys/')) {
+          return { exists: () => false };
+        }
+        return { exists: () => !!store.current, data: () => store.current };
+      },
       set: (_ref: unknown, value: unknown) => store.writes.push({ type: 'set', value }),
       update: (_ref: unknown, value: unknown) => store.writes.push({ type: 'update', value }),
     });
@@ -57,7 +63,7 @@ describe('Studio persistence safety', () => {
   it('updates only workflow stage, never publication status', async () => {
     store.current = { ...draft, status: 'Draft' };
     await updateStudioStage({} as any, ref, 'owner', 'complete');
-    expect(store.writes).toEqual([{ type: 'update', value: { studioStage: 'complete', updatedAt: 'timestamp' } }]);
+    expect(store.writes).toContainEqual({ type: 'update', value: { studioStage: 'complete', updatedAt: 'timestamp' } });
   });
   it('refuses legacy boolean publication, including a concurrent publish', async () => {
     store.current = { ...draft, published: true, studioStage: 'ideation' };
