@@ -83,7 +83,9 @@ export const cacheNicheToBrandProfile = async (
     const brandRef = doc(db, 'projects', `brand_${user.uid}`);
     const userRef = doc(db, 'users', user.uid);
     await runTransaction(db, async (transaction) => {
+      if (!isCurrent()) return;
       const profile = await transaction.get(userRef);
+      if (!isCurrent()) return;
       const brand = await transaction.get(brandRef);
       if (!isCurrent() || !profile.exists()) return;
       const answers = profile.data().onboardingAnswers;
@@ -169,7 +171,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
   // ensures the journey doc before resolving. A failure here keeps the
   // onboarding open with a retry-able error instead of stranding the user.
   const continueToToday = async () => {
-    if (transitionBusy) return;
+    if (transitionBusy || !isCurrent()) return;
     setTransitionBusy(true);
     setTransitionError('');
     try {
@@ -196,6 +198,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
       );
       if (isCurrent()) { completed.current = true; clearOnboardingRecovery(user.uid); }
     } catch (error) {
+      if (!isCurrent()) return;
       if (error instanceof OnboardingConflictError) {
         pendingKit.current = null;
         useExistingProfile.current = true;
@@ -204,7 +207,7 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
         `Your journey could not be saved. Please try again. ${error instanceof Error ? error.message : ''}`,
       );
     } finally {
-      setTransitionBusy(false);
+      if (isCurrent()) setTransitionBusy(false);
     }
   };
 
@@ -225,11 +228,13 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
   useEffect(() => {
     let isMounted = true;
     const restorePersistedNiche = async () => {
-      if (!user?.uid || recovery) return;
+      if (!user?.uid || recovery || !isMounted || !isCurrent()) return;
       try {
         const brandRef = doc(db, 'projects', `brand_${user.uid}`);
+        if (!isMounted || !isCurrent()) return;
         const snap = await getDoc(brandRef);
-        if (snap.exists() && isMounted && isCurrent()) {
+        if (!isMounted || !isCurrent()) return;
+        if (snap.exists()) {
           const projectData = snap.data();
           if (projectData.status === 'draft' && projectData.draft?.niche) {
             const draft = projectData.draft;
@@ -254,7 +259,8 @@ export default function Onboarding({ onComplete, isCurrent, user }: OnboardingPr
           }
         }
       } catch (error) {
-        console.warn('Could not restore cached branding project draft:', error);
+        if (isMounted && isCurrent())
+          console.warn('Could not restore cached branding project draft:', error);
       }
     };
     restorePersistedNiche();

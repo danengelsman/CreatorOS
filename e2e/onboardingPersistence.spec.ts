@@ -9,7 +9,7 @@ const mocks: Record<string, string> = {
     export const auth = {}, db = {}, OperationType = { GET: 'get', WRITE: 'write' };
     export const completeGoogleRedirect = async () => null;
     export const onAuthStateChanged = (_auth, cb) => { window.test.auth = cb; return () => {}; };
-    export const handleFirestoreError = () => {};
+    export const handleFirestoreError = (error, operation, path) => { window.test.errors.push({ message: error.message, operation, path }); throw error; };
     export const serverTimestamp = () => 1;
     export const logout = async () => {};
     export const apiFetch = async (url, options, owner) => {
@@ -26,7 +26,7 @@ const mocks: Record<string, string> = {
         return { message: 'Interview complete', isComplete: true, summary: window.test.summary || { niche: 'Gardening', audience: 'Beginners', vibe: 'Calm' } };
       }
       if (url.endsWith('/generate-brand')) return { name: 'Garden', tagline: 'Grow together' };
-      return { sparks: [] };
+      return { museMessage: 'Try this', sparks: [{ title: 'Garden Sparks', type: 'trending', badge: 'Trending', pitch: 'Grow plants', dreamViewer: 'Beginners', vibe: 'Calm' }] };
     };
   `,
   firestore: `
@@ -34,15 +34,40 @@ const mocks: Record<string, string> = {
     export const collection = (_db, name) => ({ key: name });
     export const where = (_field, _op, uid) => uid;
     export const query = (ref, uid) => ({ key: ref.key + '?user=' + uid });
-    export const getDoc = async ref => { const data = JSON.parse(localStorage.getItem(ref.key) || 'null'); return { exists: () => data !== null, data: () => data }; };
+    const read = async (ref, kind) => {
+      window.test.reads.push(kind + ':' + ref.key);
+      if (window.test.failRead === kind + ':' + ref.key) throw new Error('read failed');
+      const data = JSON.parse(localStorage.getItem(ref.key) || 'null');
+      if (window.test.holdRead === kind + ':' + ref.key) {
+        window.test.holdRead = null;
+        await new Promise(resolve => window.test.releaseRead = resolve);
+        window.test.reads.push('released:' + kind + ':' + ref.key);
+      }
+      return { exists: () => data !== null, data: () => data };
+    };
+    export const getDoc = ref => read(ref, 'restore');
     export const setDoc = async (ref, data, options) => { const previous = JSON.parse(localStorage.getItem(ref.key) || '{}'); localStorage.setItem(ref.key, JSON.stringify(options?.merge || options?.mergeFields ? {...previous, ...data} : data)); };
-    export const runTransaction = (_db, fn) => navigator.locks.request('firestore', async () => {
-      const writes = [];
-      const result = await fn({ get: getDoc, set: (...args) => writes.push(args) });
-      if (window.test.failCompletion && writes.some(args => args[1].updatedAt && args[1].onboardingAnswers)) throw new Error('completion failed');
-      for (const args of writes) await setDoc(...args);
-      return result;
-    });
+    export const runTransaction = (_db, fn) => {
+      const run = async () => {
+        const tracked = !!window.test.holdRetry || !!window.test.holdRead;
+        try {
+        const writes = [];
+        const transaction = { get: ref => read(ref, 'tx'), set: (...args) => writes.push(args) };
+        let result = await fn(transaction);
+        if (window.test.holdRetry) {
+          window.test.holdRetry = false;
+          writes.length = 0;
+          await new Promise(resolve => window.test.releaseRetry = resolve);
+          result = await fn(transaction);
+        }
+        if (window.test.failCompletion && writes.some(args => args[1].updatedAt && args[1].onboardingAnswers)) throw new Error('completion failed');
+        window.test.writes.push(...writes.map(args => args[0].key));
+        for (const args of writes) await setDoc(...args);
+        return result;
+        } finally { if (tracked) window.test.finished = (window.test.finished || 0) + 1; }
+      };
+      return window.test.unlocked ? run() : navigator.locks.request('firestore', run);
+    };
     export const serverTimestamp = () => 1;
     export const onSnapshot = () => () => {};
   `,
@@ -55,7 +80,8 @@ const harness = `
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import AppRoot from './src/AppRoot';
-window.test = { requests: [] };
+import { cacheNicheToBrandProfile } from './src/components/Onboarding';
+window.test = { requests: [], reads: [], writes: [], errors: [], cacheNicheToBrandProfile };
 window.test.mount = async () => { await act(async () => createRoot(document.getElementById('root')).render(<AppRoot />)); await act(async () => window.test.auth({ uid: 'A', email: 'a@example.test' })); };
 `;
 let bundle: string;
@@ -111,12 +137,23 @@ test.beforeAll(async () => {
   });
   bundle = result.outputFiles[0].text;
 });
-async function mount(page: Page) {
+async function mount(page: Page, holdRestore = false) {
+  await page.route('**/*', (route) => route.abort());
   await page.route('https://creator.test/**', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }),
   );
   await page.goto('https://creator.test/');
   await page.addScriptTag({ content: bundle });
+  if (holdRestore) {
+    await page.evaluate(() => {
+      localStorage.setItem(
+        'projects/brand_A',
+        JSON.stringify({ status: 'draft', draft: { niche: 'Old draft' } }),
+      );
+      (window as any).test.holdRead = 'restore:projects/brand_A';
+      (window as any).test.unlocked = true;
+    });
+  }
   await page.evaluate(() => (window as any).test.mount());
 }
 async function interview(page: Page) {
@@ -438,6 +475,171 @@ test('offline final chat keeps user replies rather than assistant prompts', asyn
     vibe: 'Calm',
     summary: '',
   });
+});
+
+async function switchAwayAndBack(page: Page, expectDraft = false) {
+  await page.evaluate(async () => (window as any).test.auth({ uid: 'B', email: 'b@example.test' }));
+  await expect(page.getByRole('heading', { name: "Let's Build Your Channel Style" })).toBeVisible();
+  await page.evaluate(async () => (window as any).test.auth({ uid: 'A', email: 'a@example.test' }));
+  if (expectDraft) await expect(page.getByText(/New draft/).first()).toBeVisible();
+  else
+    await expect(
+      page.getByRole('heading', { name: "Let's Build Your Channel Style" }),
+    ).toBeVisible();
+  await page.evaluate(() => {
+    (window as any).test.reads = [];
+    (window as any).test.writes = [];
+  });
+}
+
+for (const scenario of ['skip profile', 'kit profile', 'kit brand', 'retry'] as const) {
+  test(`stale ${scenario} completion stops reads after A-B-A`, async ({ page }) => {
+    await mount(page);
+    if (scenario.startsWith('kit')) await interview(page);
+    await page.evaluate((which) => {
+      const t = (window as any).test;
+      t.unlocked = true;
+      if (which === 'retry') t.holdRetry = true;
+      else t.holdRead = which === 'kit brand' ? 'tx:projects/brand_A' : 'tx:users/A';
+    }, scenario);
+    await page
+      .getByRole('button', {
+        name: scenario.startsWith('kit')
+          ? 'Build my channel style first'
+          : 'Go to Today without a brand kit',
+      })
+      .click();
+    const release = scenario === 'retry' ? 'releaseRetry' : 'releaseRead';
+    await expect
+      .poll(() => page.evaluate((name) => typeof (window as any).test[name], release))
+      .toBe('function');
+    await switchAwayAndBack(page);
+    await page.evaluate((name) => (window as any).test[name](), release);
+    await expect.poll(() => page.evaluate(() => (window as any).test.finished)).toBeGreaterThan(0);
+    const result = await page.evaluate(() => ({
+      reads: (window as any).test.reads,
+      writes: (window as any).test.writes,
+    }));
+    expect(result.reads.filter((value: string) => value.startsWith('tx:'))).toEqual([]);
+    expect(result.writes).toEqual([]);
+    await expect(
+      page.getByRole('heading', { name: "Let's Build Your Channel Style" }),
+    ).toBeVisible();
+  });
+}
+
+for (const key of ['users/A', 'projects/brand_A', 'retry']) {
+  test(`stale niche cache stops after delayed ${key} read`, async ({ page }) => {
+    await mount(page);
+    await page.getByRole('button', { name: "Let's Begin!" }).click();
+    await page.getByText('Blank page? Tap for trending niche sparks').click();
+    await expect(page.getByText('Garden Sparks').first()).toBeVisible();
+    await page.evaluate((key) => {
+      const t = (window as any).test;
+      t.unlocked = true;
+      if (key === 'retry') t.holdRetry = true;
+      else t.holdRead = 'tx:' + key;
+    }, key);
+    await page.getByText('Garden Sparks').first().click();
+    const release = key === 'retry' ? 'releaseRetry' : 'releaseRead';
+    await expect
+      .poll(() => page.evaluate((name) => typeof (window as any).test[name], release))
+      .toBe('function');
+    await switchAwayAndBack(page);
+    await page.evaluate((name) => (window as any).test[name](), release);
+    await expect.poll(() => page.evaluate(() => (window as any).test.finished)).toBeGreaterThan(0);
+    const result = await page.evaluate(() => ({
+      reads: (window as any).test.reads,
+      writes: (window as any).test.writes,
+    }));
+    expect(result.reads.filter((value: string) => value.startsWith('tx:'))).toEqual([]);
+    expect(result.writes).toEqual([]);
+  });
+}
+
+test('stale restored draft cannot affect a later A session', async ({ page }) => {
+  await mount(page, true);
+  await expect
+    .poll(() => page.evaluate(() => typeof (window as any).test.releaseRead))
+    .toBe('function');
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'projects/brand_A',
+      JSON.stringify({ status: 'draft', draft: { niche: 'New draft' } }),
+    ),
+  );
+  await switchAwayAndBack(page, true);
+  await expect(page.getByText(/New draft/).first()).toBeVisible();
+  await page.evaluate(() => (window as any).test.releaseRead());
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as any).test.reads.includes('released:restore:projects/brand_A')),
+    )
+    .toBe(true);
+  await expect(page.getByText(/Old draft/)).toHaveCount(0);
+});
+
+for (const mode of ['skip', 'kit'] as const) {
+  test(`${mode} preserves unknown fields without extra transaction writes`, async ({ page }) => {
+    await mount(page);
+    await page.evaluate(() => {
+      const profile = JSON.parse(localStorage.getItem('users/A')!);
+      profile.onboardingAnswers = { future: { kept: true } };
+      profile.futureProfile = 'keep';
+      localStorage.setItem('users/A', JSON.stringify(profile));
+      localStorage.setItem(
+        'projects/brand_A',
+        JSON.stringify({ userId: 'A', status: 'draft', futureBrand: 'keep' }),
+      );
+      (window as any).test.writes = [];
+    });
+    if (mode === 'kit') await interview(page);
+    await page
+      .getByRole('button', {
+        name: mode === 'kit' ? 'Build my channel style first' : 'Go to Today without a brand kit',
+      })
+      .click();
+    await expect(page.getByText('Router ready')).toBeVisible();
+    const state = await page.evaluate(() => ({
+      profile: JSON.parse(localStorage.getItem('users/A')!),
+      brand: JSON.parse(localStorage.getItem('projects/brand_A')!),
+      writes: (window as any).test.writes,
+    }));
+    expect(state.profile.futureProfile).toBe('keep');
+    expect(state.profile.onboardingAnswers.future).toEqual({ kept: true });
+    expect(state.brand.futureBrand).toBe('keep');
+    expect(state.writes).toEqual(mode === 'kit' ? ['projects/brand_A', 'users/A'] : ['users/A']);
+  });
+}
+
+test('niche cache retains unknown fields and reports real read errors', async ({ page }) => {
+  await mount(page);
+  const result = await page.evaluate(async () => {
+    const t = (window as any).test;
+    localStorage.setItem(
+      'projects/brand_A',
+      JSON.stringify({ userId: 'A', status: 'draft', future: 'keep' }),
+    );
+    t.writes = [];
+    await t.cacheNicheToBrandProfile({ uid: 'A' }, { title: 'Garden' }, () => true);
+    const brand = JSON.parse(localStorage.getItem('projects/brand_A')!);
+    const writes = [...t.writes];
+    t.failRead = 'tx:users/A';
+    let rejected = '';
+    try {
+      await t.cacheNicheToBrandProfile({ uid: 'A' }, { title: 'Other' }, () => true);
+    } catch (error) {
+      rejected = (error as Error).message;
+    }
+    return { brand, writes, rejected, errors: t.errors };
+  });
+  expect(result.brand.future).toBe('keep');
+  expect(result.brand.draft.niche).toBe('Garden');
+  expect(result.writes).toEqual(['projects/brand_A']);
+  expect(result.rejected).toBe('read failed');
+  expect(result.errors).toEqual([
+    { message: 'read failed', operation: 'write', path: 'projects/brand_A' },
+  ]);
 });
 
 test('building the brand saves the interview and generated tagline', async ({ page }) => {

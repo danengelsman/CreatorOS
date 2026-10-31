@@ -62,7 +62,9 @@ function RouterWrapper() {
     ensureFirstDollarJourney(uid, () => active && isCurrent()).catch((err) => {
       if (active && isCurrent()) console.error('Failed to ensure first dollar journey:', err);
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [uid, token, auth.isAuthLoading, auth.authError, showOnboarding]);
 
   if (auth.isAuthLoading) {
@@ -110,9 +112,15 @@ function RouterWrapper() {
       const userRef = doc(db, 'users', auth.user.uid);
       const brandRef = doc(db, 'projects', `brand_${auth.user.uid}`);
       await runTransaction(db, async (transaction) => {
+        const assertCurrent = () => {
+          if (!isCurrent()) throw new Error('Account changed');
+        };
+        // Firestore can invoke this callback again after an account change.
+        assertCurrent();
         const snapshot = await transaction.get(userRef);
+        assertCurrent();
         const brandSnapshot = kit ? await transaction.get(brandRef) : null;
-        if (!isCurrent()) throw new Error('Account changed');
+        assertCurrent();
         if (!snapshot.exists()) throw new Error('Account profile no longer exists');
         const previous = snapshot.data().onboardingAnswers;
         const inProgress =
@@ -133,8 +141,13 @@ function RouterWrapper() {
         }
         // Only an empty skip can be followed by an independent interview. Never
         // fill gaps in an existing interview from a different tab.
-        const merged =
-          inProgress || !hasExistingAnswers ? (answers ? { ...answers } : {}) : { ...existing };
+        const merged = inProgress
+          ? answers
+            ? { ...answers }
+            : {}
+          : !hasExistingAnswers
+            ? { ...existing, ...answers }
+            : { ...existing };
         if (kit && !conflict && answers && !merged.summary) merged.summary = answers.summary;
         if (kit) {
           const brand = brandSnapshot?.exists() ? brandSnapshot.data() : null;
@@ -178,7 +191,12 @@ function RouterWrapper() {
 
     return (
       <>
-        <Onboarding key={auth.workspaceToken?.generation} onComplete={handleOnboardingComplete} isCurrent={isCurrent} user={auth.user} />
+        <Onboarding
+          key={token?.generation}
+          onComplete={handleOnboardingComplete}
+          isCurrent={isCurrent}
+          user={auth.user}
+        />
         <VerificationBanner user={auth.user} />
       </>
     );
