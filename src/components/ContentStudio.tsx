@@ -22,7 +22,6 @@ import {
   query,
   where,
   orderBy,
-  updateDoc,
   runTransaction,
 } from 'firebase/firestore';
 import VideoStudio from './VideoStudio';
@@ -42,6 +41,7 @@ import ViralTemplatesLibrary from './ViralTemplatesLibrary';
 import { recordJourneyEvent } from '../services/creatorJourney';
 import { getFriendlyError } from '../lib/friendlyError';
 import { templatePlatform } from './studio/studioHubHelpers';
+import { prepareStudioOwnerFence, updateOwnedContentProject, STUDIO_JOURNEY_UNAVAILABLE } from './studio/studioOwnerFence';
 
 export default function Create({
   brand,
@@ -372,6 +372,8 @@ export default function Create({
             onDirtyChange?.({ dirty, saving: true, storageError: true });
           }
           await runTransaction(db, async (transaction) => {
+            if (isCurrentOwner && !isCurrentOwner()) throw new Error('Account changed');
+            if (canWriteProject && !canWriteProject()) throw new Error('Project unavailable');
             const snapshot = await transaction.get(ref);
             if (isCurrentOwner && !isCurrentOwner()) throw new Error('Account changed');
             if (canWriteProject && !canWriteProject()) throw new Error('Project unavailable');
@@ -383,6 +385,8 @@ export default function Create({
             ) {
               throw new Error('studio-conflict');
             }
+            const stageFence = await prepareStudioOwnerFence(transaction, db, user.uid, () => (!isCurrentOwner || isCurrentOwner()) && (!canWriteProject || canWriteProject()));
+            stageFence();
             transaction.update(ref, changes);
           });
           if (isCurrentOwner && !isCurrentOwner()) throw new Error('Account changed');
@@ -422,7 +426,7 @@ export default function Create({
           setBaseline(written);
           setVerificationError(false);
           setConflict(false);
-        } else await updateDoc(ref, changes);
+        } else await updateOwnedContentProject(db, ref, user.uid, changes, isCurrentOwner);
         if (firstDraftRevision && (!canWriteProject || canWriteProject())) {
           try {
             await recordJourneyEvent(user.uid, { type: 'save_draft', projectId: activeProjectId });
@@ -459,6 +463,9 @@ export default function Create({
         setConflict(true);
         setSaveError('Project changed elsewhere. Your draft was not saved; copy it before reopening.');
         showToast('Project changed elsewhere. Your draft was not overwritten.');
+      } else if (error instanceof Error && error.message === STUDIO_JOURNEY_UNAVAILABLE) {
+        transactionConflict = true; // The transaction did not stage a project write.
+        setSaveError(`${STUDIO_JOURNEY_UNAVAILABLE} Your draft remains in the editor; copy it before leaving.`);
       } else {
         setSaveError(canvasMode
           ? 'Could not save your draft with confirmation. The save may have completed; your draft was kept.'

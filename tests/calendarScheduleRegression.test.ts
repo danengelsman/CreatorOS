@@ -6,6 +6,7 @@ import AutoPublishModal from '../src/components/calendar/AutoPublishModal';
 import { scheduleProject, unscheduleProject } from '../src/components/calendar/calendarPersistence';
 
 vi.mock('@/lib/utils', () => ({ cn: (...args: any[]) => args.filter(Boolean).join(' ') }));
+vi.mock('../src/components/studio/studioOwnerFence', () => ({ prepareStudioOwnerFence: async () => () => {} }));
 vi.mock('firebase/firestore', () => ({
   serverTimestamp: () => 'timestamp',
   runTransaction: (_db: any, callback: any) => callback(transaction),

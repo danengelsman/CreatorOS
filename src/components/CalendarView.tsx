@@ -4,13 +4,11 @@ import {
   query,
   where,
   getDocs,
-  updateDoc,
   doc,
   addDoc,
   serverTimestamp,
-  deleteDoc,
 } from 'firebase/firestore';
-import { db, authorizedFetch, apiFetch } from '../firebase';
+import { auth, db, authorizedFetch, apiFetch } from '../firebase';
 import {
   startOfWeek,
   addDays,
@@ -35,6 +33,7 @@ import AutoPublishModal from './calendar/AutoPublishModal';
 import NewEventModal from './calendar/NewEventModal';
 import EventDetailModal from './calendar/EventDetailModal';
 import { scheduleProject, unscheduleProject } from './calendar/calendarPersistence';
+import { deleteOwnedContentProject, updateOwnedContentProject, STUDIO_JOURNEY_UNAVAILABLE } from './studio/studioOwnerFence';
 
 export { getPlatformStyle } from './calendar/calendarHelpers';
 
@@ -103,7 +102,9 @@ export default function CalendarView({
   };
 
   const handleSyncToPlatforms = async () => {
-    if (!selectedEvent || selectedSyncPlatforms.length === 0) return;
+    if (!user?.uid || !selectedEvent || selectedEvent.userId !== user.uid || selectedSyncPlatforms.length === 0) return;
+    const owner = { uid: user.uid, isCurrent: () => auth.currentUser?.uid === user.uid };
+    if (!owner.isCurrent()) return;
     setIsSyncing(true);
     setSyncResults(null);
     setSyncError('');
@@ -114,22 +115,25 @@ export default function CalendarView({
     try {
       const result = await authorizedFetch('/api/publish', {
         method: 'POST',
+        credentials: 'omit',
         body: JSON.stringify({
           title: originalTitle,
           body: originalBody,
           platforms: selectedSyncPlatforms,
         }),
-      });
+      }, owner);
+      if (!owner.isCurrent()) throw new Error('Account changed');
 
       if (result.success) {
         setSyncResults(result.results);
 
         const hasSuccess = Object.values(result.results).some((r: any) => r.status === 'success');
         if (hasSuccess) {
-          await updateDoc(doc(db, 'projects', selectedEvent.id), {
+          await updateOwnedContentProject(db, doc(db, 'projects', selectedEvent.id), owner.uid, {
             status: 'Published',
             updatedAt: serverTimestamp(),
-          });
+          }, owner.isCurrent);
+          if (!owner.isCurrent()) throw new Error('Account changed');
 
           await fetchAllBlocks();
 
@@ -143,7 +147,7 @@ export default function CalendarView({
       }
     } catch (err: any) {
       console.error(err);
-      setSyncError(getFriendlyError(err));
+      setSyncError(err instanceof Error && err.message === STUDIO_JOURNEY_UNAVAILABLE ? `${err.message} Publishing may already have succeeded; check the destination before publishing again.` : getFriendlyError(err));
     } finally {
       setIsSyncing(false);
     }
@@ -252,14 +256,17 @@ export default function CalendarView({
   // Delete event
   const handleDeleteEvent = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (!user?.uid) return;
     try {
-      await deleteDoc(doc(db, 'projects', id));
+      setScheduleError('');
+      await deleteOwnedContentProject(db, doc(db, 'projects', id), user.uid);
       setAllBlocks((prev) => prev.filter((b) => b.id !== id));
       setScheduledEvents((prev) => prev.filter((b) => b.id !== id));
       setUnscheduledBlocks((prev) => prev.filter((b) => b.id !== id));
       setShowDetailModal(false);
     } catch (error) {
       console.error('Error deleting block:', error);
+      setScheduleError(error instanceof Error && error.message === STUDIO_JOURNEY_UNAVAILABLE ? error.message : 'This item could not be deleted. Refresh the calendar and try again.');
     }
   };
 
@@ -332,7 +339,7 @@ export default function CalendarView({
       setDraggedBlock(null);
     } catch (error) {
       console.error('Error setting auto-publish date:', error);
-      setAutoPublishError('Could not schedule this item. It may have been published or changed. Refresh the calendar and try again.');
+      setAutoPublishError(error instanceof Error && error.message === STUDIO_JOURNEY_UNAVAILABLE ? error.message : 'Could not schedule this item. It may have been published or changed. Refresh the calendar and try again.');
     } finally {
       schedulingLock.current = false;
       setIsScheduling(false);
@@ -349,7 +356,7 @@ export default function CalendarView({
       setShowDetailModal(false);
     } catch (error) {
       console.error('Error unscheduling block:', error);
-      setScheduleError('Scheduling could not be cleared. Refresh the calendar and try again.');
+      setScheduleError(error instanceof Error && error.message === STUDIO_JOURNEY_UNAVAILABLE ? error.message : 'Scheduling could not be cleared. Refresh the calendar and try again.');
     }
   };
 

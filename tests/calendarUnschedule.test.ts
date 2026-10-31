@@ -1,7 +1,7 @@
 import React from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ slots: [] as any[], index: 0, update: vi.fn(), fetch: vi.fn(), current: null as any, transactionWait: null as Promise<void> | null }));
+const h = vi.hoisted(() => ({ slots: [] as any[], index: 0, update: vi.fn(), fetch: vi.fn(), publish: vi.fn(), current: null as any, transactionWait: null as Promise<void> | null }));
 vi.mock('react', async (importOriginal) => {
   const real = await importOriginal<typeof import('react')>();
   return { ...real, useState: (initial: any) => {
@@ -10,7 +10,8 @@ vi.mock('react', async (importOriginal) => {
     return [h.slots[i], (next: any) => { h.slots[i] = typeof next === 'function' ? next(h.slots[i]) : next; }];
   }, useRef: (initial: any) => { const i = h.index++; return h.slots[i] ??= { current: initial }; }, useEffect: () => {} };
 });
-vi.mock('../src/firebase', () => ({ db: {}, authorizedFetch: vi.fn(), apiFetch: vi.fn() }));
+vi.mock('../src/firebase', () => ({ db: {}, auth: { currentUser: { uid: 'owner' } }, authorizedFetch: h.publish, apiFetch: vi.fn() }));
+vi.mock('../src/components/studio/studioOwnerFence', () => ({ STUDIO_JOURNEY_UNAVAILABLE: 'journey unavailable', prepareStudioOwnerFence: async () => () => {} }));
 vi.mock('firebase/firestore', () => ({
   collection: (...args: any[]) => args, query: (...args: any[]) => args, where: (...args: any[]) => args,
   getDocs: h.fetch, updateDoc: h.update, doc: (_db: any, collection: string, id: string) => ({ collection, id }),
@@ -36,7 +37,7 @@ function find(node: any, name: string): any {
   }
 }
 
-beforeEach(() => { h.slots = []; h.index = 0; h.transactionWait = null; h.update.mockReset().mockResolvedValue(undefined); h.fetch.mockReset().mockResolvedValue({ docs: [] }); });
+beforeEach(() => { h.slots = []; h.index = 0; h.transactionWait = null; h.publish.mockReset().mockResolvedValue({ success: true, results: { youtube: { status: 'success' } } }); h.update.mockReset().mockResolvedValue(undefined); h.fetch.mockReset().mockResolvedValue({ docs: [] }); });
 it('unschedules through the calendar detail action and removes the Studio schedule lock', async () => {
   const render = () => { h.index = 0; return CalendarView({ user: { uid: 'owner' }, setActiveTab: vi.fn() }); };
   const event = { id: 'abc', status: 'Scheduled', scheduledDate: new Date(), autoPublish: true };
@@ -81,4 +82,17 @@ it('leaves the calendar unchanged and shows an error when a dragged draft was pu
   expect(h.slots[3]).toEqual([]);
   expect(h.slots[4]).toEqual([event]);
   expect(find(render(), 'AutoPublishModal').props.error).toContain('published or changed');
+});
+
+it('marks a successful Calendar publish through an owner transaction, not updateDoc', async () => {
+  const event = { id: 'abc', userId: 'owner', type: 'content', status: 'Draft', name: 'Owner title', data: { body: 'Owner draft' } };
+  h.current = event;
+  const render = () => { h.index = 0; return CalendarView({ user: { uid: 'owner' }, setActiveTab: vi.fn() }); };
+  find(render(), 'CalendarGrid').props.onSelectEvent(event);
+  find(render(), 'EventDetailModal').props.setSelectedSyncPlatforms(['youtube']);
+  // A foreign document must be rejected by the persistence transaction after publishing.
+  h.current = { ...event, userId: 'other' };
+  await find(render(), 'EventDetailModal').props.onSyncToPlatforms();
+  expect(h.publish).toHaveBeenCalledWith('/api/publish', expect.any(Object), expect.objectContaining({ uid: 'owner', isCurrent: expect.any(Function) }));
+  expect(h.update).not.toHaveBeenCalled();
 });

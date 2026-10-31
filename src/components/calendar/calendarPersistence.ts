@@ -1,4 +1,5 @@
 import { runTransaction, serverTimestamp, type DocumentReference, type Firestore } from 'firebase/firestore';
+import { prepareStudioOwnerFence } from '../studio/studioOwnerFence';
 
 type Schedule = { scheduledDate?: any; autoPublish?: boolean; publishTime?: string | null };
 
@@ -25,6 +26,8 @@ export async function scheduleProject(db: Firestore, ref: DocumentReference, use
     const expectedStatus = typeof expected.status === 'string' ? expected.status.trim().toLowerCase() : '';
     if (status === 'published' || project.published === true) throw new Error('Published content cannot be scheduled.');
     if (status !== expectedStatus) throw new Error('Scheduling changed since this item was opened. Refresh and try again.');
+    const stageFence = await prepareStudioOwnerFence(tx, db, userId);
+    stageFence();
     tx.update(ref, { ...schedule, status: schedule.autoPublish ? 'Scheduled' : 'Draft', updatedAt: serverTimestamp() });
   });
 }
@@ -34,6 +37,8 @@ export async function unscheduleProject(db: Firestore, ref: DocumentReference, u
   await runTransaction(db, async (tx) => {
     const project = await readProject(tx, ref, userId, expected);
     const status = typeof project.status === 'string' ? project.status.trim().toLowerCase() : '';
+    const stageFence = await prepareStudioOwnerFence(tx, db, userId);
+    stageFence();
     tx.update(ref, {
       scheduledDate: null,
       autoPublish: false,
