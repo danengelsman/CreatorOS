@@ -104,9 +104,12 @@ test.describe.serial('Phase A email/password auth flows', () => {
     await page.locator('input[placeholder="Password"]').fill(PHASE_A_TEST_PASSWORD);
     await page.locator('button[type="submit"]').click();
 
-    // Phase 1: onboarding is a one-time event at profile creation. The
-    // register test above created users/{uid}, so re-sign-in lands directly
-    // in the workspace (Today on Home) — the modal never remounts.
+    // The register test above created users/{uid} but never completed
+    // onboarding, so re-sign-in resumes the onboarding modal (sentinel
+    // profile) — the same modal a Google user would see. Complete it, then
+    // verify the workspace.
+    await expect(page.locator('text=Build Your Channel Style').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Go to Today without a brand kit' }).click();
     await expect(page.locator('header button').first()).toBeVisible();
     await expect(page.locator('text=Build Your Channel Style')).toHaveCount(0);
 

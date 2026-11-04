@@ -210,6 +210,7 @@ test('first chat failure preserves only the real answer', async ({ page }) => {
   await input.press('Enter');
   await expect(page.getByText(/Who is your dream/i)).toBeVisible();
   await page.getByRole('button', { name: 'Go to Today', exact: true }).click();
+  await expect(page.getByText('Router ready')).toBeVisible();
   expect(await answers(page)).toEqual({ niche: 'Gardening', audience: '', vibe: '', summary: '' });
 });
 
