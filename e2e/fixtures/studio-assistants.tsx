@@ -6,8 +6,13 @@ import '../../src/index.css';
 const initial = new URLSearchParams(window.location.search).get('assistant');
 createRoot(document.getElementById('root')!).render(
   <main>
-    <label>Studio notes <input aria-label="Studio notes" /></label>
-    <StudioAssistants user={null} initialAssistant={initial === 'analyzer' || initial === 'copilot' ? initial : undefined} />
+    <label>
+      Studio notes <input aria-label="Studio notes" />
+    </label>
+    <StudioAssistants
+      user={null}
+      initialAssistant={initial === 'analyzer' || initial === 'copilot' ? initial : undefined}
+    />
     <button type="button">Outside action</button>
   </main>,
 );

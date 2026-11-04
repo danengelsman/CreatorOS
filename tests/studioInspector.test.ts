@@ -3,7 +3,9 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 vi.mock('../src/services/gemini', () => ({
-  analyzeAndOptimizeRetention: vi.fn(), generateScenePlan: vi.fn(), repurposeContent: vi.fn(),
+  analyzeAndOptimizeRetention: vi.fn(),
+  generateScenePlan: vi.fn(),
+  repurposeContent: vi.fn(),
 }));
 import RetentionHookLab from '../src/components/RetentionHookLab';
 import ScenePlanner from '../src/components/ScenePlanner';
@@ -14,7 +16,12 @@ describe('inspector current editor input', () => {
     const currentScript = 'CURRENT UNSAVED SCRIPT';
     const components = [
       React.createElement(RetentionHookLab, { initialText: 'OLD', currentText: currentScript }),
-      React.createElement(ScenePlanner, { initialScript: 'OLD', currentScript, currentTitle: 'CURRENT TITLE', showToast: () => {} }),
+      React.createElement(ScenePlanner, {
+        initialScript: 'OLD',
+        currentScript,
+        currentTitle: 'CURRENT TITLE',
+        showToast: () => {},
+      }),
       React.createElement(ContentRepurposer, { currentContent: currentScript }),
     ];
     for (const component of components) {

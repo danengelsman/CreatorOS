@@ -8,7 +8,13 @@ import { auth } from '../firebase';
 import type { ApiRequestOwner } from '../lib/apiClient';
 import { useBoundRequestOwner } from '../hooks/useBoundRequestOwner';
 
-export default function ContentRepurposer({ currentContent, owner: inputOwner }: { currentContent?: string; owner?: ApiRequestOwner }) {
+export default function ContentRepurposer({
+  currentContent,
+  owner: inputOwner,
+}: {
+  currentContent?: string;
+  owner?: ApiRequestOwner;
+}) {
   const owner = useBoundRequestOwner(inputOwner);
   const [localInput, setInputContent] = useState('');
   const inputContent = currentContent ?? localInput;
@@ -19,7 +25,8 @@ export default function ContentRepurposer({ currentContent, owner: inputOwner }:
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleGenerate = async () => {
-    if (!inputContent.trim() || !owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
+    if (!inputContent.trim() || !owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent())
+      return;
 
     setIsGenerating(true);
     setErrorMsg('');
@@ -87,7 +94,12 @@ export default function ContentRepurposer({ currentContent, owner: inputOwner }:
             animate={{ opacity: 1, y: 0 }}
             className="space-y-10"
           >
-            {resultInput !== inputContent && <p role="status">The script changed since these drafts were generated. Generate again for the current draft.</p>}
+            {resultInput !== inputContent && (
+              <p role="status">
+                The script changed since these drafts were generated. Generate again for the current
+                draft.
+              </p>
+            )}
             {results.platforms.map((platformData: any, pIndex: number) => (
               <section key={`platform-${pIndex}`}>
                 <div

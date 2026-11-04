@@ -183,7 +183,11 @@ export default function RetentionHookLab({
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          {resultInput !== inputText && <p role="status">The script changed since this analysis. Run it again for the current draft.</p>}
+          {resultInput !== inputText && (
+            <p role="status">
+              The script changed since this analysis. Run it again for the current draft.
+            </p>
+          )}
           {/* Top Score Banner */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
             {/* Score Box */}

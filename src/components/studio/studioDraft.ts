@@ -39,11 +39,11 @@ export function sameBaseline(a: StudioBaseline, b: StudioBaseline): boolean {
 // write until the user explicitly discards the draft. A later successful save
 // does not prove an earlier ambiguous request cannot still be observed.
 export function recoveryPendingWrites(saved: any): StudioDraft[] {
-  const isDraft = (value: any): value is StudioDraft => value &&
-    ['title', 'body', 'platform'].every((key) => typeof value[key] === 'string');
+  const isDraft = (value: any): value is StudioDraft =>
+    value && ['title', 'body', 'platform'].every((key) => typeof value[key] === 'string');
   if (Array.isArray(saved.pendingWrites)) {
     // An unreadable entry is still evidence of an unresolved write.
-    return saved.pendingWrites.map((value: unknown) => isDraft(value) ? value : saved.draft);
+    return saved.pendingWrites.map((value: unknown) => (isDraft(value) ? value : saved.draft));
   }
   if (saved.pending != null) return [isDraft(saved.pending) ? saved.pending : saved.draft];
   return [];

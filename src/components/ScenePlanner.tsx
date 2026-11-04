@@ -268,7 +268,12 @@ export default function ScenePlanner({
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          {(resultInput.script !== scriptText || resultInput.title !== titleText) && <p role="status">The editor changed since this plan was generated. Generate again for the current draft.</p>}
+          {(resultInput.script !== scriptText || resultInput.title !== titleText) && (
+            <p role="status">
+              The editor changed since this plan was generated. Generate again for the current
+              draft.
+            </p>
+          )}
           {/* Summary Overview Bar */}
           <div className="bg-[var(--bg-tertiary)] p-4 rounded-2xl border border-[var(--separator)] grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>

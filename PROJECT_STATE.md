@@ -1,10 +1,23 @@
 # CreatorOS — Project State & Handoff
 
-**Updated:** 2026-10-18 · **Purpose:** lossless handoff for any fresh conversation. Read this plus `PRODUCTION_READINESS_PLAN.md` before doing anything.
+**Updated:** 2026-11-04 · **Purpose:** lossless handoff for any fresh conversation. Read this plus `PRODUCTION_READINESS_PLAN.md` before doing anything. The current checkpoint below supersedes historical in-progress entries.
+
+## Current checkpoint — Studio released; reviewed closeout PR #29
+
+- **Merged:** Studio PR #28 as `cda0108`, then documentation PR #15 as `8db7f83`. Remote `main` was independently fetched and inspected on November 4. Do not recreate or re-merge the Studio release branch.
+- **Production:** Vercel `creator-os`, deployment `dpl_DmLKAtQgCSSJ7YGFdyxZKitA6KXt`, reports READY, Production, source `8db7f83`, with the stable domain `creator-os-delta-lilac.vercel.app` assigned. HTTP probes of `/`, `/login`, `/studio`, `/studio/release-check`, and `/roadmap` returned 200 and the same entry asset; the asset returned 200. These are hosting/deep-link fallback checks, not authenticated browser journeys.
+- **API gate:** missing and forged Bearer credentials on `POST /api/gemini/generate` returned 401 with the expected JSON errors and request IDs. No authenticated provider call or paid render was performed.
+- **CI at `8db7f83`:** quality job passed, including 290 unit tests across 32 files; Chromium E2E passed 106 with 2 skipped. The general E2E emulator log explicitly defaults to allow-all rules because it does not consume the multi-database rules configuration: this is UI/integration evidence, not production-rule authorization evidence.
+- **Formatting:** CI reported 90 unformatted files in its non-blocking Prettier job. The initial 90-file formatter pass matched configured formatter output from each HEAD blob. Independent review additionally confirmed equivalent structure and unchanged template/string/regex values for all 89 code/test/style files; `PROJECT_STATE.md` also contains intentional manual checkpoint edits. `prettier --check .` passed locally before the added CI job; the final workflow and checkpoint files also pass. Clean remote release gates remain required before merge.
+- **Verification fallback and result:** local full TypeScript and ESLint checks timed out without diagnostics; the cached Java emulator also timed out. These are not passing gates. Clean Linux CI run `41873823184` on reviewed closeout source `1fafaaa` passed typecheck, ESLint, build, artifact freshness, 290 unit tests in 32 files, formatting, and Chromium UI E2E (106 passed, 2 skipped). The new isolated actual-rules job passed all 4 tests, 0 failures, using JDK 21 and the single-database demo config. Final documentation-only updates must also pass PR CI before merge.
+- **Rules DEPLOYED and independently read back (2026-11-04 17:22 UTC):** the only live-to-repo difference was the previously approved reserved-brand-ID create restriction (`84204ac`, integrated as `c6977b9`). Both targets passed the production CLI dry-run; after the clean CI rule gate, the parent deployed `firestore:rules` to BOTH `(default)` and the named application database. Separate exact release GET → ruleset source GET → repeat release GET verified stable releases and byte-for-byte equality with the intended working file for both databases. Normalized source SHA-256: `8de9b4208ac6d707b4ffc0eeaba16d6e77586ee11d424b6acbdf20e88aaec279`. Private rollback snapshots remain preserved outside scratch. This proves deployed source identity, not a production user write/read roundtrip.
+- **Local work:** use `chore/studio-release-closeout` in the separate `CreatorOS_wt_release_closeout` worktree. The original checkout remains at `3683d67` with six uncommitted tracked paths plus unrelated untracked `docs/app_launch/` and `tsconfig.test.json`; preserve them and inspect their relationship to merged fixes before reuse. They are not part of the deployed artifact.
+- **Leftover patch audit:** do not replay the old sign-out return-memory change, broadened URL parser, sentinel loosening, or superseded E2E edits over main. Independent offline review found that summary-only sentinel matching can discard substantive answers; the merged singleton-shape check remains unchanged. A separate remaining case exists when a signed-out user requests protected destination A and then B: the helper retains A. That regression is recorded for a separately scoped fix, not bundled with this formatting/verification closeout.
+- **Remaining limits:** real Google sign-in roundtrip, authenticated live provider behavior, production persistence roundtrip, and iOS Safari are not reverified by these probes. Staging, strict TypeScript, monitoring/alerting, and other definition-of-done items must be assessed separately; this is not a blanket production-ready declaration.
 
 ## Repo state
 
-- Path: `C:\Users\ADMIN\Documents\CreatorOS_Repo` · production branch `main` @ `b1380fa` (Phase 1 Today journey, PR #8); docs/admin-claim-state branch records this update. Verify the current HEAD before work; earlier sections retain historical SHAs.
+- Canonical repository: `danengelsman/CreatorOS`, production branch `main`; latest verified remote checkpoint `8db7f83`. Active closeout worktree: `CreatorOS_wt_release_closeout`. The original `CreatorOS_Repo` checkout is behind with preserved local edits. Earlier sections retain historical SHAs.
 - Git identity fixed (repo-local + global): `Daniel Engelsman <danengelsman@gmail.com>` — OpenClaw commits now attribute correctly
 - History rewrite (2026-10-03): all 51 commits on `main` are Daniel as author+committer; content verified byte-identical (tree `b6bbdb47…`)
 - **Safety backup:** `C:\Users\ADMIN\Documents\CreatorOS_Repo_backup_pre-rewrite_20261003.bundle` (full pre-rewrite history). Delete after ~2 stable weeks in production.
@@ -157,9 +170,9 @@ Week 5 D7-A work landed here (file-based TanStack Router routes under `src/route
   - ✅ Independent read-only release acceptance audit: found one functional release blocker (P1 - scheduled projects stranded without Calendar access), one UX acceptance gap (P2 - outer assistant backdrop does not dismiss drawer), and three E2E contract failures; provided prioritized findings and exact fixes; current experience inventory verified; combined verification path provided.
     Parent now owns serial integration, combined gates, exact-commit independent review, approved rules deployment and application release. The source navigation worktree remains read-only; unrelated files are preserved. Execution plan: `.hermes/plans/2026-10-31_studio-release-recovery.md`.
     - 2026-10-31 integration & verification complete:
-      * Merged `fix/studio-owner-api` (b32e997) & `fix/studio-owner-commit-fence`
-      * Addressed release audit findings: added StudioAssistants backdrop click-to-dismiss, restored Hub unschedule action, updated E2E smoke video locators & studioAccountJourney test fixtures (commit b21a118)
-      * Passed all release gates:
+      - Merged `fix/studio-owner-api` (b32e997) & `fix/studio-owner-commit-fence`
+      - Addressed release audit findings: added StudioAssistants backdrop click-to-dismiss, restored Hub unschedule action, updated E2E smoke video locators & studioAccountJourney test fixtures (commit b21a118)
+      - Passed all release gates:
         - Typecheck & Lint (`npm run lint` / `tsc --noEmit && eslint .`): 0 errors ✅
         - Production build (`npm run build`): clean bundle generated ✅
         - Artifact freshness (`npm run check:artifact`): api/_server.js fresh ✅
@@ -168,7 +181,7 @@ Week 5 D7-A work landed here (file-based TanStack Router routes under `src/route
 
 ## Next action
 
-1. EXECUTING Week 5 (Active) → Phase 5 frontend architecture: D8-A Zustand slices, F5.4 CalendarView/LandingPage splits, F5.5 font/CSS hygiene.
-2. DONE 2026-10-25: Gemini model audit verified vs live API; dead `src/App.tsx` deleted (PR #20 `f691f14`).
-3. Firestore rules deployed Oct 24 for `first_dollar_journeys`.
-4. Next Phase: Phase 6 launch readiness (Roadmap derivation, billing decision, staging env, launch gate).
+1. Close out reviewed PR #29 (`chore/studio-release-closeout`): final documentation CI, merge, verify remote main and the new stable-domain Vercel release. Source commit `1fafaaa` already passed every CI check; approved rules are deployed and independently read back for both targets. Do not repeat the already merged PR #28 or blindly replay preserved primary-checkout patches.
+2. F5.2 Zustand slices and F5.4 LandingPage/CalendarView decomposition already merged in PR #22 (`ca143fe`). Its PR labels the LandingPage split F5.3, but F5.3 in the plan of record means strict TypeScript: the actual config enables `strictNullChecks`, not full `strict`/`noImplicitAny`.
+3. Assess remaining F5.3 strictness, F5.5 hygiene, F5.6 bundle discipline, and the staging/release/monitoring definition-of-done against current source before selecting the next implementation chunk.
+4. Growth/community/billing, advanced auth, video-engine redesign, and native iOS remain outside this closeout. The recorded launch scope is create-focused and billing is deferred.

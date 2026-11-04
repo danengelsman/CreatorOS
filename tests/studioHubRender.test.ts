@@ -9,54 +9,102 @@ vi.mock('../src/components/ViralTemplatesLibrary', () => ({ default: () => null 
 import StudioHub from '../src/components/studio/StudioHub';
 
 const props = {
-  user: { uid: 'owner' }, brand: null, isProjectsLoading: false,
-  projectsLoadError: false, onOpenProject: vi.fn(), projects: [],
+  user: { uid: 'owner' },
+  brand: null,
+  isProjectsLoading: false,
+  projectsLoadError: false,
+  onOpenProject: vi.fn(),
+  projects: [],
 };
 
 describe('StudioHub rendering', () => {
   it('offers a selected VideoIdeas handoff without consuming it while rendering', () => {
     const clear = vi.fn();
-    const html = renderToStaticMarkup(React.createElement(StudioHub, {
-      ...props, selectedIdea: { title: 'Handoff idea', hook: 'Hook', description: 'Concept' }, onClearSelectedIdea: clear,
-    }));
+    const html = renderToStaticMarkup(
+      React.createElement(StudioHub, {
+        ...props,
+        selectedIdea: { title: 'Handoff idea', hook: 'Hook', description: 'Concept' },
+        onClearSelectedIdea: clear,
+      }),
+    );
     expect(html).toContain('Handoff idea');
     expect(html).toContain('Create from selected idea');
     expect(clear).not.toHaveBeenCalled();
   });
   it('shows loading and failure rather than an empty pipeline', () => {
-    const loading = renderToStaticMarkup(React.createElement(StudioHub, { ...props, isProjectsLoading: true }));
+    const loading = renderToStaticMarkup(
+      React.createElement(StudioHub, { ...props, isProjectsLoading: true }),
+    );
     expect(loading).toContain('Loading your projects');
     expect(loading).not.toContain('Your ideas and drafts will appear here');
-    const error = renderToStaticMarkup(React.createElement(StudioHub, { ...props, projectsLoadError: true }));
+    const error = renderToStaticMarkup(
+      React.createElement(StudioHub, { ...props, projectsLoadError: true }),
+    );
     expect(error).toContain('Projects could not be loaded');
     expect(error).not.toContain('Your ideas and drafts will appear here');
   });
 
   it('blocks a calendar-dated draft even without auto-publish', () => {
-    const html = renderToStaticMarkup(React.createElement(StudioHub, { ...props, projects: [
-      { id: 'dated', userId: 'owner', type: 'content', name: 'Calendar draft', status: 'Draft', scheduledDate: new Date(), autoPublish: false },
-    ] }));
+    const html = renderToStaticMarkup(
+      React.createElement(StudioHub, {
+        ...props,
+        projects: [
+          {
+            id: 'dated',
+            userId: 'owner',
+            type: 'content',
+            name: 'Calendar draft',
+            status: 'Draft',
+            scheduledDate: new Date(),
+            autoPublish: false,
+          },
+        ],
+      }),
+    );
     expect(html.indexOf('Calendar draft')).toBeGreaterThan(html.indexOf('pipeline-production'));
     expect(html).toContain('Manage it in Calendar');
     expect(html).not.toContain('Mark ready');
   });
 
   it('shows legacy boolean-published projects as published without stage controls', () => {
-    const html = renderToStaticMarkup(React.createElement(StudioHub, { ...props, projects: [
-      { id: 'legacy', userId: 'owner', type: 'content', name: 'Legacy live', status: 'Draft', published: true },
-    ] }));
+    const html = renderToStaticMarkup(
+      React.createElement(StudioHub, {
+        ...props,
+        projects: [
+          {
+            id: 'legacy',
+            userId: 'owner',
+            type: 'content',
+            name: 'Legacy live',
+            status: 'Draft',
+            published: true,
+          },
+        ],
+      }),
+    );
     expect(html.indexOf('Legacy live')).toBeGreaterThan(html.indexOf('pipeline-published'));
     expect(html).toContain('Publication status is managed outside the Studio workflow');
     expect(html).not.toContain('Change stage for Legacy live');
   });
 
   it('places only content projects into the mapped columns without hiding legacy statuses', () => {
-    const html = renderToStaticMarkup(React.createElement(StudioHub, { ...props, projects: [
-      { id: 'one', userId: 'owner', type: 'content', name: 'Draft item', status: 'Draft' },
-      { id: 'two', userId: 'owner', type: 'content', name: 'Scheduled item', status: 'Scheduled' },
-      { id: 'three', userId: 'owner', type: 'content', name: 'Live item', status: 'Published' },
-      { id: 'four', userId: 'owner', type: 'workflow', name: 'Hidden workflow' },
-    ] }));
+    const html = renderToStaticMarkup(
+      React.createElement(StudioHub, {
+        ...props,
+        projects: [
+          { id: 'one', userId: 'owner', type: 'content', name: 'Draft item', status: 'Draft' },
+          {
+            id: 'two',
+            userId: 'owner',
+            type: 'content',
+            name: 'Scheduled item',
+            status: 'Scheduled',
+          },
+          { id: 'three', userId: 'owner', type: 'content', name: 'Live item', status: 'Published' },
+          { id: 'four', userId: 'owner', type: 'workflow', name: 'Hidden workflow' },
+        ],
+      }),
+    );
     expect(html).toContain('lg:grid-cols-3');
     expect(html).not.toContain('lg:grid-cols-4');
     const ideation = html.indexOf('pipeline-ideation');

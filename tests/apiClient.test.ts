@@ -108,7 +108,8 @@ describe('apiFetch — request shaping', () => {
 
 describe('apiFetch — non-API passthrough', () => {
   it.each(['/api/auth/google/callback?code=x', '/api/auth/tiktok/callback?code=x'])(
-    'passes public callback %s through without bearer auth', async (url) => {
+    'passes public callback %s through without bearer auth',
+    async (url) => {
       mockState.currentUser = null;
       fetchMock.mockResolvedValueOnce(new Response('ok'));
       await apiFetch(url);
@@ -131,54 +132,97 @@ describe('apiFetch — non-API passthrough', () => {
 });
 
 describe('apiFetch — 401 force-refresh-retry-once', () => {
-  it.each(['init', 'request'] as const)('promptly aborts an unresolved initial token with the %s signal', async (source) => {
-    const controller = new AbortController();
-    let rejectToken!: (error: Error) => void;
-    mockState.currentUser = { uid: 'A', getIdToken: () => new Promise<string>((_resolve, reject) => { rejectToken = reject; }) };
-    const input = source === 'request' ? new Request('http://localhost:5173/api/projects', { signal: controller.signal }) : '/api/projects';
-    const result = apiFetch(input, source === 'init' ? { signal: controller.signal } : {}).catch((error) => error);
-    controller.abort();
-    expect((await result).name).toBe('AbortError');
-    rejectToken(new Error('late token failure'));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(dispatchEventMock).not.toHaveBeenCalled();
-  }, 500);
+  it.each(['init', 'request'] as const)(
+    'promptly aborts an unresolved initial token with the %s signal',
+    async (source) => {
+      const controller = new AbortController();
+      let rejectToken!: (error: Error) => void;
+      mockState.currentUser = {
+        uid: 'A',
+        getIdToken: () =>
+          new Promise<string>((_resolve, reject) => {
+            rejectToken = reject;
+          }),
+      };
+      const input =
+        source === 'request'
+          ? new Request('http://localhost:5173/api/projects', { signal: controller.signal })
+          : '/api/projects';
+      const result = apiFetch(input, source === 'init' ? { signal: controller.signal } : {}).catch(
+        (error) => error,
+      );
+      controller.abort();
+      expect((await result).name).toBe('AbortError');
+      rejectToken(new Error('late token failure'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(dispatchEventMock).not.toHaveBeenCalled();
+    },
+    500,
+  );
 
-  it.each(['init', 'request'] as const)('promptly aborts an unresolved refresh with the %s signal', async (source) => {
-    const controller = new AbortController();
-    let rejectRefresh!: (error: Error) => void;
-    let refreshStarted!: () => void;
-    const started = new Promise<void>((resolve) => { refreshStarted = resolve; });
-    mockState.currentUser = { uid: 'A', getIdToken: (force) => force
-      ? (refreshStarted(), new Promise<string>((_resolve, reject) => { rejectRefresh = reject; }))
-      : Promise.resolve('token-1') };
-    fetchMock.mockResolvedValue(jsonResponse({}, 401));
-    const input = source === 'request' ? new Request('http://localhost:5173/api/projects', { signal: controller.signal }) : '/api/projects';
-    const result = apiFetch(input, source === 'init' ? { signal: controller.signal } : {}).catch((error) => error);
-    await started;
-    controller.abort();
-    expect((await result).name).toBe('AbortError');
-    rejectRefresh(new Error('late refresh failure'));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(dispatchEventMock).not.toHaveBeenCalled();
-  }, 500);
+  it.each(['init', 'request'] as const)(
+    'promptly aborts an unresolved refresh with the %s signal',
+    async (source) => {
+      const controller = new AbortController();
+      let rejectRefresh!: (error: Error) => void;
+      let refreshStarted!: () => void;
+      const started = new Promise<void>((resolve) => {
+        refreshStarted = resolve;
+      });
+      mockState.currentUser = {
+        uid: 'A',
+        getIdToken: (force) =>
+          force
+            ? (refreshStarted(),
+              new Promise<string>((_resolve, reject) => {
+                rejectRefresh = reject;
+              }))
+            : Promise.resolve('token-1'),
+      };
+      fetchMock.mockResolvedValue(jsonResponse({}, 401));
+      const input =
+        source === 'request'
+          ? new Request('http://localhost:5173/api/projects', { signal: controller.signal })
+          : '/api/projects';
+      const result = apiFetch(input, source === 'init' ? { signal: controller.signal } : {}).catch(
+        (error) => error,
+      );
+      await started;
+      controller.abort();
+      expect((await result).name).toBe('AbortError');
+      rejectRefresh(new Error('late refresh failure'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(dispatchEventMock).not.toHaveBeenCalled();
+    },
+    500,
+  );
 
   it('does not acquire a token for a pre-aborted signal', async () => {
     const controller = new AbortController();
     const token = vi.fn(() => Promise.resolve('token-1'));
     mockState.currentUser = { uid: 'A', getIdToken: token };
     controller.abort();
-    await expect(apiFetch('/api/projects', { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
+    await expect(apiFetch('/api/projects', { signal: controller.signal })).rejects.toMatchObject({
+      name: 'AbortError',
+    });
     expect(token).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it('does not send after aborting while the initial token is pending', async () => {
     const controller = new AbortController();
     let resolveToken!: (token: string) => void;
-    mockState.currentUser = { uid: 'A', getIdToken: () => new Promise<string>((resolve) => { resolveToken = resolve; }) };
-    const pending = apiFetch('/api/projects', { signal: controller.signal }).catch((error) => error);
+    mockState.currentUser = {
+      uid: 'A',
+      getIdToken: () =>
+        new Promise<string>((resolve) => {
+          resolveToken = resolve;
+        }),
+    };
+    const pending = apiFetch('/api/projects', { signal: controller.signal }).catch(
+      (error) => error,
+    );
     controller.abort();
     resolveToken('token-1');
     expect((await pending).name).toBe('AbortError');
@@ -190,10 +234,21 @@ describe('apiFetch — 401 force-refresh-retry-once', () => {
     const controller = new AbortController();
     let resolveRetry!: (response: Response) => void;
     let retryStarted!: () => void;
-    const started = new Promise<void>((resolve) => { retryStarted = resolve; });
+    const started = new Promise<void>((resolve) => {
+      retryStarted = resolve;
+    });
     fetchMock.mockResolvedValueOnce(jsonResponse({}, 401));
-    fetchMock.mockImplementationOnce(() => (retryStarted(), new Promise<Response>((resolve) => { resolveRetry = resolve; })));
-    const pending = apiFetch('/api/projects', { signal: controller.signal }).catch((error) => error);
+    fetchMock.mockImplementationOnce(
+      () => (
+        retryStarted(),
+        new Promise<Response>((resolve) => {
+          resolveRetry = resolve;
+        })
+      ),
+    );
+    const pending = apiFetch('/api/projects', { signal: controller.signal }).catch(
+      (error) => error,
+    );
     await started;
     controller.abort();
     resolveRetry(jsonResponse({}, 401));
@@ -201,25 +256,40 @@ describe('apiFetch — 401 force-refresh-retry-once', () => {
     expect(dispatchEventMock).not.toHaveBeenCalled();
   });
 
-  it.each(['init', 'request'] as const)('ignores rejected refresh after %s signal aborts', async (source) => {
-    const controller = new AbortController();
-    let rejectRefresh!: (error: Error) => void;
-    let refreshStarted!: () => void;
-    const started = new Promise<void>((resolve) => { refreshStarted = resolve; });
-    mockState.currentUser = { uid: 'A', getIdToken: (force) => force
-      ? (refreshStarted(), new Promise<string>((_resolve, reject) => { rejectRefresh = reject; }))
-      : Promise.resolve('token-1') };
-    fetchMock.mockResolvedValue(jsonResponse({}, 401));
-    const input = source === 'request' ? new Request('http://localhost:5173/api/projects', { signal: controller.signal }) : '/api/projects';
-    const pending = apiFetch(input, source === 'init' ? { signal: controller.signal } : {});
-    const result = pending.catch((error) => error);
-    await started;
-    controller.abort();
-    rejectRefresh(new Error('refresh failed'));
-    expect((await result).name).toBe('AbortError');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(dispatchEventMock).not.toHaveBeenCalled();
-  });
+  it.each(['init', 'request'] as const)(
+    'ignores rejected refresh after %s signal aborts',
+    async (source) => {
+      const controller = new AbortController();
+      let rejectRefresh!: (error: Error) => void;
+      let refreshStarted!: () => void;
+      const started = new Promise<void>((resolve) => {
+        refreshStarted = resolve;
+      });
+      mockState.currentUser = {
+        uid: 'A',
+        getIdToken: (force) =>
+          force
+            ? (refreshStarted(),
+              new Promise<string>((_resolve, reject) => {
+                rejectRefresh = reject;
+              }))
+            : Promise.resolve('token-1'),
+      };
+      fetchMock.mockResolvedValue(jsonResponse({}, 401));
+      const input =
+        source === 'request'
+          ? new Request('http://localhost:5173/api/projects', { signal: controller.signal })
+          : '/api/projects';
+      const pending = apiFetch(input, source === 'init' ? { signal: controller.signal } : {});
+      const result = pending.catch((error) => error);
+      await started;
+      controller.abort();
+      rejectRefresh(new Error('refresh failed'));
+      expect((await result).name).toBe('AbortError');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(dispatchEventMock).not.toHaveBeenCalled();
+    },
+  );
 
   it('replays a consumed Request body after refresh', async () => {
     const bodies: string[] = [];
@@ -227,7 +297,10 @@ describe('apiFetch — 401 force-refresh-retry-once', () => {
       bodies.push(await new Request(input, init).text());
       return jsonResponse({}, bodies.length === 1 ? 401 : 200);
     });
-    const request = new Request('http://localhost:5173/api/projects', { method: 'POST', body: '{"hello":"world"}' });
+    const request = new Request('http://localhost:5173/api/projects', {
+      method: 'POST',
+      body: '{"hello":"world"}',
+    });
     await expect(apiFetch(request)).resolves.toMatchObject({ ok: true });
     expect(bodies).toEqual(['{"hello":"world"}', '{"hello":"world"}']);
   });
@@ -236,12 +309,23 @@ describe('apiFetch — 401 force-refresh-retry-once', () => {
     const controller = new AbortController();
     let resolveRefresh!: (token: string) => void;
     let refreshStarted!: () => void;
-    const started = new Promise<void>((resolve) => { refreshStarted = resolve; });
-    mockState.currentUser = { uid: 'A', getIdToken: (force) => force
-      ? (refreshStarted(), new Promise<string>((resolve) => { resolveRefresh = resolve; }))
-      : Promise.resolve('token-1') };
+    const started = new Promise<void>((resolve) => {
+      refreshStarted = resolve;
+    });
+    mockState.currentUser = {
+      uid: 'A',
+      getIdToken: (force) =>
+        force
+          ? (refreshStarted(),
+            new Promise<string>((resolve) => {
+              resolveRefresh = resolve;
+            }))
+          : Promise.resolve('token-1'),
+    };
     fetchMock.mockResolvedValue(jsonResponse({}, 401));
-    const pending = apiFetch('/api/projects', { signal: controller.signal }).catch((error) => error);
+    const pending = apiFetch('/api/projects', { signal: controller.signal }).catch(
+      (error) => error,
+    );
     await started;
     controller.abort();
     resolveRefresh('token-2');
@@ -253,10 +337,14 @@ describe('apiFetch — 401 force-refresh-retry-once', () => {
   it('uses the init signal instead of the Request signal when overridden', async () => {
     const requestController = new AbortController();
     const initController = new AbortController();
-    const request = new Request('http://localhost:5173/api/projects', { signal: requestController.signal });
+    const request = new Request('http://localhost:5173/api/projects', {
+      signal: requestController.signal,
+    });
     requestController.abort();
     fetchMock.mockResolvedValue(jsonResponse({}, 200));
-    await expect(apiFetch(request, { signal: initController.signal })).resolves.toMatchObject({ ok: true });
+    await expect(apiFetch(request, { signal: initController.signal })).resolves.toMatchObject({
+      ok: true,
+    });
   });
 
   it('retries once with the refreshed token and succeeds', async () => {
@@ -282,17 +370,27 @@ describe('apiFetch — 401 force-refresh-retry-once', () => {
     expect(dispatchEventMock.mock.calls[0][0].type).toBe(AUTH_EXPIRED_EVENT);
   });
 
-  it.each([false, true])('reports a Firebase invalidated token during %s refresh', async (forceFailure) => {
-    mockState.currentUser = { uid: 'A', getIdToken: async (force) => {
-      if (!!force === forceFailure) throw Object.assign(new Error('invalidated'), { code: 'auth/user-token-expired' });
-      return 'A-token';
-    } };
-    fetchMock.mockResolvedValue(jsonResponse({}, 401));
-    await expect(apiFetch('/api/projects')).rejects.toBeInstanceOf(AuthExpiredError);
-    expect(dispatchEventMock).toHaveBeenCalledTimes(1);
-    expect(dispatchEventMock.mock.calls[0][0].detail).toEqual({ uid: 'A', generation: useWorkspaceStore.getState().generation });
-    expect(fetchMock).toHaveBeenCalledTimes(forceFailure ? 1 : 0);
-  });
+  it.each([false, true])(
+    'reports a Firebase invalidated token during %s refresh',
+    async (forceFailure) => {
+      mockState.currentUser = {
+        uid: 'A',
+        getIdToken: async (force) => {
+          if (!!force === forceFailure)
+            throw Object.assign(new Error('invalidated'), { code: 'auth/user-token-expired' });
+          return 'A-token';
+        },
+      };
+      fetchMock.mockResolvedValue(jsonResponse({}, 401));
+      await expect(apiFetch('/api/projects')).rejects.toBeInstanceOf(AuthExpiredError);
+      expect(dispatchEventMock).toHaveBeenCalledTimes(1);
+      expect(dispatchEventMock.mock.calls[0][0].detail).toEqual({
+        uid: 'A',
+        generation: useWorkspaceStore.getState().generation,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(forceFailure ? 1 : 0);
+    },
+  );
   it('throws AuthExpiredError when the forced refresh yields no token', async () => {
     mockState.currentUser = authUser('token-1', null);
     fetchMock.mockResolvedValue(jsonResponse({}, 401));
@@ -309,9 +407,16 @@ describe('onboarding API owner generations', () => {
     const token = useWorkspaceStore.getState().changeAccount('A');
     mockState.currentUser = { uid: 'A', getIdToken: vi.fn(async () => 'A-token') };
     fetchMock.mockResolvedValue(jsonResponse({}, 401));
-    await expect(apiFetch('/api/onboarding/chat', {}, {
-      uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token),
-    })).rejects.toBeInstanceOf(AuthExpiredError);
+    await expect(
+      apiFetch(
+        '/api/onboarding/chat',
+        {},
+        {
+          uid: 'A',
+          isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token),
+        },
+      ),
+    ).rejects.toBeInstanceOf(AuthExpiredError);
     expect(dispatchEventMock).toHaveBeenCalledTimes(1);
     expect(dispatchEventMock.mock.calls[0][0].detail).toEqual(token);
   });
@@ -321,50 +426,82 @@ describe('onboarding API owner generations', () => {
     ['typed chat', '/api/onboarding/chat'],
     ['brand generation', '/api/onboarding/generate-brand'],
   ];
-  it.each(paths)('%s never dispatches after A-B-A during token acquisition', async (_label, url) => {
-    const token = useWorkspaceStore.getState().changeAccount('A');
-    let release!: (value: string) => void;
-    const delayed = new Promise<string>((resolve) => { release = resolve; });
-    mockState.currentUser = { uid: 'A', getIdToken: () => delayed };
-    const pending = apiFetch(url, {}, { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) }).catch((error) => error);
-    useWorkspaceStore.getState().changeAccount('B');
-    useWorkspaceStore.getState().changeAccount('A');
-    release('old-token');
-    expect((await pending).name).toBe('AbortError');
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(dispatchEventMock).not.toHaveBeenCalled();
-  });
-  it.each(paths)('%s never retries or expires a new A session after a delayed 401 refresh', async (_label, url) => {
-    const token = useWorkspaceStore.getState().changeAccount('A');
-    let release!: (value: string) => void;
-    let signalStarted!: () => void;
-    const started = new Promise<void>((resolve) => { signalStarted = resolve; });
-    const delayed = new Promise<string>((resolve) => { release = resolve; });
-    mockState.currentUser = { uid: 'A', getIdToken: (force) => force ? (signalStarted(), delayed) : Promise.resolve('old-token') };
-    fetchMock.mockResolvedValue(jsonResponse({}, 401));
-    const pending = apiFetch(url, {}, { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) }).catch((error) => error);
-    await started;
-    useWorkspaceStore.getState().changeAccount('B');
-    useWorkspaceStore.getState().changeAccount('A');
-    release('old-refresh');
-    expect((await pending).name).toBe('AbortError');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(dispatchEventMock).not.toHaveBeenCalled();
-  });
+  it.each(paths)(
+    '%s never dispatches after A-B-A during token acquisition',
+    async (_label, url) => {
+      const token = useWorkspaceStore.getState().changeAccount('A');
+      let release!: (value: string) => void;
+      const delayed = new Promise<string>((resolve) => {
+        release = resolve;
+      });
+      mockState.currentUser = { uid: 'A', getIdToken: () => delayed };
+      const pending = apiFetch(
+        url,
+        {},
+        { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) },
+      ).catch((error) => error);
+      useWorkspaceStore.getState().changeAccount('B');
+      useWorkspaceStore.getState().changeAccount('A');
+      release('old-token');
+      expect((await pending).name).toBe('AbortError');
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(dispatchEventMock).not.toHaveBeenCalled();
+    },
+  );
+  it.each(paths)(
+    '%s never retries or expires a new A session after a delayed 401 refresh',
+    async (_label, url) => {
+      const token = useWorkspaceStore.getState().changeAccount('A');
+      let release!: (value: string) => void;
+      let signalStarted!: () => void;
+      const started = new Promise<void>((resolve) => {
+        signalStarted = resolve;
+      });
+      const delayed = new Promise<string>((resolve) => {
+        release = resolve;
+      });
+      mockState.currentUser = {
+        uid: 'A',
+        getIdToken: (force) => (force ? (signalStarted(), delayed) : Promise.resolve('old-token')),
+      };
+      fetchMock.mockResolvedValue(jsonResponse({}, 401));
+      const pending = apiFetch(
+        url,
+        {},
+        { uid: 'A', isCurrent: () => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) },
+      ).catch((error) => error);
+      await started;
+      useWorkspaceStore.getState().changeAccount('B');
+      useWorkspaceStore.getState().changeAccount('A');
+      release('old-refresh');
+      expect((await pending).name).toBe('AbortError');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(dispatchEventMock).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('implicit request owner', () => {
   it('rejects a response body read that completes after an account switch', async () => {
     let release!: (value: Uint8Array) => void;
     let started!: () => void;
-    const reading = new Promise<void>(resolve => { started = resolve; });
-    const stream = new ReadableStream<Uint8Array>({ start(controller) { release = value => { controller.enqueue(value); controller.close(); }; } });
-    fetchMock.mockResolvedValue(new Response(stream, {status: 200}));
+    const reading = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        release = (value) => {
+          controller.enqueue(value);
+          controller.close();
+        };
+      },
+    });
+    fetchMock.mockResolvedValue(new Response(stream, { status: 200 }));
     const response = await apiFetch('/api/projects');
-    const pending = response.text().catch(error => error);
+    const pending = response.text().catch((error) => error);
     started();
     await reading;
-    mockState.currentUser = { uid:'B', getIdToken: async () => 'B-token' };
+    mockState.currentUser = { uid: 'B', getIdToken: async () => 'B-token' };
     useWorkspaceStore.getState().changeAccount('B');
     release(new TextEncoder().encode('private A'));
     expect((await pending).name).toBe('AbortError');
@@ -372,11 +509,21 @@ describe('implicit request owner', () => {
   it.each(['initial token', 'refresh'])('rejects A-B-A during %s', async (phase) => {
     let release!: (value: string) => void;
     let began!: () => void;
-    const started = new Promise<void>(resolve => { began = resolve; });
-    const delayed = new Promise<string>(resolve => { release = resolve; });
-    mockState.currentUser = { uid: 'A', getIdToken: (force) => (phase === 'refresh' ? force : !force) ? (began(), delayed) : Promise.resolve('A-token') };
+    const started = new Promise<void>((resolve) => {
+      began = resolve;
+    });
+    const delayed = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    mockState.currentUser = {
+      uid: 'A',
+      getIdToken: (force) =>
+        (phase === 'refresh' ? force : !force) ? (began(), delayed) : Promise.resolve('A-token'),
+    };
     fetchMock.mockResolvedValue(jsonResponse({}, 401));
-    const pending = apiFetch('/api/publish', {method:'POST',body:'A private payload'}).catch(error => error);
+    const pending = apiFetch('/api/publish', { method: 'POST', body: 'A private payload' }).catch(
+      (error) => error,
+    );
     await started;
     useWorkspaceStore.getState().changeAccount('B');
     useWorkspaceStore.getState().changeAccount('A');
@@ -390,9 +537,20 @@ describe('implicit request owner', () => {
     useWorkspaceStore.getState().changeAccount(null);
     let callback!: (user: unknown) => void;
     let began!: () => void;
-    const started = new Promise<void>(resolve => { began = resolve; });
-    vi.mocked(onAuthStateChanged).mockImplementationOnce(((_auth: unknown, cb: (user: unknown) => void) => { callback = cb; began(); return () => {}; }) as typeof onAuthStateChanged);
-    const pending = apiFetch('/api/publish', {method:'POST',body:'old payload'}).catch(error => error);
+    const started = new Promise<void>((resolve) => {
+      began = resolve;
+    });
+    vi.mocked(onAuthStateChanged).mockImplementationOnce(((
+      _auth: unknown,
+      cb: (user: unknown) => void,
+    ) => {
+      callback = cb;
+      began();
+      return () => {};
+    }) as typeof onAuthStateChanged);
+    const pending = apiFetch('/api/publish', { method: 'POST', body: 'old payload' }).catch(
+      (error) => error,
+    );
     await started;
     mockState.currentUser = authUser('A-token');
     useWorkspaceStore.getState().changeAccount('A');
@@ -407,10 +565,19 @@ describe('implicit request owner', () => {
     mockState.currentUser = a;
     let release!: (value: Response) => void;
     let dispatched!: () => void;
-    const started = new Promise<void>((resolve) => { dispatched = resolve; });
-    fetchMock.mockImplementationOnce(() => { dispatched(); return new Promise((resolve) => { release = resolve; }); });
+    const started = new Promise<void>((resolve) => {
+      dispatched = resolve;
+    });
+    fetchMock.mockImplementationOnce(() => {
+      dispatched();
+      return new Promise((resolve) => {
+        release = resolve;
+      });
+    });
     fetchMock.mockResolvedValue(jsonResponse({}));
-    const pending = apiFetch('/api/publish', { method: 'POST', body: 'A private payload' }).catch((error) => error);
+    const pending = apiFetch('/api/publish', { method: 'POST', body: 'A private payload' }).catch(
+      (error) => error,
+    );
     await started;
     mockState.currentUser = b;
     useWorkspaceStore.getState().changeAccount('B');
@@ -458,8 +625,13 @@ describe('apiFetch — other errors and auth state', () => {
     const clearTimer = vi.spyOn(globalThis, 'clearTimeout');
     let callback!: (user: unknown) => void;
     let listening!: () => void;
-    const started = new Promise<void>((resolve) => { listening = resolve; });
-    vi.mocked(onAuthStateChanged).mockImplementationOnce(((_auth: unknown, cb: (user: unknown) => void) => {
+    const started = new Promise<void>((resolve) => {
+      listening = resolve;
+    });
+    vi.mocked(onAuthStateChanged).mockImplementationOnce(((
+      _auth: unknown,
+      cb: (user: unknown) => void,
+    ) => {
       callback = cb;
       listening();
       return unsubscribe;

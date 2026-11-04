@@ -476,7 +476,11 @@ export default function EventDetailModal({
 
         {/* Footer Actions */}
         <div className="p-6 bg-[var(--bg-secondary)]/40 border-t border-[var(--separator)] flex flex-wrap gap-3 items-center justify-between">
-          {scheduleError && <p role="alert" className="w-full text-sm text-red-500">{scheduleError}</p>}
+          {scheduleError && (
+            <p role="alert" className="w-full text-sm text-red-500">
+              {scheduleError}
+            </p>
+          )}
           <button
             onClick={() => onDeleteEvent(selectedEvent.id)}
             className="px-4 py-3 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 text-[13px] font-bold transition-colors flex items-center gap-2"

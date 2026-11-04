@@ -1,9 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { clearAuthReturnIfReached, pendingAuthReturn, rememberAuthReturn, safeAuthReturn } from '../src/lib/authReturn';
+import {
+  clearAuthReturnIfReached,
+  pendingAuthReturn,
+  rememberAuthReturn,
+  safeAuthReturn,
+} from '../src/lib/authReturn';
 
 describe('safe auth return', () => {
   afterEach(() => vi.unstubAllGlobals());
-  it.each(['https://evil.test/path', '//evil.test/path', '/\\evil.test', '/login', '/path\nheader', null, 42])('rejects unsafe destination %s', (value) => {
+  it.each([
+    'https://evil.test/path',
+    '//evil.test/path',
+    '/\\evil.test',
+    '/login',
+    '/path\nheader',
+    null,
+    42,
+  ])('rejects unsafe destination %s', (value) => {
     expect(safeAuthReturn(value)).toBeNull();
   });
   it('preserves the first route, query and hash until the exact destination is reached', () => {
@@ -22,7 +35,14 @@ describe('safe auth return', () => {
     expect(pendingAuthReturn()).toBeNull();
   });
   it('falls back safely if session storage is inaccessible', () => {
-    vi.stubGlobal('sessionStorage', { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } });
+    vi.stubGlobal('sessionStorage', {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+    });
     expect(() => rememberAuthReturn('/studio')).not.toThrow();
     expect(pendingAuthReturn()).toBeNull();
   });

@@ -144,32 +144,40 @@ export const generateContentIdeas = async (brandData: any) => {
   return parseModelJson(contentIdeasSchema, data.text, 'content ideas').ideas;
 };
 
-export const scoreContent = async (content: string, brandVoice: string, owner?: ApiRequestOwner) => {
-  const response = await apiFetch('/api/gemini/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'gemini-3.8-flash',
-      contents: `Score this content (0-100) based on hook strength, clarity, engagement potential, and storytelling. 
+export const scoreContent = async (
+  content: string,
+  brandVoice: string,
+  owner?: ApiRequestOwner,
+) => {
+  const response = await apiFetch(
+    '/api/gemini/generate',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gemini-3.8-flash',
+        contents: `Score this content (0-100) based on hook strength, clarity, engagement potential, and storytelling. 
       Brand Voice: ${brandVoice}
       Content: ${content}`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'OBJECT',
-          properties: {
-            score: { type: 'INTEGER' },
-            feedback: { type: 'STRING' },
-            suggestions: {
-              type: 'ARRAY',
-              items: { type: 'STRING' },
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              score: { type: 'INTEGER' },
+              feedback: { type: 'STRING' },
+              suggestions: {
+                type: 'ARRAY',
+                items: { type: 'STRING' },
+              },
             },
+            required: ['score', 'feedback', 'suggestions'],
           },
-          required: ['score', 'feedback', 'suggestions'],
         },
-      },
-    }),
-  }, owner);
+      }),
+    },
+    owner,
+  );
   if (!response.ok) {
     const errText = await response.text();
     try {
@@ -254,82 +262,89 @@ export const quickPolish = async (content: string) => {
 };
 
 export const repurposeContent = async (content: string, owner?: ApiRequestOwner) => {
-  const response = await apiFetch('/api/gemini/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'gemini-3.8-flash',
-      contents: `Analyze this published content and automatically suggest multiple ways to repurpose it for other platforms (e.g., TikTok, Twitter, LinkedIn).
+  const response = await apiFetch(
+    '/api/gemini/generate',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gemini-3.8-flash',
+        contents: `Analyze this published content and automatically suggest multiple ways to repurpose it for other platforms (e.g., TikTok, Twitter, LinkedIn).
       Provide specific, actionable ideas for transforming the content.
       Include suggested edits, format changes, platform-specific optimizations, and a draft for each idea.
       Content: ${content}`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'OBJECT',
-          properties: {
-            platforms: {
-              type: 'ARRAY',
-              items: {
-                type: 'OBJECT',
-                properties: {
-                  platform: {
-                    type: 'STRING',
-                    description: 'Platform name (e.g. TikTok, Twitter, LinkedIn)',
-                  },
-                  icon: { type: 'STRING', description: 'A relevant single emoji for the platform' },
-                  color: {
-                    type: 'STRING',
-                    description: 'A hex color code associated with the platform brand',
-                  },
-                  ideas: {
-                    type: 'ARRAY',
-                    items: {
-                      type: 'OBJECT',
-                      properties: {
-                        title: {
-                          type: 'STRING',
-                          description: 'Catchy title for this repurposing idea',
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              platforms: {
+                type: 'ARRAY',
+                items: {
+                  type: 'OBJECT',
+                  properties: {
+                    platform: {
+                      type: 'STRING',
+                      description: 'Platform name (e.g. TikTok, Twitter, LinkedIn)',
+                    },
+                    icon: {
+                      type: 'STRING',
+                      description: 'A relevant single emoji for the platform',
+                    },
+                    color: {
+                      type: 'STRING',
+                      description: 'A hex color code associated with the platform brand',
+                    },
+                    ideas: {
+                      type: 'ARRAY',
+                      items: {
+                        type: 'OBJECT',
+                        properties: {
+                          title: {
+                            type: 'STRING',
+                            description: 'Catchy title for this repurposing idea',
+                          },
+                          transformation: {
+                            type: 'STRING',
+                            description:
+                              "Specific actionable ideas for transforming the content (e.g., 'Extract the top 3 tips, cut the intro, reframe as a bold claim')",
+                          },
+                          format_changes: {
+                            type: 'STRING',
+                            description:
+                              "Suggested format changes (e.g., 'Turn into a 60s fast-paced vertical video' or 'Carousel post with 5 slides')",
+                          },
+                          optimizations: {
+                            type: 'STRING',
+                            description:
+                              'Platform-specific optimizations (e.g., specific hashtags, pacing, visual hooks, best times to post)',
+                          },
+                          draft: {
+                            type: 'STRING',
+                            description: 'The actual script, post text, or thread content draft',
+                          },
                         },
-                        transformation: {
-                          type: 'STRING',
-                          description:
-                            "Specific actionable ideas for transforming the content (e.g., 'Extract the top 3 tips, cut the intro, reframe as a bold claim')",
-                        },
-                        format_changes: {
-                          type: 'STRING',
-                          description:
-                            "Suggested format changes (e.g., 'Turn into a 60s fast-paced vertical video' or 'Carousel post with 5 slides')",
-                        },
-                        optimizations: {
-                          type: 'STRING',
-                          description:
-                            'Platform-specific optimizations (e.g., specific hashtags, pacing, visual hooks, best times to post)',
-                        },
-                        draft: {
-                          type: 'STRING',
-                          description: 'The actual script, post text, or thread content draft',
-                        },
+                        required: [
+                          'title',
+                          'transformation',
+                          'format_changes',
+                          'optimizations',
+                          'draft',
+                        ],
                       },
-                      required: [
-                        'title',
-                        'transformation',
-                        'format_changes',
-                        'optimizations',
-                        'draft',
-                      ],
                     },
                   },
+                  required: ['platform', 'icon', 'color', 'ideas'],
                 },
-                required: ['platform', 'icon', 'color', 'ideas'],
               },
             },
+            required: ['platforms'],
           },
-          required: ['platforms'],
         },
-      },
-    }),
-  }, owner);
+      }),
+    },
+    owner,
+  );
   if (!response.ok) {
     const errText = await response.text();
     try {
@@ -412,11 +427,15 @@ export const generateVideo = async (
   durationSeconds: number = 5,
   owner?: ApiRequestOwner,
 ) => {
-  const response = await apiFetch('/api/gemini/generate-video', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, aspectRatio, durationSeconds }),
-  }, owner);
+  const response = await apiFetch(
+    '/api/gemini/generate-video',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, aspectRatio, durationSeconds }),
+    },
+    owner,
+  );
   if (!response.ok) throw new Error(await response.text());
   return await response.json(); // { operationName: string }
 };
@@ -425,11 +444,15 @@ export const getOperationStatus = async (operation: any, owner?: ApiRequestOwner
   if (operation && operation.done) {
     return operation;
   }
-  const response = await apiFetch('/api/gemini/video-status', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ operationName: operation.operationName || operation.name }),
-  }, owner);
+  const response = await apiFetch(
+    '/api/gemini/video-status',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operationName: operation.operationName || operation.name }),
+    },
+    owner,
+  );
   if (!response.ok) throw new Error(await response.text());
   return await response.json();
 };
@@ -528,7 +551,12 @@ export const generateSmartSuggestions = async (brandData: any, existingContent: 
   return parseModelJson(smartSuggestionsSchema, data.text, 'smart suggestions');
 };
 
-export const generateScenePlan = async (scriptText: string, title?: string, brand?: any, owner?: ApiRequestOwner) => {
+export const generateScenePlan = async (
+  scriptText: string,
+  title?: string,
+  brand?: any,
+  owner?: ApiRequestOwner,
+) => {
   const brandContext = brand
     ? `\nCREATOR BRAND CONTEXT:\n- Name: ${brand.name}\n- Archetype: ${brand.archetype}\n- Visual Style: ${brand.visual_style || 'N/A'}\n- Primary Color: ${brand.colors?.primary || 'N/A'}\nKeep these visual aesthetics in mind, particularly for title cards and image prompts.`
     : '';
@@ -556,76 +584,80 @@ Visual selection rules:
 Script to Plan into Visual Beats:
 ${scriptText}`;
 
-  const response = await apiFetch('/api/gemini/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'gemini-3.8-flash',
-      contents: `${systemPrompt}\n\n${userContent}`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'OBJECT',
-          properties: {
-            video_plan: {
-              type: 'OBJECT',
-              properties: {
-                working_title: { type: 'STRING' },
-                aspect_ratio: { type: 'STRING' },
-                wpm_assumed: { type: 'INTEGER' },
-                target_length_seconds_estimate: { type: 'INTEGER' },
-                length_flag: { type: 'STRING' },
-                sections: {
-                  type: 'ARRAY',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      section_id: { type: 'STRING' },
-                      section_type: { type: 'STRING' },
-                      section_label: { type: 'STRING' },
-                      beats: {
-                        type: 'ARRAY',
-                        items: {
-                          type: 'OBJECT',
-                          properties: {
-                            beat_id: { type: 'STRING' },
-                            narration: { type: 'STRING' },
-                            est_seconds: { type: 'INTEGER' },
-                            visual: {
-                              type: 'OBJECT',
-                              properties: {
-                                type: { type: 'STRING' },
-                                stock_query: { type: 'STRING' },
-                                ai_image_prompt: { type: 'STRING' },
-                                title_card_text: { type: 'STRING' },
+  const response = await apiFetch(
+    '/api/gemini/generate',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gemini-3.8-flash',
+        contents: `${systemPrompt}\n\n${userContent}`,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              video_plan: {
+                type: 'OBJECT',
+                properties: {
+                  working_title: { type: 'STRING' },
+                  aspect_ratio: { type: 'STRING' },
+                  wpm_assumed: { type: 'INTEGER' },
+                  target_length_seconds_estimate: { type: 'INTEGER' },
+                  length_flag: { type: 'STRING' },
+                  sections: {
+                    type: 'ARRAY',
+                    items: {
+                      type: 'OBJECT',
+                      properties: {
+                        section_id: { type: 'STRING' },
+                        section_type: { type: 'STRING' },
+                        section_label: { type: 'STRING' },
+                        beats: {
+                          type: 'ARRAY',
+                          items: {
+                            type: 'OBJECT',
+                            properties: {
+                              beat_id: { type: 'STRING' },
+                              narration: { type: 'STRING' },
+                              est_seconds: { type: 'INTEGER' },
+                              visual: {
+                                type: 'OBJECT',
+                                properties: {
+                                  type: { type: 'STRING' },
+                                  stock_query: { type: 'STRING' },
+                                  ai_image_prompt: { type: 'STRING' },
+                                  title_card_text: { type: 'STRING' },
+                                },
+                                required: ['type', 'stock_query', 'ai_image_prompt'],
                               },
-                              required: ['type', 'stock_query', 'ai_image_prompt'],
+                              on_screen_text: { type: 'STRING' },
                             },
-                            on_screen_text: { type: 'STRING' },
+                            required: ['beat_id', 'narration', 'est_seconds', 'visual'],
                           },
-                          required: ['beat_id', 'narration', 'est_seconds', 'visual'],
                         },
                       },
+                      required: ['section_id', 'section_type', 'section_label', 'beats'],
                     },
-                    required: ['section_id', 'section_type', 'section_label', 'beats'],
                   },
                 },
+                required: [
+                  'working_title',
+                  'aspect_ratio',
+                  'wpm_assumed',
+                  'target_length_seconds_estimate',
+                  'length_flag',
+                  'sections',
+                ],
               },
-              required: [
-                'working_title',
-                'aspect_ratio',
-                'wpm_assumed',
-                'target_length_seconds_estimate',
-                'length_flag',
-                'sections',
-              ],
             },
+            required: ['video_plan'],
           },
-          required: ['video_plan'],
         },
-      },
-    }),
-  }, owner);
+      }),
+    },
+    owner,
+  );
 
   if (!response.ok) {
     const errText = await response.text();
@@ -661,86 +693,90 @@ Output strict raw JSON only matching the schema provided.`;
 Draft Hook / Intro Script to Analyze:
 "${scriptOrHookText}"`;
 
-  const response = await apiFetch('/api/gemini/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'gemini-3.8-flash',
-      contents: `${systemPrompt}\n\n${userContent}`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'OBJECT',
-          properties: {
-            retention_analysis: {
-              type: 'OBJECT',
-              properties: {
-                retention_score: { type: 'INTEGER' },
-                verdict: { type: 'STRING' },
-                summary_critique: { type: 'STRING' },
-                dropoff_reasons: {
-                  type: 'ARRAY',
-                  items: { type: 'STRING' },
-                },
-                first_5s_heatmap: {
-                  type: 'ARRAY',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      second: { type: 'INTEGER' },
-                      attention_level: { type: 'INTEGER' },
-                      viewer_thought: { type: 'STRING' },
-                      visual_pattern_disrupt: { type: 'STRING' },
+  const response = await apiFetch(
+    '/api/gemini/generate',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gemini-3.8-flash',
+        contents: `${systemPrompt}\n\n${userContent}`,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              retention_analysis: {
+                type: 'OBJECT',
+                properties: {
+                  retention_score: { type: 'INTEGER' },
+                  verdict: { type: 'STRING' },
+                  summary_critique: { type: 'STRING' },
+                  dropoff_reasons: {
+                    type: 'ARRAY',
+                    items: { type: 'STRING' },
+                  },
+                  first_5s_heatmap: {
+                    type: 'ARRAY',
+                    items: {
+                      type: 'OBJECT',
+                      properties: {
+                        second: { type: 'INTEGER' },
+                        attention_level: { type: 'INTEGER' },
+                        viewer_thought: { type: 'STRING' },
+                        visual_pattern_disrupt: { type: 'STRING' },
+                      },
+                      required: [
+                        'second',
+                        'attention_level',
+                        'viewer_thought',
+                        'visual_pattern_disrupt',
+                      ],
                     },
-                    required: [
-                      'second',
-                      'attention_level',
-                      'viewer_thought',
-                      'visual_pattern_disrupt',
-                    ],
+                  },
+                  optimized_hooks: {
+                    type: 'ARRAY',
+                    items: {
+                      type: 'OBJECT',
+                      properties: {
+                        angle_name: { type: 'STRING' },
+                        hook_text: { type: 'STRING' },
+                        visual_cue: { type: 'STRING' },
+                        predicted_retention: { type: 'INTEGER' },
+                        ctr_boost_estimate: { type: 'STRING' },
+                      },
+                      required: [
+                        'angle_name',
+                        'hook_text',
+                        'visual_cue',
+                        'predicted_retention',
+                        'ctr_boost_estimate',
+                      ],
+                    },
+                  },
+                  mid_video_pacing_tips: {
+                    type: 'ARRAY',
+                    items: { type: 'STRING' },
                   },
                 },
-                optimized_hooks: {
-                  type: 'ARRAY',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      angle_name: { type: 'STRING' },
-                      hook_text: { type: 'STRING' },
-                      visual_cue: { type: 'STRING' },
-                      predicted_retention: { type: 'INTEGER' },
-                      ctr_boost_estimate: { type: 'STRING' },
-                    },
-                    required: [
-                      'angle_name',
-                      'hook_text',
-                      'visual_cue',
-                      'predicted_retention',
-                      'ctr_boost_estimate',
-                    ],
-                  },
-                },
-                mid_video_pacing_tips: {
-                  type: 'ARRAY',
-                  items: { type: 'STRING' },
-                },
+                required: [
+                  'retention_score',
+                  'verdict',
+                  'summary_critique',
+                  'dropoff_reasons',
+                  'first_5s_heatmap',
+                  'optimized_hooks',
+                  'mid_video_pacing_tips',
+                ],
               },
-              required: [
-                'retention_score',
-                'verdict',
-                'summary_critique',
-                'dropoff_reasons',
-                'first_5s_heatmap',
-                'optimized_hooks',
-                'mid_video_pacing_tips',
-              ],
             },
+            required: ['retention_analysis'],
           },
-          required: ['retention_analysis'],
         },
-      },
-    }),
-  }, owner);
+      }),
+    },
+    owner,
+  );
 
   if (!response.ok) {
     const errText = await response.text();

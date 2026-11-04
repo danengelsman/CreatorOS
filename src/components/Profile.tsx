@@ -52,7 +52,8 @@ export default function Profile({
   const revokingRef = useRef(false);
 
   const handleRevokeAllSessions = async () => {
-    if (revokingRef.current || !owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
+    if (revokingRef.current || !owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent())
+      return;
     revokingRef.current = true;
     setIsRevokingAll(true);
     setRevokeError('');
@@ -399,14 +400,14 @@ export default function Profile({
               </p>
             )}
             <p className="mt-2 text-[12px] text-[var(--label-tertiary)] leading-relaxed">
-              Revokes refresh tokens for this account, including this browser and other devices.
-              An already issued ID token can remain usable for up to an hour. A session cookie
-              authenticated in the same second as revocation may remain usable until expiration
-              (up to 14 days). Cookies remain in this browser until expiration or replacement.
-              Firebase may sign this browser out when a revoked refresh fails.
-              Logout in the navigation signs out of Firebase on this browser, but does not remove
-              or invalidate an existing server cookie. Avoid switching accounts during revocation,
-              token refresh or sign-out: Firebase does not scope sign-out to one account.
+              Revokes refresh tokens for this account, including this browser and other devices. An
+              already issued ID token can remain usable for up to an hour. A session cookie
+              authenticated in the same second as revocation may remain usable until expiration (up
+              to 14 days). Cookies remain in this browser until expiration or replacement. Firebase
+              may sign this browser out when a revoked refresh fails. Logout in the navigation signs
+              out of Firebase on this browser, but does not remove or invalidate an existing server
+              cookie. Avoid switching accounts during revocation, token refresh or sign-out:
+              Firebase does not scope sign-out to one account.
             </p>
           </div>
         </section>

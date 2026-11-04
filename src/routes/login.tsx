@@ -26,9 +26,10 @@ function LoginComponent() {
   return (
     <Login
       navigate={(path: string) => {
-        const target = path === '/_auth/dashboard' || path === '/dashboard'
-          ? pendingAuthReturn() || '/dashboard'
-          : path;
+        const target =
+          path === '/_auth/dashboard' || path === '/dashboard'
+            ? pendingAuthReturn() || '/dashboard'
+            : path;
         void navigate({ href: target });
       }}
     />

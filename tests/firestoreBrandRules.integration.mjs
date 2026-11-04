@@ -25,14 +25,18 @@ const token = (uid, claims = {}) => {
   })}.`;
 };
 const fields = (uid, type = 'brand_kit', name = 'Test') => ({
-  userId: { stringValue: uid }, name: { stringValue: name },
-  type: { stringValue: type }, createdAt: { timestampValue: '2025-01-01T00:00:00Z' },
+  userId: { stringValue: uid },
+  name: { stringValue: name },
+  type: { stringValue: type },
+  createdAt: { timestampValue: '2025-01-01T00:00:00Z' },
 });
 async function request(method, id, credential, body, query = '') {
   const headers = { 'Content-Type': 'application/json' };
   if (credential) headers.Authorization = `Bearer ${credential}`;
   const response = await fetch(`${root}/projects/${encodeURIComponent(id)}${query}`, {
-    method, headers, body: body ? JSON.stringify(body) : undefined,
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
   });
   return { status: response.status, body: await response.text() };
 }
@@ -41,7 +45,13 @@ async function expectStatus(expected, promise) {
   assert.equal(result.status, expected, result.body);
 }
 const create = (uid, id, type = 'brand_kit', claims = {}, dataUid = uid) =>
-  request('PATCH', id, uid === null ? null : token(uid, claims), { fields: fields(dataUid, type) }, '?currentDocument.exists=false');
+  request(
+    'PATCH',
+    id,
+    uid === null ? null : token(uid, claims),
+    { fields: fields(dataUid, type) },
+    '?currentDocument.exists=false',
+  );
 
 test('project create reserves every brand_ prefix regardless of type or newline', async () => {
   await expectStatus(200, create('alice', 'brand_alice'));
@@ -54,10 +64,28 @@ test('project create reserves every brand_ prefix regardless of type or newline'
   await expectStatus(200, create('alice', 'xbrand_bob', 'workflow'));
   await expectStatus(200, create('alice', 'Brand_bob', 'tutorial'));
   await expectStatus(200, create('alice', 'ordinary\nproject', 'content'));
-  await expectStatus(403, request('PATCH', 'invalid-name', token('alice'), { fields: fields('alice', 'content', '') }, '?currentDocument.exists=false'));
+  await expectStatus(
+    403,
+    request(
+      'PATCH',
+      'invalid-name',
+      token('alice'),
+      { fields: fields('alice', 'content', '') },
+      '?currentDocument.exists=false',
+    ),
+  );
   const badTime = fields('alice', 'content');
   badTime.createdAt = { stringValue: 'not a timestamp' };
-  await expectStatus(403, request('PATCH', 'invalid-time', token('alice'), { fields: badTime }, '?currentDocument.exists=false'));
+  await expectStatus(
+    403,
+    request(
+      'PATCH',
+      'invalid-time',
+      token('alice'),
+      { fields: badTime },
+      '?currentDocument.exists=false',
+    ),
+  );
   await expectStatus(403, create('alice', 'invalid-type', 'invalid'));
   await expectStatus(403, create('alice', 'invalid-owner', 'content', {}, 'bob'));
   await expectStatus(403, create(null, 'anonymous-project', 'content', {}, 'anonymous'));
@@ -65,7 +93,13 @@ test('project create reserves every brand_ prefix regardless of type or newline'
 });
 
 test('custom UID characters compare literally, not as regex', async () => {
-  for (const uid of ['a.b+[]()', 'unicode-雪', 'line\nbreak', 'carriage\rreturn', 'x'.repeat(128)]) {
+  for (const uid of [
+    'a.b+[]()',
+    'unicode-雪',
+    'line\nbreak',
+    'carriage\rreturn',
+    'x'.repeat(128),
+  ]) {
     await expectStatus(403, create('attacker', `brand_${uid}`));
     await expectStatus(200, create(uid, `brand_${uid}`));
   }
@@ -82,13 +116,37 @@ test('admin creates obey validation and the new reservation (no create bypass)',
 
 test('legacy reserved IDs retain owner update and admin read/update/delete behavior', async () => {
   // Emulator-only administrative seed recreates a legacy pre-fix occupied ID.
-  await expectStatus(200, request('PATCH', 'brand_legacy-victim', 'owner', { fields: fields('legacy-owner') }));
+  await expectStatus(
+    200,
+    request('PATCH', 'brand_legacy-victim', 'owner', { fields: fields('legacy-owner') }),
+  );
   await expectStatus(200, request('GET', 'brand_legacy-victim', token('legacy-owner')));
   await expectStatus(403, request('GET', 'brand_legacy-victim', token('legacy-victim')));
-  await expectStatus(200, request('PATCH', 'brand_legacy-victim', token('legacy-owner'), { fields: fields('legacy-owner', 'content', 'Updated') }));
-  await expectStatus(403, request('PATCH', 'brand_legacy-victim', token('legacy-owner'), { fields: fields('legacy-victim') }));
-  await expectStatus(200, request('GET', 'brand_legacy-victim', token('admin-user', { admin: true })));
-  await expectStatus(200, request('PATCH', 'brand_legacy-victim', token('admin-user', { admin: true }), { fields: fields('legacy-owner', 'content', 'Admin edit') }));
+  await expectStatus(
+    200,
+    request('PATCH', 'brand_legacy-victim', token('legacy-owner'), {
+      fields: fields('legacy-owner', 'content', 'Updated'),
+    }),
+  );
+  await expectStatus(
+    403,
+    request('PATCH', 'brand_legacy-victim', token('legacy-owner'), {
+      fields: fields('legacy-victim'),
+    }),
+  );
+  await expectStatus(
+    200,
+    request('GET', 'brand_legacy-victim', token('admin-user', { admin: true })),
+  );
+  await expectStatus(
+    200,
+    request('PATCH', 'brand_legacy-victim', token('admin-user', { admin: true }), {
+      fields: fields('legacy-owner', 'content', 'Admin edit'),
+    }),
+  );
   await expectStatus(403, request('DELETE', 'brand_legacy-victim', token('legacy-victim')));
-  await expectStatus(200, request('DELETE', 'brand_legacy-victim', token('admin-user', { admin: true })));
+  await expectStatus(
+    200,
+    request('DELETE', 'brand_legacy-victim', token('admin-user', { admin: true })),
+  );
 });

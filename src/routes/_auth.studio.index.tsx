@@ -32,7 +32,13 @@ function StudioHome() {
     <>
       {inspector && (
         <p role="status" className="px-4 text-sm text-[var(--label-secondary)]">
-          Choose a project to open {inspector === 'retention' ? 'Hook & Retention' : inspector === 'repurpose' ? 'Repurpose' : 'Scene Planner'}.
+          Choose a project to open{' '}
+          {inspector === 'retention'
+            ? 'Hook & Retention'
+            : inspector === 'repurpose'
+              ? 'Repurpose'
+              : 'Scene Planner'}
+          .
         </p>
       )}
       <StudioHub
@@ -45,10 +51,16 @@ function StudioHome() {
         projectsLoadError={projectsLoadError}
         selectedIdea={selectedIdea}
         selectedIdeaReceipt={receipt}
-        onClearSelectedIdea={(seed, originalReceipt) => state.clearSelectedIdea(token, seed, originalReceipt)}
+        onClearSelectedIdea={(seed, originalReceipt) =>
+          state.clearSelectedIdea(token, seed, originalReceipt)
+        }
         onOpenProject={(projectId) => {
           if (isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)) {
-            void navigate({ to: '/studio/$projectId', params: { projectId }, search: { inspector } });
+            void navigate({
+              to: '/studio/$projectId',
+              params: { projectId },
+              search: { inspector },
+            });
           }
         }}
       />

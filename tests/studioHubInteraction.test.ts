@@ -1,15 +1,31 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ slots: [] as any[], index: 0, writes: [] as any[], docs: new Map<string, any>(), failAfterWrite: false, failBeforeWrite: false, nextId: 0 }));
+const h = vi.hoisted(() => ({
+  slots: [] as any[],
+  index: 0,
+  writes: [] as any[],
+  docs: new Map<string, any>(),
+  failAfterWrite: false,
+  failBeforeWrite: false,
+  nextId: 0,
+}));
 vi.mock('react', async (importOriginal) => {
   const real = await importOriginal<typeof import('react')>();
   const useState = (initial: any) => {
     const i = h.index++;
     if (!(i in h.slots)) h.slots[i] = typeof initial === 'function' ? initial() : initial;
-    return [h.slots[i], (next: any) => { h.slots[i] = typeof next === 'function' ? next(h.slots[i]) : next; }];
+    return [
+      h.slots[i],
+      (next: any) => {
+        h.slots[i] = typeof next === 'function' ? next(h.slots[i]) : next;
+      },
+    ];
   };
-  const useRef = (initial: any) => { const i = h.index++; return h.slots[i] ??= { current: initial }; };
+  const useRef = (initial: any) => {
+    const i = h.index++;
+    return (h.slots[i] ??= { current: initial });
+  };
   return { ...real, useState, useRef, useEffect: () => {} };
 });
 vi.mock('../src/firebase', () => ({ db: {} }));
@@ -20,12 +36,24 @@ vi.mock('firebase/firestore', () => ({
   doc: (...args: any[]) => ({ id: args.length === 3 ? args[2] : `project-${++h.nextId}` }),
   serverTimestamp: () => 'timestamp',
   runTransaction: async (_db: any, callback: any) => {
-    if (h.failBeforeWrite) { h.failBeforeWrite = false; throw new Error('offline'); }
+    if (h.failBeforeWrite) {
+      h.failBeforeWrite = false;
+      throw new Error('offline');
+    }
     await callback({
-      get: async (ref: any) => ({ exists: () => h.docs.has(ref.id), data: () => h.docs.get(ref.id) }),
-      set: (ref: any, value: any) => { h.writes.push({ id: ref.id, value }); h.docs.set(ref.id, value); },
+      get: async (ref: any) => ({
+        exists: () => h.docs.has(ref.id),
+        data: () => h.docs.get(ref.id),
+      }),
+      set: (ref: any, value: any) => {
+        h.writes.push({ id: ref.id, value });
+        h.docs.set(ref.id, value);
+      },
     });
-    if (h.failAfterWrite) { h.failAfterWrite = false; throw new Error('ambiguous failure'); }
+    if (h.failAfterWrite) {
+      h.failAfterWrite = false;
+      throw new Error('ambiguous failure');
+    }
   },
 }));
 import StudioHub, { StudioHubContent } from '../src/components/studio/StudioHub';
@@ -38,20 +66,56 @@ function find(node: any, predicate: (node: any) => boolean): any {
     if (result) return result;
   }
 }
-const text = (n: any): string => typeof n === 'string' ? n : React.isValidElement(n) ? React.Children.toArray((n.props as any).children).map(text).join('') : '';
+const text = (n: any): string =>
+  typeof n === 'string'
+    ? n
+    : React.isValidElement(n)
+      ? React.Children.toArray((n.props as any).children)
+          .map(text)
+          .join('')
+      : '';
 function button(tree: any, label: string) {
   const result = find(tree, (n) => n.type === 'button' && text(n).trim() === label);
   expect(result, `button ${label}`).toBeTruthy();
   return result;
 }
 
-beforeEach(() => { const data = new Map<string, string>(); vi.stubGlobal('sessionStorage', { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => data.set(key, value), removeItem: (key: string) => data.delete(key) }); h.slots = []; h.index = 0; h.writes = []; h.docs.clear(); h.failAfterWrite = false; h.failBeforeWrite = false; h.nextId = 0; vi.spyOn(console, 'error').mockImplementation(() => {}); });
+beforeEach(() => {
+  const data = new Map<string, string>();
+  vi.stubGlobal('sessionStorage', {
+    getItem: (key: string) => data.get(key) ?? null,
+    setItem: (key: string, value: string) => data.set(key, value),
+    removeItem: (key: string) => data.delete(key),
+  });
+  h.slots = [];
+  h.index = 0;
+  h.writes = [];
+  h.docs.clear();
+  h.failAfterWrite = false;
+  h.failBeforeWrite = false;
+  h.nextId = 0;
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+});
 describe('StudioHub retry interaction', () => {
   it('retains the handoff on a definite failure and retries the same project', async () => {
     const idea = { title: 'Original', description: 'Keep this' };
-    const clear = vi.fn(); const open = vi.fn();
-    const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea }, onClearSelectedIdea: clear, onOpenProject: open };
-    const render = () => { h.index = 0; return StudioHubContent(props); };
+    const clear = vi.fn();
+    const open = vi.fn();
+    const props = {
+      user: { uid: 'owner' },
+      brand: null,
+      projects: [],
+      isProjectsLoading: false,
+      projectsLoadError: false,
+      selectedIdea: idea,
+      selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea },
+      onClearSelectedIdea: clear,
+      onOpenProject: open,
+    };
+    const render = () => {
+      h.index = 0;
+      return StudioHubContent(props);
+    };
     h.failBeforeWrite = true;
     button(render(), 'Create from selected idea').props.onClick();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -66,9 +130,23 @@ describe('StudioHub retry interaction', () => {
   });
   it('refuses retry under another account and retains the original seed for the original account', async () => {
     const idea = { title: 'Private idea' };
-    const clear = vi.fn(); const open = vi.fn();
-    const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea }, onClearSelectedIdea: clear, onOpenProject: open };
-    const render = () => { h.index = 0; return StudioHubContent(props); };
+    const clear = vi.fn();
+    const open = vi.fn();
+    const props = {
+      user: { uid: 'owner' },
+      brand: null,
+      projects: [],
+      isProjectsLoading: false,
+      projectsLoadError: false,
+      selectedIdea: idea,
+      selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea },
+      onClearSelectedIdea: clear,
+      onOpenProject: open,
+    };
+    const render = () => {
+      h.index = 0;
+      return StudioHubContent(props);
+    };
     h.failAfterWrite = true;
     button(render(), 'Create from selected idea').props.onClick();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -87,9 +165,23 @@ describe('StudioHub retry interaction', () => {
   });
   it('preserves an ambiguous selected idea failure across close, retries the same ID without overwriting, and clears the handoff only after success', async () => {
     const idea = { title: 'Original', description: 'Keep this' };
-    const clear = vi.fn(); const open = vi.fn();
-    const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea }, onClearSelectedIdea: clear, onOpenProject: open };
-    const render = () => { h.index = 0; return StudioHubContent(props); };
+    const clear = vi.fn();
+    const open = vi.fn();
+    const props = {
+      user: { uid: 'owner' },
+      brand: null,
+      projects: [],
+      isProjectsLoading: false,
+      projectsLoadError: false,
+      selectedIdea: idea,
+      selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea },
+      onClearSelectedIdea: clear,
+      onOpenProject: open,
+    };
+    const render = () => {
+      h.index = 0;
+      return StudioHubContent(props);
+    };
     button(render(), 'New project').props.onClick();
     h.failAfterWrite = true;
     await button(render(), 'Create from selected idea').props.onClick();
@@ -111,8 +203,20 @@ describe('StudioHub retry interaction', () => {
 
 it('ambiguous create after remount reconciles instead of duplicating', async () => {
   const idea = { title: 'Original', description: 'Keep this' };
-  const props = { user: { uid: 'owner' }, brand: null, projects: [], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, onClearSelectedIdea: vi.fn(), onOpenProject: vi.fn() };
-  const render = () => { h.index = 0; return StudioHubContent(props); };
+  const props = {
+    user: { uid: 'owner' },
+    brand: null,
+    projects: [],
+    isProjectsLoading: false,
+    projectsLoadError: false,
+    selectedIdea: idea,
+    onClearSelectedIdea: vi.fn(),
+    onOpenProject: vi.fn(),
+  };
+  const render = () => {
+    h.index = 0;
+    return StudioHubContent(props);
+  };
   h.failAfterWrite = true;
   button(render(), 'Create from selected idea').props.onClick();
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -125,10 +229,25 @@ it('ambiguous create after remount reconciles instead of duplicating', async () 
 });
 
 it('remounts and quarantines stale inputs across account switches', () => {
-  const idea = { title: 'Private idea' }; const brand = { name: 'Private brand' };
-  const open = vi.fn(); const clear = vi.fn();
-  const props = { user: { uid: 'owner' }, brand, projects: [{ userId: 'owner', name: 'Private project' }], isProjectsLoading: false, projectsLoadError: false, selectedIdea: idea, selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea }, onClearSelectedIdea: clear, onOpenProject: open };
-  const render = () => { h.index = 0; return StudioHub(props)!; };
+  const idea = { title: 'Private idea' };
+  const brand = { name: 'Private brand' };
+  const open = vi.fn();
+  const clear = vi.fn();
+  const props = {
+    user: { uid: 'owner' },
+    brand,
+    projects: [{ userId: 'owner', name: 'Private project' }],
+    isProjectsLoading: false,
+    projectsLoadError: false,
+    selectedIdea: idea,
+    selectedIdeaReceipt: { token: { uid: 'owner', generation: 1 }, value: idea },
+    onClearSelectedIdea: clear,
+    onOpenProject: open,
+  };
+  const render = () => {
+    h.index = 0;
+    return StudioHub(props)!;
+  };
   const original = render();
   expect(original.props.selectedIdea).toBe(idea);
   props.user = { uid: 'other' };
@@ -139,11 +258,14 @@ it('remounts and quarantines stale inputs across account switches', () => {
   expect(switched.props.selectedIdea).toBeNull();
   expect(switched.props.brand).toBeNull();
   expect(switched.props.projects).toEqual([]);
-  original.props.onOpenProject('private'); original.props.onClearSelectedIdea();
-  expect(open).not.toHaveBeenCalled(); expect(clear).not.toHaveBeenCalled();
+  original.props.onOpenProject('private');
+  original.props.onClearSelectedIdea();
+  expect(open).not.toHaveBeenCalled();
+  expect(clear).not.toHaveBeenCalled();
   props.selectedIdea = { title: 'New account idea' };
   expect(render().props.selectedIdea).toBe(props.selectedIdea);
-  props.user = { uid: 'owner' }; render();
+  props.user = { uid: 'owner' };
+  render();
   original.props.onOpenProject('private');
   expect(open).not.toHaveBeenCalled();
 });

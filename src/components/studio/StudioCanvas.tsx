@@ -15,7 +15,16 @@ export interface StudioCanvasProps {
 }
 
 // The route resolves projects; remount only when the owner or project changes.
-export default function StudioCanvas({ user, brand, project, onBack, initialInspector, isCurrentOwner, canWriteProject, unavailable }: StudioCanvasProps) {
+export default function StudioCanvas({
+  user,
+  brand,
+  project,
+  onBack,
+  initialInspector,
+  isCurrentOwner,
+  canWriteProject,
+  unavailable,
+}: StudioCanvasProps) {
   const state = useRef({ dirty: false, saving: false, storageError: false });
   // A server read can detect loss of access before the live listener does.
   // Latch synchronously so later callbacks cannot re-enable writes in this mount.
@@ -31,7 +40,10 @@ export default function StudioCanvas({ user, brand, project, onBack, initialInsp
   const navigate = useNavigate();
   const key = `${user?.uid || ''}:${project?.id || ''}`;
   const shouldBlock = useCallback(() => {
-    if (bypass.current) { bypass.current = false; return false; }
+    if (bypass.current) {
+      bypass.current = false;
+      return false;
+    }
     if (state.current.saving) {
       window.alert('Please wait for the project save to finish before leaving.');
       return true;
@@ -49,21 +61,35 @@ export default function StudioCanvas({ user, brand, project, onBack, initialInsp
     bypass.current = true;
     action();
     // onBack may change local state instead of navigating through the router.
-    setTimeout(() => { bypass.current = false; }, 0);
+    setTimeout(() => {
+      bypass.current = false;
+    }, 0);
   };
 
   return (
     <section aria-label="Project canvas" className="space-y-4">
       <header className="flex items-center gap-4">
-        <button type="button" onClick={() => leave(onBack)} className="ios-button ios-button-tinted">
+        <button
+          type="button"
+          onClick={() => leave(onBack)}
+          className="ios-button ios-button-tinted"
+        >
           Back to projects
         </button>
         <h1 className="text-xl font-semibold text-[var(--label-primary)]">Project canvas</h1>
       </header>
       {user?.uid && project?.id && <LegacyDraftWarning userId={user.uid} projectId={project.id} />}
-      {effectiveUnavailable && <div role="alert" className="space-y-2">
-        <p>{effectiveUnavailable === 'missing' ? 'This project is no longer available to this account.' : 'The project connection failed.'} Saving is disabled. Copy your draft before leaving; your editor remains open in this tab.</p>
-      </div>}
+      {effectiveUnavailable && (
+        <div role="alert" className="space-y-2">
+          <p>
+            {effectiveUnavailable === 'missing'
+              ? 'This project is no longer available to this account.'
+              : 'The project connection failed.'}{' '}
+            Saving is disabled. Copy your draft before leaving; your editor remains open in this
+            tab.
+          </p>
+        </div>
+      )}
       {!user?.uid || !project?.id || project.userId !== user.uid || project.type !== 'content' ? (
         <p role="alert">This content project is not available for this account.</p>
       ) : (
@@ -78,7 +104,9 @@ export default function StudioCanvas({ user, brand, project, onBack, initialInsp
           selectedProject={project}
           canvasMode
           initialInspector={initialInspector}
-          onDirtyChange={(value) => { state.current = value; }}
+          onDirtyChange={(value) => {
+            state.current = value;
+          }}
           setActiveTab={(tab) => {
             if (tab === 'brand' || tab === 'profile') navigate({ to: `/${tab}` as any });
             else leave(onBack);

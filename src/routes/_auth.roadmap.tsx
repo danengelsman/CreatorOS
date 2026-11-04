@@ -16,7 +16,10 @@ export const Route = createFileRoute('/_auth/roadmap')({
     return (
       <LayoutShell user={auth.user}>
         <div className="px-4 pt-4 sm:px-6">
-          <Link to="/first-dollar" className="text-sm font-semibold text-[var(--accent)] underline focus-visible:outline focus-visible:outline-2">
+          <Link
+            to="/first-dollar"
+            className="text-sm font-semibold text-[var(--accent)] underline focus-visible:outline focus-visible:outline-2"
+          >
             First Dollar dashboard
           </Link>
         </div>

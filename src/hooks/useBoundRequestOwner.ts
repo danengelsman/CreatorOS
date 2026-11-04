@@ -6,7 +6,9 @@ export function useBoundRequestOwner(owner?: ApiRequestOwner): ApiRequestOwner |
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; };
+    return () => {
+      mounted.current = false;
+    };
   }, []);
   return owner && { uid: owner.uid, isCurrent: () => mounted.current && owner.isCurrent() };
 }
