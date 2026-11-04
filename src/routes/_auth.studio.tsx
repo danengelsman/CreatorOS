@@ -10,9 +10,14 @@ type StudioSearch = {
 
 export const Route = createFileRoute('/_auth/studio')({
   validateSearch: (search: Record<string, unknown>): StudioSearch => ({
-    assistant: search.assistant === 'analyzer' || search.assistant === 'copilot' ? search.assistant : undefined,
+    assistant:
+      search.assistant === 'analyzer' || search.assistant === 'copilot'
+        ? search.assistant
+        : undefined,
     inspector:
-      search.inspector === 'retention' || search.inspector === 'planner' || search.inspector === 'repurpose'
+      search.inspector === 'retention' ||
+      search.inspector === 'planner' ||
+      search.inspector === 'repurpose'
         ? search.inspector
         : undefined,
   }),
@@ -25,7 +30,11 @@ function StudioLayout() {
   return (
     <LayoutShell user={user}>
       <div className="flex justify-end mb-4">
-        <StudioAssistants key={`${user?.uid ?? ''}:${assistant ?? ''}`} user={user} initialAssistant={assistant} />
+        <StudioAssistants
+          key={`${user?.uid ?? ''}:${assistant ?? ''}`}
+          user={user}
+          initialAssistant={assistant}
+        />
       </div>
       <Outlet />
     </LayoutShell>

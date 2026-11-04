@@ -135,7 +135,11 @@ export default function AutoPublishModal({
           </div>
         </div>
 
-        {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-red-500">
+            {error}
+          </p>
+        )}
         {/* Action Buttons */}
         <div className="flex gap-3 pt-2">
           <button

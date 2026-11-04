@@ -181,7 +181,7 @@ test.beforeAll(async () => {
 });
 test.beforeEach(async ({ page: testPage }) => {
   page = testPage;
-  await page.route('**/*', route => route.abort());
+  await page.route('**/*', (route) => route.abort());
   await page.setContent('<div id="root"></div>');
   await page.addScriptTag({ content: bundle });
 });
@@ -212,34 +212,49 @@ test('an unscoped auth-expired event cannot sign out the current account', async
   await expect(page.getByText('Router ready')).toBeVisible();
 });
 
-for (const method of ['email', 'register', 'google'] as const) test(`${method} login does not start a shared-cookie exchange`, async () => {
-  await page.route('**/*', route => route.abort());
-  await page.route('https://creator.test/**', route => route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }));
-  await page.goto('https://creator.test/login');
-  let exchanges = 0;
-  await page.route('**/api/auth/session', route => { exchanges++; return route.fulfill({ json: { ok: true } }); });
-  await page.addScriptTag({ content: bundle });
-  await call('mountLogin');
-  if (method === 'google') {
-    await page.getByRole('button', { name: 'Continue with Google' }).click();
-  } else {
-    if (method === 'register') await page.getByTestId('auth-view-toggle').click();
-    await page.getByPlaceholder('Email Address').fill('a@example.test');
-    await page.getByPlaceholder('Password', { exact: true }).fill('example-password');
-    if (method === 'register') await page.getByPlaceholder('Confirm Password').fill('example-password');
-    await page.getByRole('button', { name: method === 'register' ? 'Sign Up' : 'Sign In', exact: true }).first().click();
-  }
-  await page.waitForTimeout(200);
-  expect(await page.evaluate(() => (window as any).test.logins)).toBe(1);
-  expect(await page.evaluate(() => (window as any).test.navigations)).toEqual(['/dashboard']);
-  expect(exchanges).toBe(0);
-});
+for (const method of ['email', 'register', 'google'] as const)
+  test(`${method} login does not start a shared-cookie exchange`, async () => {
+    await page.route('**/*', (route) => route.abort());
+    await page.route('https://creator.test/**', (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }),
+    );
+    await page.goto('https://creator.test/login');
+    let exchanges = 0;
+    await page.route('**/api/auth/session', (route) => {
+      exchanges++;
+      return route.fulfill({ json: { ok: true } });
+    });
+    await page.addScriptTag({ content: bundle });
+    await call('mountLogin');
+    if (method === 'google') {
+      await page.getByRole('button', { name: 'Continue with Google' }).click();
+    } else {
+      if (method === 'register') await page.getByTestId('auth-view-toggle').click();
+      await page.getByPlaceholder('Email Address').fill('a@example.test');
+      await page.getByPlaceholder('Password', { exact: true }).fill('example-password');
+      if (method === 'register')
+        await page.getByPlaceholder('Confirm Password').fill('example-password');
+      await page
+        .getByRole('button', { name: method === 'register' ? 'Sign Up' : 'Sign In', exact: true })
+        .first()
+        .click();
+    }
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => (window as any).test.logins)).toBe(1);
+    expect(await page.evaluate(() => (window as any).test.navigations)).toEqual(['/dashboard']);
+    expect(exchanges).toBe(0);
+  });
 
 test('password reset request and confirmation remain usable without cookie exchange', async () => {
-  await page.route('https://creator.test/**', route => route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }));
+  await page.route('https://creator.test/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }),
+  );
   await page.goto('https://creator.test/login');
   let exchanges = 0;
-  await page.route('**/api/auth/session', route => { exchanges++; return route.fulfill({ json: { ok: true } }); });
+  await page.route('**/api/auth/session', (route) => {
+    exchanges++;
+    return route.fulfill({ json: { ok: true } });
+  });
   await page.addScriptTag({ content: bundle });
   await call('mountLogin');
   await page.getByTestId('forgot-password-link').click();
@@ -255,7 +270,9 @@ test('password reset request and confirmation remain usable without cookie excha
   await page.getByRole('button', { name: 'Update Password' }).click();
   await expect(page.getByTestId('back-to-signin-after-reset')).toBeVisible();
   expect(await page.evaluate(() => (window as any).test.verifiedCodes)).toEqual(['reset-code']);
-  expect(await page.evaluate(() => (window as any).test.resets)).toEqual([{ code: 'reset-code', password: 'new-strong-password' }]);
+  expect(await page.evaluate(() => (window as any).test.resets)).toEqual([
+    { code: 'reset-code', password: 'new-strong-password' },
+  ]);
   await page.getByTestId('back-to-signin-after-reset').click();
   await page.getByPlaceholder('Email Address').fill('a@example.test');
   await page.getByPlaceholder('Password', { exact: true }).fill('new-strong-password');
@@ -266,25 +283,48 @@ test('password reset request and confirmation remain usable without cookie excha
 });
 
 test('a late exchange response overwrites a newer HttpOnly cookie in Chromium', async () => {
-  await page.route('**/*', route => route.abort());
-  await page.route('https://creator.test/**', route => route.fulfill({ contentType: 'text/html', body: '<div></div>' }));
+  await page.route('**/*', (route) => route.abort());
+  await page.route('https://creator.test/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<div></div>' }),
+  );
   await page.goto('https://creator.test/');
   let release!: () => void;
   let started!: () => void;
-  const pending = new Promise<void>(resolve => { release = resolve; });
-  const ready = new Promise<void>(resolve => { started = resolve; });
-  await page.route('**/exchange/*', async route => {
-    const account = route.request().url().endsWith('/A') ? 'A' : 'B';
-    if (account === 'A') { started(); await pending; }
-    await route.fulfill({ status: 200, headers: { 'set-cookie': `creatoros_session=${account}; HttpOnly; Secure; SameSite=Lax; Path=/` }, body: 'ok' });
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
   });
-  await page.evaluate(() => { (window as any).oldExchange = fetch('/exchange/A'); });
+  const ready = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  await page.route('**/exchange/*', async (route) => {
+    const account = route.request().url().endsWith('/A') ? 'A' : 'B';
+    if (account === 'A') {
+      started();
+      await pending;
+    }
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'set-cookie': `creatoros_session=${account}; HttpOnly; Secure; SameSite=Lax; Path=/`,
+      },
+      body: 'ok',
+    });
+  });
+  await page.evaluate(() => {
+    (window as any).oldExchange = fetch('/exchange/A');
+  });
   await ready;
-  await page.evaluate(async () => { await fetch('/exchange/B'); });
-  expect((await page.context().cookies()).find(c => c.name === 'creatoros_session')?.value).toBe('B');
+  await page.evaluate(async () => {
+    await fetch('/exchange/B');
+  });
+  expect((await page.context().cookies()).find((c) => c.name === 'creatoros_session')?.value).toBe(
+    'B',
+  );
   release();
-  await page.evaluate(async () => { await (window as any).oldExchange; });
-  const cookie = (await page.context().cookies()).find(c => c.name === 'creatoros_session');
+  await page.evaluate(async () => {
+    await (window as any).oldExchange;
+  });
+  const cookie = (await page.context().cookies()).find((c) => c.name === 'creatoros_session');
   expect(cookie).toMatchObject({ value: 'A', httpOnly: true });
 });
 

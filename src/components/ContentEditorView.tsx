@@ -445,7 +445,12 @@ export default function ContentEditorView({
                       <button
                         key={idx}
                         onClick={() => {
-                          if (canvasMode && (title || body) && !window.confirm('Replace the current project draft with this idea?')) return;
+                          if (
+                            canvasMode &&
+                            (title || body) &&
+                            !window.confirm('Replace the current project draft with this idea?')
+                          )
+                            return;
                           setTitle(idea.title);
                           setBody(idea.hook + '\n\n' + idea.description);
                           setShowBrainstorm(false);

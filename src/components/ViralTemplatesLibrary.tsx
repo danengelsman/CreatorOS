@@ -109,7 +109,8 @@ export default function ViralTemplatesLibrary({
       : TEMPLATES.filter((t) => t.platform === selectedPlatform);
 
   const handleTailorToBrand = async () => {
-    if (!selectedTemplate || !owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
+    if (!selectedTemplate || !owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent())
+      return;
 
     setIsTailoring(true);
     setErrorMsg('');
@@ -135,26 +136,30 @@ export default function ViralTemplatesLibrary({
       "tailored_hook" (string)
       "tailored_body" (string)`;
 
-      const response = await apiFetch('/api/gemini/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gemini-3.8-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: 'OBJECT',
-              properties: {
-                tailored_title: { type: 'STRING' },
-                tailored_hook: { type: 'STRING' },
-                tailored_body: { type: 'STRING' },
+      const response = await apiFetch(
+        '/api/gemini/generate',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gemini-3.8-flash',
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: 'OBJECT',
+                properties: {
+                  tailored_title: { type: 'STRING' },
+                  tailored_hook: { type: 'STRING' },
+                  tailored_body: { type: 'STRING' },
+                },
+                required: ['tailored_title', 'tailored_hook', 'tailored_body'],
               },
-              required: ['tailored_title', 'tailored_hook', 'tailored_body'],
             },
-          },
-        }),
-      }, owner);
+          }),
+        },
+        owner,
+      );
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -271,130 +276,136 @@ export default function ViralTemplatesLibrary({
       </div>
 
       {/* Detail / Customization Modal */}
-        {selectedTemplate && (
-          <dialog
-            ref={(element) => { if (element && !element.open) element.showModal(); }}
-            aria-label="Template details"
-            onCancel={(event) => { event.preventDefault(); event.stopPropagation(); setSelectedTemplate(null); }}
-            className="m-auto max-h-[90vh] w-[min(95vw,42rem)] rounded-[24px] bg-transparent p-0 backdrop:bg-black/50"
+      {selectedTemplate && (
+        <dialog
+          ref={(element) => {
+            if (element && !element.open) element.showModal();
+          }}
+          aria-label="Template details"
+          onCancel={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setSelectedTemplate(null);
+          }}
+          className="m-auto max-h-[90vh] w-[min(95vw,42rem)] rounded-[24px] bg-transparent p-0 backdrop:bg-black/50"
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+            className="bg-[var(--bg-primary)] border border-[var(--separator)] shadow-2xl rounded-[24px] w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
           >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-[var(--bg-primary)] border border-[var(--separator)] shadow-2xl rounded-[24px] w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
-            >
-              <div className="flex items-center justify-between p-5 border-b border-[var(--separator)] bg-[var(--bg-secondary)]/50">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[var(--bg-tertiary)] rounded-xl text-[var(--accent)]">
-                    {React.createElement(PLATFORM_ICONS[selectedTemplate.platform] || FileText, {
-                      size: 24,
-                      weight: 'fill',
-                    })}
-                  </div>
-                  <div>
-                    <h3 className="font-serif text-[20px] font-bold text-[var(--label-primary)]">
-                      {tailoredVersion ? tailoredVersion.title : selectedTemplate.title}
-                    </h3>
-                    <span className="text-[13px] text-[var(--label-secondary)] font-medium">
-                      {selectedTemplate.platform} • {selectedTemplate.type}
-                    </span>
-                  </div>
+            <div className="flex items-center justify-between p-5 border-b border-[var(--separator)] bg-[var(--bg-secondary)]/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[var(--bg-tertiary)] rounded-xl text-[var(--accent)]">
+                  {React.createElement(PLATFORM_ICONS[selectedTemplate.platform] || FileText, {
+                    size: 24,
+                    weight: 'fill',
+                  })}
                 </div>
-                <button
-                  onClick={() => setSelectedTemplate(null)}
-                  aria-label="Close template details"
-                  autoFocus
-                  className="p-2 text-[var(--label-secondary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="p-6 overflow-y-auto flex-1 space-y-6">
-                {errorMsg && (
-                  <div className="p-3 rounded-xl bg-red-500/10 text-red-500 text-[13px] font-bold border border-red-500/20">
-                    {errorMsg}
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12px] uppercase tracking-wider font-bold text-[var(--label-tertiary)]">
-                      The Hook
-                    </span>
-                    {tailoredVersion && (
-                      <span className="text-[10px] font-bold uppercase bg-[var(--accent)]/10 text-[var(--accent)] px-2 py-0.5 rounded-sm">
-                        AI Tailored
-                      </span>
-                    )}
-                  </div>
-                  <div
-                    className={cn(
-                      'p-4 rounded-xl text-[15px] leading-relaxed font-medium border',
-                      tailoredVersion
-                        ? 'bg-[var(--accent)]/5 border-[var(--accent)]/20 text-[var(--label-primary)]'
-                        : 'bg-[var(--bg-secondary)] border-[var(--separator)] text-[var(--label-secondary)] italic',
-                    )}
-                  >
-                    "{tailoredVersion ? tailoredVersion.hook : selectedTemplate.hook}"
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12px] uppercase tracking-wider font-bold text-[var(--label-tertiary)]">
-                      Script / Body
-                    </span>
-                  </div>
-                  <div
-                    className={cn(
-                      'p-4 rounded-xl text-[14px] leading-relaxed whitespace-pre-wrap border',
-                      tailoredVersion
-                        ? 'bg-[var(--accent)]/5 border-[var(--accent)]/20 text-[var(--label-primary)]'
-                        : 'bg-[var(--bg-secondary)] border-[var(--separator)] text-[var(--label-secondary)]',
-                    )}
-                  >
-                    {tailoredVersion ? tailoredVersion.body : selectedTemplate.body}
-                  </div>
+                <div>
+                  <h3 className="font-serif text-[20px] font-bold text-[var(--label-primary)]">
+                    {tailoredVersion ? tailoredVersion.title : selectedTemplate.title}
+                  </h3>
+                  <span className="text-[13px] text-[var(--label-secondary)] font-medium">
+                    {selectedTemplate.platform} • {selectedTemplate.type}
+                  </span>
                 </div>
               </div>
+              <button
+                onClick={() => setSelectedTemplate(null)}
+                aria-label="Close template details"
+                autoFocus
+                className="p-2 text-[var(--label-secondary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
-              <div className="p-5 border-t border-[var(--separator)] bg-[var(--bg-secondary)]/50 flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={handleTailorToBrand}
-                  disabled={isTailoring || !!tailoredVersion}
-                  className="flex-1 ios-button bg-[var(--bg-primary)] border border-[var(--accent)] text-[var(--accent)] px-4 py-3 rounded-xl text-[14px] font-bold hover:bg-[var(--accent)]/5 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isTailoring ? (
-                    <>
-                      <Sparkle size={18} className="animate-pulse" weight="fill" />
-                      Tailoring to your brand...
-                    </>
-                  ) : tailoredVersion ? (
-                    <>
-                      <CheckCircle size={18} weight="fill" />
-                      Tailored to Brand
-                    </>
-                  ) : (
-                    <>
-                      <MagicWand size={18} weight="fill" />
-                      Tailor to my Brand with AI
-                    </>
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-red-500/10 text-red-500 text-[13px] font-bold border border-red-500/20">
+                  {errorMsg}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] uppercase tracking-wider font-bold text-[var(--label-tertiary)]">
+                    The Hook
+                  </span>
+                  {tailoredVersion && (
+                    <span className="text-[10px] font-bold uppercase bg-[var(--accent)]/10 text-[var(--accent)] px-2 py-0.5 rounded-sm">
+                      AI Tailored
+                    </span>
                   )}
-                </button>
-
-                <button
-                  onClick={handleUseTemplate}
-                  className="flex-1 ios-button bg-[var(--accent)] text-white px-4 py-3 rounded-xl text-[14px] font-bold hover:bg-[var(--accent)]/90 shadow-lg shadow-[var(--accent)]/20 transition-all flex items-center justify-center gap-2"
+                </div>
+                <div
+                  className={cn(
+                    'p-4 rounded-xl text-[15px] leading-relaxed font-medium border',
+                    tailoredVersion
+                      ? 'bg-[var(--accent)]/5 border-[var(--accent)]/20 text-[var(--label-primary)]'
+                      : 'bg-[var(--bg-secondary)] border-[var(--separator)] text-[var(--label-secondary)] italic',
+                  )}
                 >
-                  Use Template in Editor
-                  <ArrowRight size={18} weight="bold" />
-                </button>
+                  "{tailoredVersion ? tailoredVersion.hook : selectedTemplate.hook}"
+                </div>
               </div>
-            </motion.div>
-          </dialog>
-        )}
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] uppercase tracking-wider font-bold text-[var(--label-tertiary)]">
+                    Script / Body
+                  </span>
+                </div>
+                <div
+                  className={cn(
+                    'p-4 rounded-xl text-[14px] leading-relaxed whitespace-pre-wrap border',
+                    tailoredVersion
+                      ? 'bg-[var(--accent)]/5 border-[var(--accent)]/20 text-[var(--label-primary)]'
+                      : 'bg-[var(--bg-secondary)] border-[var(--separator)] text-[var(--label-secondary)]',
+                  )}
+                >
+                  {tailoredVersion ? tailoredVersion.body : selectedTemplate.body}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-[var(--separator)] bg-[var(--bg-secondary)]/50 flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleTailorToBrand}
+                disabled={isTailoring || !!tailoredVersion}
+                className="flex-1 ios-button bg-[var(--bg-primary)] border border-[var(--accent)] text-[var(--accent)] px-4 py-3 rounded-xl text-[14px] font-bold hover:bg-[var(--accent)]/5 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isTailoring ? (
+                  <>
+                    <Sparkle size={18} className="animate-pulse" weight="fill" />
+                    Tailoring to your brand...
+                  </>
+                ) : tailoredVersion ? (
+                  <>
+                    <CheckCircle size={18} weight="fill" />
+                    Tailored to Brand
+                  </>
+                ) : (
+                  <>
+                    <MagicWand size={18} weight="fill" />
+                    Tailor to my Brand with AI
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleUseTemplate}
+                className="flex-1 ios-button bg-[var(--accent)] text-white px-4 py-3 rounded-xl text-[14px] font-bold hover:bg-[var(--accent)]/90 shadow-lg shadow-[var(--accent)]/20 transition-all flex items-center justify-center gap-2"
+              >
+                Use Template in Editor
+                <ArrowRight size={18} weight="bold" />
+              </button>
+            </div>
+          </motion.div>
+        </dialog>
+      )}
     </div>
   );
 }

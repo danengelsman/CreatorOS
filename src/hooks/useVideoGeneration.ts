@@ -40,7 +40,8 @@ export function useVideoGeneration({
   const parseVideoSeconds = (s: string) => (s.includes('20') ? 20 : s.includes('10') ? 10 : 5);
   const owner: ApiRequestOwner = {
     uid: user?.uid || '',
-    isCurrent: () => !!user?.uid && auth.currentUser?.uid === user.uid && (isCurrentOwner?.() ?? false),
+    isCurrent: () =>
+      !!user?.uid && auth.currentUser?.uid === user.uid && (isCurrentOwner?.() ?? false),
   };
   const [avatarGender, setAvatarGender] = useState(brand?.avatar?.gender || 'Female');
   const [avatarClothing, setAvatarClothing] = useState(
@@ -193,7 +194,12 @@ export function useVideoGeneration({
     try {
       let operation;
       try {
-        operation = await generateVideo(promptStr, videoAspect, parseVideoSeconds(videoLength), owner);
+        operation = await generateVideo(
+          promptStr,
+          videoAspect,
+          parseVideoSeconds(videoLength),
+          owner,
+        );
       } catch (createErr: any) {
         if (TIER_LIMIT_RE.test(String(createErr?.message || createErr))) {
           throw new Error(TIER_LIMIT_MSG);

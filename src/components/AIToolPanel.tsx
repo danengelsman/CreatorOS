@@ -286,7 +286,14 @@ export default function AIToolPanel({
                           </div>
                           <button
                             onClick={() => {
-                              if (canvasMode && body && !window.confirm('Replace the current project draft with this topic?')) return;
+                              if (
+                                canvasMode &&
+                                body &&
+                                !window.confirm(
+                                  'Replace the current project draft with this topic?',
+                                )
+                              )
+                                return;
                               setTitle(t.topic);
                               setBody(
                                 `${t.angle}\n\n[Topic Context / Target Justification]:\n${t.justification}`,

@@ -28,7 +28,13 @@ test.describe('CreatorOS End-to-End System Smoke Tests', () => {
     const blockedExternalRequests: string[] = [];
     await page.route('**/*', (route) => {
       const url = new URL(route.request().url());
-      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.protocol === 'data:' || url.protocol === 'blob:') return route.continue();
+      if (
+        url.hostname === 'localhost' ||
+        url.hostname === '127.0.0.1' ||
+        url.protocol === 'data:' ||
+        url.protocol === 'blob:'
+      )
+        return route.continue();
       blockedExternalRequests.push(url.href);
       return route.abort();
     });
@@ -199,7 +205,9 @@ test.describe('CreatorOS End-to-End System Smoke Tests', () => {
     // Verify the simulated custom video player has rendered the completed video.
     // The completed video appears in BOTH the Gemini Preview panel and Video
     // History; scope to the preview player so the assertion isn't ambiguous.
-    const previewSection = page.getByText('Gemini Preview', { exact: true }).locator('xpath=ancestor::section[1]');
+    const previewSection = page
+      .getByText('Gemini Preview', { exact: true })
+      .locator('xpath=ancestor::section[1]');
     const videoContainer = previewSection.locator('video');
     await expect(videoContainer).toBeVisible();
     await expect(page.locator('video')).toHaveCount(2); // preview + history entry

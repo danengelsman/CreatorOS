@@ -156,8 +156,12 @@ test.describe.serial('Phase A email/password auth flows', () => {
     await expect(page.locator('[data-testid="sign-out-all-devices"]')).toBeVisible();
     await page.locator('[data-testid="sign-out-all-devices"]').click();
 
-    await expect(page.getByRole('status')).toContainText('Refresh tokens revoked', { timeout: 30_000 });
-    await expect(page.getByText(/same second as revocation may remain usable until expiration/)).toBeVisible();
+    await expect(page.getByRole('status')).toContainText('Refresh tokens revoked', {
+      timeout: 30_000,
+    });
+    await expect(
+      page.getByText(/same second as revocation may remain usable until expiration/),
+    ).toBeVisible();
     await expect(page.locator('[data-testid="sign-out-all-devices"]')).toBeVisible();
   });
 });

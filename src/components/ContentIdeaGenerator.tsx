@@ -73,12 +73,20 @@ export default function ContentIdeaGenerator({
 
   const fetchAnalyticsAndIdeas = async () => {
     const generation = lifecycle.current;
-    const isCurrent = () => !!ownerUid.current && auth.currentUser?.uid === ownerUid.current && lifecycle.current === generation && (isCurrentOwner?.() ?? true);
+    const isCurrent = () =>
+      !!ownerUid.current &&
+      auth.currentUser?.uid === ownerUid.current &&
+      lifecycle.current === generation &&
+      (isCurrentOwner?.() ?? true);
     if (!isCurrent()) return;
     try {
       setIsLoading(true);
       setLoadingText('Analyzing trends and performance...');
-      const res = await authorizedFetch('/api/analytics/summary', {}, { uid: ownerUid.current, isCurrent });
+      const res = await authorizedFetch(
+        '/api/analytics/summary',
+        {},
+        { uid: ownerUid.current, isCurrent },
+      );
       if (!isCurrent()) return;
       let currentAnalytics = null;
       if (res && res.success) {
@@ -122,47 +130,51 @@ export default function ContentIdeaGenerator({
       
       Suggest ideas that align with their niche and leverage current trends.`;
 
-      const response = await apiFetch('/api/gemini/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gemini-3.8-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: 'OBJECT',
-              properties: {
-                ideas: {
-                  type: 'ARRAY',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      title: { type: 'STRING' },
-                      hook: { type: 'STRING' },
-                      description: { type: 'STRING' },
-                      trend_factor: {
-                        type: 'STRING',
-                        description:
-                          "Why this works right now (e.g. 'Capitalizes on current DIY trend')",
+      const response = await apiFetch(
+        '/api/gemini/generate',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gemini-3.8-flash',
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: 'OBJECT',
+                properties: {
+                  ideas: {
+                    type: 'ARRAY',
+                    items: {
+                      type: 'OBJECT',
+                      properties: {
+                        title: { type: 'STRING' },
+                        hook: { type: 'STRING' },
+                        description: { type: 'STRING' },
+                        trend_factor: {
+                          type: 'STRING',
+                          description:
+                            "Why this works right now (e.g. 'Capitalizes on current DIY trend')",
+                        },
+                        estimated_prep_time: { type: 'STRING' },
                       },
-                      estimated_prep_time: { type: 'STRING' },
+                      required: [
+                        'title',
+                        'hook',
+                        'description',
+                        'trend_factor',
+                        'estimated_prep_time',
+                      ],
                     },
-                    required: [
-                      'title',
-                      'hook',
-                      'description',
-                      'trend_factor',
-                      'estimated_prep_time',
-                    ],
                   },
                 },
+                required: ['ideas'],
               },
-              required: ['ideas'],
             },
-          },
-        }),
-      }, { uid: ownerUid.current, isCurrent });
+          }),
+        },
+        { uid: ownerUid.current, isCurrent },
+      );
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -184,7 +196,11 @@ export default function ContentIdeaGenerator({
 
   const generateQuickIdea = async () => {
     const generation = lifecycle.current;
-    const isCurrent = () => !!ownerUid.current && auth.currentUser?.uid === ownerUid.current && lifecycle.current === generation && (isCurrentOwner?.() ?? true);
+    const isCurrent = () =>
+      !!ownerUid.current &&
+      auth.currentUser?.uid === ownerUid.current &&
+      lifecycle.current === generation &&
+      (isCurrentOwner?.() ?? true);
     // Only generate if we don't already have one showing
     if (!isCurrent() || quickIdea || isGeneratingQuickIdea) return;
 
@@ -195,26 +211,30 @@ export default function ContentIdeaGenerator({
       
       The idea should be incredibly low friction, requiring almost zero prep time.`;
 
-      const response = await apiFetch('/api/gemini/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gemini-3.8-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: 'OBJECT',
-              properties: {
-                title: { type: 'STRING' },
-                hook: { type: 'STRING' },
-                description: { type: 'STRING' },
+      const response = await apiFetch(
+        '/api/gemini/generate',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gemini-3.8-flash',
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: 'OBJECT',
+                properties: {
+                  title: { type: 'STRING' },
+                  hook: { type: 'STRING' },
+                  description: { type: 'STRING' },
+                },
+                required: ['title', 'hook', 'description'],
               },
-              required: ['title', 'hook', 'description'],
             },
-          },
-        }),
-      }, { uid: ownerUid.current, isCurrent });
+          }),
+        },
+        { uid: ownerUid.current, isCurrent },
+      );
 
       if (response.ok) {
         const data = await response.json();

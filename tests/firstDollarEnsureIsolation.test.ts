@@ -15,18 +15,28 @@ vi.mock('firebase/firestore', () => ({
   onSnapshot: vi.fn(),
 }));
 
-import { ensureFirstDollarJourney, updateFirstDollarJourney } from '../src/services/firstDollarJourney';
+import {
+  ensureFirstDollarJourney,
+  updateFirstDollarJourney,
+} from '../src/services/firstDollarJourney';
 
 describe('ensureFirstDollarJourney account lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fake.runTransaction.mockImplementation((_db, callback) => callback({ get: fake.get, set: fake.set, update: fake.update }));
+    fake.runTransaction.mockImplementation((_db, callback) =>
+      callback({ get: fake.get, set: fake.set, update: fake.update }),
+    );
   });
 
   it('does not stage a write when the originating generation changes during the read', async () => {
     let current = true;
     let release!: (value: { exists: () => boolean }) => void;
-    fake.get.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+    fake.get.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
     const pending = ensureFirstDollarJourney('A', () => current);
     expect(fake.get).toHaveBeenCalledWith({ collection: 'first_dollar_journeys', uid: 'A' });
     current = false;
@@ -51,7 +61,12 @@ describe('ensureFirstDollarJourney account lifecycle', () => {
   it('does not stage an update after the originating generation changes during the read', async () => {
     let current = true;
     let release!: (value: { exists: () => boolean }) => void;
-    fake.get.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+    fake.get.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
     const pending = updateFirstDollarJourney('A', { type: 'start' }, () => current);
     current = false;
     release({ exists: () => true });

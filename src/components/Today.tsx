@@ -23,7 +23,8 @@ export default function Today(props: TodayProps) {
   const auth = useAuth();
   const token = auth.workspaceToken;
   const current = useWorkspaceStore((state) => isWorkspaceTokenCurrent(state, token));
-  if (!token || !current || token.uid !== props.user?.uid || token.uid !== auth.user?.uid) return null;
+  if (!token || !current || token.uid !== props.user?.uid || token.uid !== auth.user?.uid)
+    return null;
   return <TodaySession key={`${token.uid}:${token.generation}`} {...props} token={token} />;
 }
 
@@ -31,9 +32,12 @@ function TodaySession({ user, setActiveTab, token }: TodayProps & { token: Works
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; };
+    return () => {
+      mounted.current = false;
+    };
   }, []);
-  const isCurrent = () => mounted.current && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token);
+  const isCurrent = () =>
+    mounted.current && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token);
   const [journey, setJourney] = useState<FirstDollarJourney | null>(null);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
@@ -51,8 +55,9 @@ function TodaySession({ user, setActiveTab, token }: TodayProps & { token: Works
     setLoading(true);
     setJourney(null);
     setError('');
-    ensureFirstDollarJourney(user.uid, () =>
-      active && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token),
+    ensureFirstDollarJourney(
+      user.uid,
+      () => active && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token),
     )
       .then((result) => {
         if (!active || !isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)) return;
@@ -61,10 +66,12 @@ function TodaySession({ user, setActiveTab, token }: TodayProps & { token: Works
         unsubscribe = watchFirstDollarJourney(
           user.uid,
           (updated) => {
-            if (active && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)) setJourney(updated);
+            if (active && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token))
+              setJourney(updated);
           },
           (reason) => {
-            if (active && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)) setError(`Could not sync your journey: ${reason.message}`);
+            if (active && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token))
+              setError(`Could not sync your journey: ${reason.message}`);
           },
         );
       })

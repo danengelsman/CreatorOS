@@ -93,6 +93,34 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # Security-rules evidence is separate from the UI smoke suite: this
+  # single-database demo config loads the repository's actual firestore.rules.
+  firestore-rules:
+    name: Firestore rules (isolated emulator, actual repository rules)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test actual Firestore rules in an isolated demo project
+        run: npm run test:rules
+
   format:
     name: Prettier check (non-blocking until repo-wide format pass)
     runs-on: ubuntu-latest

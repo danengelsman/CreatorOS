@@ -126,7 +126,7 @@ test.beforeAll(async () => {
 });
 test.beforeEach(async ({ page: testPage }) => {
   page = testPage;
-  await page.route('**/*', route => route.abort());
+  await page.route('**/*', (route) => route.abort());
   await page.setContent('<div id="root"></div>');
   await page.addScriptTag({ content: bundle });
   if (test.info().title.includes('initial observer timeout')) await page.clock.install();
@@ -409,7 +409,9 @@ test('stale transaction retry starts no read after batched A-B-A', async () => {
   });
   await call('authEvent', 'A');
   await call('lookup', 'A', false);
-  await expect.poll(() => page.evaluate(() => typeof (window as any).test.releaseRetry)).toBe('function');
+  await expect
+    .poll(() => page.evaluate(() => typeof (window as any).test.releaseRetry))
+    .toBe('function');
   await call('batchedSwitch');
   const before = await page.evaluate(() => (window as any).test.lookups.length);
   await page.evaluate(() => (window as any).test.releaseRetry());

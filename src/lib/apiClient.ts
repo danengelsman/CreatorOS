@@ -73,14 +73,24 @@ function abortable<T>(promise: Promise<T>, signal?: AbortSignal | null): Promise
     };
     signal.addEventListener('abort', onAbort, { once: true });
     promise.then(
-      (value) => { signal.removeEventListener('abort', onAbort); resolve(value); },
-      (error) => { signal.removeEventListener('abort', onAbort); reject(error); },
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
     );
     if (signal.aborted) onAbort();
   });
 }
 
-async function currentUserIdToken(forceRefresh = false, assertActive: () => void = () => {}, signal?: AbortSignal | null): Promise<string | null> {
+async function currentUserIdToken(
+  forceRefresh = false,
+  assertActive: () => void = () => {},
+  signal?: AbortSignal | null,
+): Promise<string | null> {
   const user = auth.currentUser;
   if (!user) return null;
   try {
@@ -88,7 +98,15 @@ async function currentUserIdToken(forceRefresh = false, assertActive: () => void
   } catch (error) {
     assertActive();
     const code = (error as { code?: string })?.code;
-    if (code && ['auth/user-token-expired', 'auth/invalid-user-token', 'auth/user-disabled', 'auth/user-not-found'].includes(code)) {
+    if (
+      code &&
+      [
+        'auth/user-token-expired',
+        'auth/invalid-user-token',
+        'auth/user-disabled',
+        'auth/user-not-found',
+      ].includes(code)
+    ) {
       throw new AuthExpiredError();
     }
     console.warn('apiClient: failed to resolve ID token:', error);
@@ -97,7 +115,10 @@ async function currentUserIdToken(forceRefresh = false, assertActive: () => void
 }
 
 /** Resolves the current ID token, briefly waiting for Firebase auth to finish restoring a session. */
-async function requireIdToken(assertOwner: () => void = () => {}, signal?: AbortSignal | null): Promise<string> {
+async function requireIdToken(
+  assertOwner: () => void = () => {},
+  signal?: AbortSignal | null,
+): Promise<string> {
   let token = await currentUserIdToken(false, assertOwner, signal);
   assertOwner();
   if (!token) {
@@ -125,7 +146,10 @@ async function requireIdToken(assertOwner: () => void = () => {}, signal?: Abort
       };
       const timer = setTimeout(finish, 2500);
       signal?.addEventListener('abort', onAbort, { once: true });
-      if (signal?.aborted) { onAbort(); return; }
+      if (signal?.aborted) {
+        onAbort();
+        return;
+      }
       unsubscribe = onAuthStateChanged(auth, finish);
       if (settled) unsubscribe();
     });
@@ -173,30 +197,41 @@ async function throwForResponse(response: Response, assertActive: () => void): P
   throw new Error(body?.error || `Request failed with status ${response.status}`);
 }
 
-function guardResponseBody(response: Response, assertActive: () => void, signal?: AbortSignal | null): Response {
+function guardResponseBody(
+  response: Response,
+  assertActive: () => void,
+  signal?: AbortSignal | null,
+): Response {
   // Body reads happen after fetch resolves. Fence the consumption as well as
   // response headers, including clones. Direct ReadableStream access requires
   // caller-side fencing; current API consumers use these methods.
   for (const method of ['json', 'text', 'blob', 'arrayBuffer', 'formData', 'bytes'] as const) {
     const original = (response as any)[method];
     if (typeof original !== 'function') continue;
-    Object.defineProperty(response, method, { configurable: true, value: async (...args: unknown[]) => {
-      assertActive();
-      try {
-        const value = await abortable(original.apply(response, args), signal);
+    Object.defineProperty(response, method, {
+      configurable: true,
+      value: async (...args: unknown[]) => {
         assertActive();
-        return value;
-      } catch (error) {
-        assertActive();
-        throw error;
-      }
-    } });
+        try {
+          const value = await abortable(original.apply(response, args), signal);
+          assertActive();
+          return value;
+        } catch (error) {
+          assertActive();
+          throw error;
+        }
+      },
+    });
   }
   const clone = response.clone?.bind(response);
-  if (clone) Object.defineProperty(response, 'clone', { configurable: true, value: () => {
-    assertActive();
-    return guardResponseBody(clone(), assertActive, signal);
-  } });
+  if (clone)
+    Object.defineProperty(response, 'clone', {
+      configurable: true,
+      value: () => {
+        assertActive();
+        return guardResponseBody(clone(), assertActive, signal);
+      },
+    });
   return response;
 }
 
@@ -213,7 +248,8 @@ export async function apiFetch(
   owner?: ApiRequestOwner,
   options?: { suppressAuthExpiredEvent?: boolean; retryUnauthorized?: boolean },
 ): Promise<Response> {
-  const signal = init.signal !== undefined ? init.signal : input instanceof Request ? input.signal : undefined;
+  const signal =
+    init.signal !== undefined ? init.signal : input instanceof Request ? input.signal : undefined;
   const rawUrl = extractRequestUrl(input);
 
   // Non-API requests remain untouched and must never inherit account ownership.
@@ -221,7 +257,8 @@ export async function apiFetch(
 
   // OAuth callbacks are public browser endpoints, not bearer API calls.
   const path = new URL(rawUrl, window.location.origin).pathname;
-  if (path === '/api/auth/google/callback' || path === '/api/auth/tiktok/callback') return fetch(input, init);
+  if (path === '/api/auth/google/callback' || path === '/api/auth/tiktok/callback')
+    return fetch(input, init);
 
   // Capture both the actual SDK user and the workspace lifecycle at invocation,
   // before any await. A sign-in that finishes later must never adopt this payload.
@@ -232,8 +269,13 @@ export async function apiFetch(
   const assertOwner = () => {
     if (signal?.aborted) throw signal.reason ?? new DOMException('Request aborted', 'AbortError');
     const workspace = useWorkspaceStore.getState();
-    if ((originUser && originUser.uid !== originUid) || auth.currentUser !== originUser || workspace.uid !== originUid || workspace.generation !== originGeneration ||
-        (owner && (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()))) {
+    if (
+      (originUser && originUser.uid !== originUid) ||
+      auth.currentUser !== originUser ||
+      workspace.uid !== originUid ||
+      workspace.generation !== originGeneration ||
+      (owner && (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()))
+    ) {
       throw new DOMException('Request owner is no longer current', 'AbortError');
     }
   };
@@ -241,14 +283,18 @@ export async function apiFetch(
   const reportExpired = () => {
     assertOwner();
     if (!options?.suppressAuthExpiredEvent && originUid) {
-      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, {
-        detail: { uid: originUid, generation: originGeneration },
-      }));
+      window.dispatchEvent(
+        new CustomEvent(AUTH_EXPIRED_EVENT, {
+          detail: { uid: originUid, generation: originGeneration },
+        }),
+      );
     }
   };
   const acquireToken = async (force: boolean) => {
     try {
-      return force ? await currentUserIdToken(true, assertOwner, signal) : await requireIdToken(assertOwner, signal);
+      return force
+        ? await currentUserIdToken(true, assertOwner, signal)
+        : await requireIdToken(assertOwner, signal);
     } catch (error) {
       if (error instanceof AuthExpiredError) reportExpired();
       throw error;
@@ -266,7 +312,10 @@ export async function apiFetch(
   const fetchAttempt = async () => {
     assertOwner();
     try {
-      const result = await fetch(request instanceof Request ? request.clone() : request, { ...init, headers });
+      const result = await fetch(request instanceof Request ? request.clone() : request, {
+        ...init,
+        headers,
+      });
       assertOwner();
       return result;
     } catch (error) {
@@ -298,7 +347,6 @@ export async function apiFetch(
   return guardResponseBody(response, assertOwner, signal);
 }
 
-
 /**
  * Phase A — "Sign out of all devices": revokes every refresh token server-side
  * (POST /api/auth/revoke-all). Owner-bound requests leave the existing cookie
@@ -309,5 +357,10 @@ export async function revokeAllSessions(owner?: ApiRequestOwner): Promise<void> 
   // A delayed response must not clear a newer account's shared cookie.
   // Firebase may still accept a same-second cookie until expiry; do not promise otherwise.
   // Do not force-refresh or replay this destructive request on a 401.
-  await apiFetch('/api/auth/revoke-all', { method: 'POST', ...(owner ? { credentials: 'omit' as const } : {}) }, owner, { retryUnauthorized: !owner });
+  await apiFetch(
+    '/api/auth/revoke-all',
+    { method: 'POST', ...(owner ? { credentials: 'omit' as const } : {}) },
+    owner,
+    { retryUnauthorized: !owner },
+  );
 }

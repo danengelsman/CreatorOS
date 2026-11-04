@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { canAddRecoveryWrite, recoveryPendingWrites, projectDraft, projectBaseline, sameBaseline, sameDraft, studioUpdate, trustedServerSnapshot } from '../src/components/studio/studioDraft';
+import {
+  canAddRecoveryWrite,
+  recoveryPendingWrites,
+  projectDraft,
+  projectBaseline,
+  sameBaseline,
+  sameDraft,
+  studioUpdate,
+  trustedServerSnapshot,
+} from '../src/components/studio/studioDraft';
 
 describe('project canvas draft safety', () => {
   it('reads the existing editor fields without losing fallback names', () => {
@@ -32,18 +41,24 @@ describe('project canvas draft safety', () => {
   it('retains complete or previously pruned pending history without trusting snapshots', () => {
     const a = { title: 'Title', body: 'A', platform: 'youtube' };
     const b = { ...a, body: 'B' };
-    expect(recoveryPendingWrites({draft:a,pendingWrites:[a,b,a]})).toEqual([a,b,a]);
-    expect(recoveryPendingWrites({draft:a,pendingWrites:[b]})).toEqual([b]);
-    expect(recoveryPendingWrites({draft:a,pending:a})).toEqual([a]);
-    expect(recoveryPendingWrites({draft:a,pendingWrites:[null]})).toEqual([a]);
-    expect(recoveryPendingWrites({draft:a})).toEqual([]);
+    expect(recoveryPendingWrites({ draft: a, pendingWrites: [a, b, a] })).toEqual([a, b, a]);
+    expect(recoveryPendingWrites({ draft: a, pendingWrites: [b] })).toEqual([b]);
+    expect(recoveryPendingWrites({ draft: a, pending: a })).toEqual([a]);
+    expect(recoveryPendingWrites({ draft: a, pendingWrites: [null] })).toEqual([a]);
+    expect(recoveryPendingWrites({ draft: a })).toEqual([]);
   });
 
   it('requires explicit server and no-pending-writes metadata', () => {
-    expect(trustedServerSnapshot({metadata:{fromCache:false,hasPendingWrites:false}})).toBe(true);
-    expect(trustedServerSnapshot({metadata:{fromCache:true,hasPendingWrites:false}})).toBe(false);
-    expect(trustedServerSnapshot({metadata:{fromCache:false,hasPendingWrites:true}})).toBe(false);
-    expect(trustedServerSnapshot({metadata:{fromCache:false}})).toBe(false);
+    expect(trustedServerSnapshot({ metadata: { fromCache: false, hasPendingWrites: false } })).toBe(
+      true,
+    );
+    expect(trustedServerSnapshot({ metadata: { fromCache: true, hasPendingWrites: false } })).toBe(
+      false,
+    );
+    expect(trustedServerSnapshot({ metadata: { fromCache: false, hasPendingWrites: true } })).toBe(
+      false,
+    );
+    expect(trustedServerSnapshot({ metadata: { fromCache: false } })).toBe(false);
     expect(trustedServerSnapshot({})).toBe(false);
   });
 

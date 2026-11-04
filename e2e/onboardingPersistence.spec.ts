@@ -126,7 +126,10 @@ test.beforeAll(async () => {
       {
         name: 'mock-io',
         setup(build) {
-          build.onResolve({ filter: /^@phosphor-icons\/react$/ }, () => ({ path: 'icons', namespace: 'mock' }));
+          build.onResolve({ filter: /^@phosphor-icons\/react$/ }, () => ({
+            path: 'icons',
+            namespace: 'mock',
+          }));
           build.onResolve({ filter: /^react$/ }, () => ({ path: require.resolve('react') }));
           build.onResolve({ filter: /^(?:@\/firebase|\.\.\/firebase)$/ }, () => ({
             path: 'firebase',
@@ -148,10 +151,13 @@ test.beforeAll(async () => {
             path: 'routerProvider',
             namespace: 'mock',
           }));
-          build.onResolve({ filter: /^\.\/components\/(?:VerificationBanner|SessionExpired)$/ }, () => ({
-            path: 'verification',
-            namespace: 'mock',
-          }));
+          build.onResolve(
+            { filter: /^\.\/components\/(?:VerificationBanner|SessionExpired)$/ },
+            () => ({
+              path: 'verification',
+              namespace: 'mock',
+            }),
+          );
           build.onResolve({ filter: /^@\// }, (args) => ({
             path: path.join(root, 'src', args.path.slice(2) + '.ts'),
           }));
@@ -515,7 +521,8 @@ async function switchAwayAndBack(page: Page, expectDraft = false, recoveredSucce
   await expect(page.getByRole('heading', { name: "Let's Build Your Channel Style" })).toBeVisible();
   await page.evaluate(async () => (window as any).test.auth({ uid: 'A', email: 'a@example.test' }));
   if (expectDraft) await expect(page.getByText(/New draft/).first()).toBeVisible();
-  else if (recoveredSuccess) await expect(page.getByRole('heading', {name: 'Your Profile is Ready!'})).toBeVisible();
+  else if (recoveredSuccess)
+    await expect(page.getByRole('heading', { name: 'Your Profile is Ready!' })).toBeVisible();
   else
     await expect(
       page.getByRole('heading', { name: "Let's Build Your Channel Style" }),
@@ -557,7 +564,11 @@ for (const scenario of ['skip profile', 'kit profile', 'kit brand', 'retry'] as 
     expect(result.reads.filter((value: string) => value.startsWith('tx:'))).toEqual([]);
     expect(result.writes).toEqual([]);
     await expect(
-      page.getByRole('heading', { name: scenario.startsWith('kit') ? 'Your Profile is Ready!' : "Let's Build Your Channel Style" }),
+      page.getByRole('heading', {
+        name: scenario.startsWith('kit')
+          ? 'Your Profile is Ready!'
+          : "Let's Build Your Channel Style",
+      }),
     ).toBeVisible();
   });
 }
@@ -615,14 +626,18 @@ test('stale restored draft cannot affect a later A session', async ({ page }) =>
 
 test('untouched onboarding restores a delayed draft', async ({ page }) => {
   await mount(page, true);
-  await expect.poll(() => page.evaluate(() => typeof (window as any).test.releaseRead)).toBe('function');
+  await expect
+    .poll(() => page.evaluate(() => typeof (window as any).test.releaseRead))
+    .toBe('function');
   await page.evaluate(() => (window as any).test.releaseRead());
   await expect(page.getByText(/Old draft/).first()).toBeVisible();
 });
 
 test('delayed draft cannot replace typed or sent interview answers', async ({ page }) => {
   await mount(page, true);
-  await page.evaluate(() => { (window as any).test.partialChat = true; });
+  await page.evaluate(() => {
+    (window as any).test.partialChat = true;
+  });
   await page.getByRole('button', { name: "Let's Begin!" }).click();
   const input = page.getByPlaceholder('Type your response here...');
   await input.fill('My real niche');
@@ -630,22 +645,40 @@ test('delayed draft cannot replace typed or sent interview answers', async ({ pa
   await expect(page.getByText('Tell me more')).toBeVisible();
   await input.fill('My unsent audience');
   await page.evaluate(() => (window as any).test.releaseRead());
-  await expect.poll(() => page.evaluate(() => (window as any).test.reads.includes('released:restore:projects/brand_A'))).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as any).test.reads.includes('released:restore:projects/brand_A')),
+    )
+    .toBe(true);
   await expect(page.getByText('My real niche')).toBeVisible();
   await expect(input).toHaveValue('My unsent audience');
   await expect(page.getByText(/Old draft/)).toHaveCount(0);
   await page.getByRole('button', { name: 'Go to Today', exact: true }).click();
-  expect(await answers(page)).toEqual({ niche: 'My real niche', audience: '', vibe: '', summary: '' });
+  expect(await answers(page)).toEqual({
+    niche: 'My real niche',
+    audience: '',
+    vibe: '',
+    summary: '',
+  });
 });
 
 test('delayed draft cannot regress completed interview', async ({ page }) => {
   await mount(page, true);
   await interview(page);
   await page.evaluate(() => (window as any).test.releaseRead());
-  await expect.poll(() => page.evaluate(() => (window as any).test.reads.includes('released:restore:projects/brand_A'))).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as any).test.reads.includes('released:restore:projects/brand_A')),
+    )
+    .toBe(true);
   await expect(page.getByRole('heading', { name: 'Your Profile is Ready!' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue to Today' }).click();
-  expect(await answers(page)).toEqual({ niche: 'Gardening', audience: 'Beginners', vibe: 'Calm', summary: '' });
+  expect(await answers(page)).toEqual({
+    niche: 'Gardening',
+    audience: 'Beginners',
+    vibe: 'Calm',
+    summary: '',
+  });
 });
 
 for (const mode of ['skip', 'kit'] as const) {
@@ -724,7 +757,9 @@ test('building the brand saves the interview and generated tagline', async ({ pa
   });
 });
 
-test('real SDK refresh expiration returns to login and recovers only the same UID interview', async ({ page }) => {
+test('real SDK refresh expiration returns to login and recovers only the same UID interview', async ({
+  page,
+}) => {
   await mount(page, false, true);
   await page.getByRole('button', { name: "Let's Begin!" }).click();
   const input = page.getByPlaceholder('Type your response here...');
@@ -735,21 +770,29 @@ test('real SDK refresh expiration returns to login and recovers only the same UI
   // Involuntary sign-out no longer records a return path (deliberate): a
   // deep link navigated to while signed out is remembered instead.
   expect(await page.evaluate(() => (window as any).test.pendingAuthReturn())).toBeNull();
-  expect(await page.evaluate(() => (window as any).test.transport.some((url: string) => url.includes('/token?')))).toBe(true);
+  expect(
+    await page.evaluate(() =>
+      (window as any).test.transport.some((url: string) => url.includes('/token?')),
+    ),
+  ).toBe(true);
   await page.evaluate(() => (window as any).test.signInSDK('B'));
   await expect(page.getByRole('heading', { name: "Let's Build Your Channel Style" })).toBeVisible();
-  await expect(page.getByText('My private gardening answer', {exact: true})).toHaveCount(0);
+  await expect(page.getByText('My private gardening answer', { exact: true })).toHaveCount(0);
   await page.evaluate(() => (window as any).test.signInSDK('A'));
   await expect(input).toHaveValue('My private gardening answer');
-  await expect(page.getByText('My private gardening answer', {exact: true})).toHaveCount(0);
+  await expect(page.getByText('My private gardening answer', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Interview complete')).toHaveCount(0);
 });
 
-test('spark authentication error remains visible after its pending dismiss timer', async ({ page }) => {
+test('spark authentication error remains visible after its pending dismiss timer', async ({
+  page,
+}) => {
   await mount(page);
   await page.getByRole('button', { name: "Let's Begin!" }).click();
   await page.getByText('Blank page? Tap for trending niche sparks').click();
-  await page.evaluate(() => { (window as any).test.expiredChat = true; });
+  await page.evaluate(() => {
+    (window as any).test.expiredChat = true;
+  });
   await page.getByText('Garden Sparks').first().click();
   await expect(page.getByText('Sign in again, then select your idea to retry.')).toBeVisible();
   await page.waitForTimeout(1200);
@@ -759,30 +802,50 @@ test('spark authentication error remains visible after its pending dismiss timer
 test('same UID reload preserves a generated kit for exact completion retry', async ({ page }) => {
   await mount(page);
   await interview(page);
-  await page.evaluate(() => { (window as any).test.failCompletion = true; });
+  await page.evaluate(() => {
+    (window as any).test.failCompletion = true;
+  });
   await page.getByRole('button', { name: 'Build my channel style first' }).click();
   await expect(page.getByRole('alert')).toContainText('completion failed');
   await mount(page);
   await expect(page.getByRole('heading', { name: 'Your Profile is Ready!' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue to Today' }).click();
   await expect(page.getByText('Router ready')).toBeVisible();
-  expect(await answers(page)).toEqual({ niche: 'Gardening', audience: 'Beginners', vibe: 'Calm', summary: 'Grow together' });
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('projects/brand_A')!).data)).toEqual({ name: 'Garden', tagline: 'Grow together' });
-  expect(await page.evaluate(() => (window as any).test.requests.filter((request: any) => request.url.endsWith('/generate-brand')))).toHaveLength(0);
+  expect(await answers(page)).toEqual({
+    niche: 'Gardening',
+    audience: 'Beginners',
+    vibe: 'Calm',
+    summary: 'Grow together',
+  });
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('projects/brand_A')!).data),
+  ).toEqual({ name: 'Garden', tagline: 'Grow together' });
+  expect(
+    await page.evaluate(() =>
+      (window as any).test.requests.filter((request: any) =>
+        request.url.endsWith('/generate-brand'),
+      ),
+    ),
+  ).toHaveLength(0);
 });
 
-test('batched A-B-A keys the actual onboarding generation while preserving the owner draft', async ({ page }) => {
+test('batched A-B-A keys the actual onboarding generation while preserving the owner draft', async ({
+  page,
+}) => {
   await mount(page);
   await page.getByRole('button', { name: "Let's Begin!" }).click();
   const input = page.getByPlaceholder('Type your response here...');
   await input.fill('Unsent owner draft');
-  const marker = await input.evaluate(element => { (element as any).generationMarker = 'old'; return true; });
+  const marker = await input.evaluate((element) => {
+    (element as any).generationMarker = 'old';
+    return true;
+  });
   expect(marker).toBe(true);
   await page.evaluate(async () => {
     const t = (window as any).test;
-    t.auth({uid:'B',email:'b@example.test'});
-    await t.auth({uid:'A',email:'a@example.test'});
+    t.auth({ uid: 'B', email: 'b@example.test' });
+    await t.auth({ uid: 'A', email: 'a@example.test' });
   });
   await expect(input).toHaveValue('Unsent owner draft');
-  expect(await input.evaluate(element => (element as any).generationMarker)).toBeUndefined();
+  expect(await input.evaluate((element) => (element as any).generationMarker)).toBeUndefined();
 });

@@ -173,7 +173,12 @@ export default function PerfectPromptCopilot({ user }: { user: any }) {
 
       <div className="px-4">
         {activeTab === 'generator' && (
-          <GeneratorView user={user} input={generatorInput} setInput={setGeneratorInput} inputRef={generatorInputRef} />
+          <GeneratorView
+            user={user}
+            input={generatorInput}
+            setInput={setGeneratorInput}
+            inputRef={generatorInputRef}
+          />
         )}
         {activeTab === 'templates' && (
           <TemplatesView
@@ -273,7 +278,9 @@ function GeneratorView({
   return (
     <div className="space-y-6">
       <div className="bg-[var(--bg-tertiary)] ios-card p-6 space-y-4">
-        <label htmlFor={inputId} className="ios-label px-0">Rough Idea</label>
+        <label htmlFor={inputId} className="ios-label px-0">
+          Rough Idea
+        </label>
         <textarea
           id={inputId}
           ref={inputRef}
@@ -374,21 +381,33 @@ function TemplatesView({
         event.stopPropagation();
         closeDetail();
       } else if (event.key === 'Tab') {
-        const buttons = detailContentRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
+        const buttons =
+          detailContentRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
         if (!buttons?.length) return;
         const first = buttons[0];
         const last = buttons[buttons.length - 1];
-        if (event.shiftKey && (document.activeElement === first || !detailContentRef.current?.contains(document.activeElement))) {
+        if (
+          event.shiftKey &&
+          (document.activeElement === first ||
+            !detailContentRef.current?.contains(document.activeElement))
+        ) {
           event.preventDefault();
           last.focus();
-        } else if (!event.shiftKey && (document.activeElement === last || !detailContentRef.current?.contains(document.activeElement))) {
+        } else if (
+          !event.shiftKey &&
+          (document.activeElement === last ||
+            !detailContentRef.current?.contains(document.activeElement))
+        ) {
           event.preventDefault();
           first.focus();
         }
       }
     };
     const onFocusIn = (event: FocusEvent) => {
-      if (detailRef.current?.getClientRects().length && !detailContentRef.current?.contains(event.target as Node)) {
+      if (
+        detailRef.current?.getClientRects().length &&
+        !detailContentRef.current?.contains(event.target as Node)
+      ) {
         detailCloseRef.current?.focus();
       }
     };
@@ -542,14 +561,21 @@ function TemplatesView({
             <div
               key={i}
               onClick={(e) => {
-                detailOpenerRef.current = e.currentTarget.querySelector('button[data-template-opener]');
+                detailOpenerRef.current = e.currentTarget.querySelector(
+                  'button[data-template-opener]',
+                );
                 setSelectedModalTemplate(tpl);
               }}
               className="bg-[var(--bg-tertiary)] ios-card p-5 ios-card-clickable cursor-pointer hover:border-[var(--accent)] transition-all group relative"
             >
               <div className="flex justify-between items-start gap-4 mb-2">
                 <h3 className="font-semibold text-[17px] text-[var(--label-primary)] group-hover:text-[var(--accent)] transition-colors">
-                  <button type="button" data-template-opener aria-haspopup="dialog" className="text-left rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">
+                  <button
+                    type="button"
+                    data-template-opener
+                    aria-haspopup="dialog"
+                    className="text-left rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                  >
                     {tpl.title}
                   </button>
                 </h3>
@@ -638,7 +664,10 @@ function TemplatesView({
                   <span className="text-[10px] uppercase tracking-wider font-bold text-[var(--accent)] block">
                     {platform.name} Template
                   </span>
-                  <h2 id={detailTitleId} className="font-serif text-[20px] font-bold text-[var(--label-primary)]">
+                  <h2
+                    id={detailTitleId}
+                    className="font-serif text-[20px] font-bold text-[var(--label-primary)]"
+                  >
                     {selectedModalTemplate.title}
                   </h2>
                 </div>

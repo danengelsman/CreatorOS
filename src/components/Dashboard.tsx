@@ -915,7 +915,11 @@ export default function Dashboard({
                     <button
                       type="button"
                       key={project.id}
-                      onClick={() => project.type === 'content' && onOpenProject ? onOpenProject(project) : setActiveTab('create')}
+                      onClick={() =>
+                        project.type === 'content' && onOpenProject
+                          ? onOpenProject(project)
+                          : setActiveTab('create')
+                      }
                       className={cn(
                         'group flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-white/[0.035] md:px-7',
                         focusRing,

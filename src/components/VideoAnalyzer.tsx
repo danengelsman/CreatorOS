@@ -106,7 +106,13 @@ export default function VideoAnalyzer() {
   return (
     <div className="max-w-5xl mx-auto w-full pb-24">
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
-        {isAnalyzing ? 'Analyzing video.' : error ? `Analysis failed. ${error}` : result ? 'Analysis complete. Results are ready.' : ''}
+        {isAnalyzing
+          ? 'Analyzing video.'
+          : error
+            ? `Analysis failed. ${error}`
+            : result
+              ? 'Analysis complete. Results are ready.'
+              : ''}
       </div>
       <div className="pt-4 border-b border-[var(--separator)] pb-6 mb-8 flex items-center justify-between px-2">
         <div>
@@ -230,9 +236,12 @@ export default function VideoAnalyzer() {
                 <span className="font-bold text-[18px] text-[var(--label-primary)] mb-2">
                   Upload Video Content
                 </span>
-                <span id={uploadHintId} className="text-[14px] text-[var(--label-secondary)] max-w-sm mb-6">
-                  Drag and drop a video file here, or click to browse. Max size 1GB. MP4, MOV, or WEBM
-                  format.
+                <span
+                  id={uploadHintId}
+                  className="text-[14px] text-[var(--label-secondary)] max-w-sm mb-6"
+                >
+                  Drag and drop a video file here, or click to browse. Max size 1GB. MP4, MOV, or
+                  WEBM format.
                 </span>
               </button>
               <input
@@ -255,7 +264,11 @@ export default function VideoAnalyzer() {
                 className="text-[var(--accent)] mb-4 animate-pulse"
                 weight="fill"
               />
-              <h3 ref={pendingRef} tabIndex={-1} className="font-bold text-[20px] text-[var(--label-primary)] mb-2">
+              <h3
+                ref={pendingRef}
+                tabIndex={-1}
+                className="font-bold text-[20px] text-[var(--label-primary)] mb-2"
+              >
                 Analyzing Video
               </h3>
               <p className="text-[14px] text-[var(--label-secondary)] max-w-sm">
@@ -270,7 +283,13 @@ export default function VideoAnalyzer() {
                     <CheckCircle size={18} weight="fill" />
                   </div>
                   <div>
-                    <h3 ref={resultRef} tabIndex={-1} className="font-bold text-[14px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">Analysis results</h3>
+                    <h3
+                      ref={resultRef}
+                      tabIndex={-1}
+                      className="font-bold text-[14px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    >
+                      Analysis results
+                    </h3>
                     <div className="font-bold text-[14px]">{file?.name}</div>
                     <div className="text-[12px] text-[var(--label-secondary)] capitalize">
                       {analysisType} Generated

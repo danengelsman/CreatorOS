@@ -33,40 +33,85 @@ export const runTransaction = async (_db, callback) => {
 };`,
   child: 'import React from "react"; export default function Stub(){return null}',
 };
-const result = await build({stdin:{contents:source,resolveDir:root,sourcefile:'hub-harness.tsx',loader:'tsx'},bundle:true,write:false,format:'iife',platform:'browser',plugins:[{name:'doubles',setup(b){
-  b.onResolve({filter:/firebase\/firestore$/},()=>({path:'firestore',namespace:'mock'}));
-  b.onResolve({filter:/firebase$/},args=>args.path.startsWith('.') ? {path:'firebase',namespace:'mock'} : null);
-  b.onResolve({filter:/\/(ContentIdeaGenerator|ViralTemplatesLibrary)$/},()=>({path:'child',namespace:'mock'}));
-  b.onLoad({filter:/.*/,namespace:'mock'},args=>({contents:mocks[args.path],loader:'jsx',resolveDir:root}));
-}}]});
-const browser = await chromium.launch({headless:true});
+const result = await build({
+  stdin: { contents: source, resolveDir: root, sourcefile: 'hub-harness.tsx', loader: 'tsx' },
+  bundle: true,
+  write: false,
+  format: 'iife',
+  platform: 'browser',
+  plugins: [
+    {
+      name: 'doubles',
+      setup(b) {
+        b.onResolve({ filter: /firebase\/firestore$/ }, () => ({
+          path: 'firestore',
+          namespace: 'mock',
+        }));
+        b.onResolve({ filter: /firebase$/ }, (args) =>
+          args.path.startsWith('.') ? { path: 'firebase', namespace: 'mock' } : null,
+        );
+        b.onResolve({ filter: /\/(ContentIdeaGenerator|ViralTemplatesLibrary)$/ }, () => ({
+          path: 'child',
+          namespace: 'mock',
+        }));
+        b.onLoad({ filter: /.*/, namespace: 'mock' }, (args) => ({
+          contents: mocks[args.path],
+          loader: 'jsx',
+          resolveDir: root,
+        }));
+      },
+    },
+  ],
+});
+const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage();
-  await page.route('**/*', route => route.abort());
-  await page.route('https://hub.test/**', route => route.fulfill({contentType:'text/html',body:'<div id="root"></div>'}));
-  for (const scenario of ['remount','reload']) {
+  await page.route('**/*', (route) => route.abort());
+  await page.route('https://hub.test/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }),
+  );
+  for (const scenario of ['remount', 'reload']) {
     await page.goto('https://hub.test/');
-    await page.evaluate(() => {sessionStorage.clear(); sessionStorage.setItem('failAfterWrite','yes');});
-    await page.addScriptTag({content:result.outputFiles[0].text});
-    await page.getByRole('button',{name:'New project'}).click();
-    await page.getByRole('button',{name:'Create from selected idea'}).click();
+    await page.evaluate(() => {
+      sessionStorage.clear();
+      sessionStorage.setItem('failAfterWrite', 'yes');
+    });
+    await page.addScriptTag({ content: result.outputFiles[0].text });
+    await page.getByRole('button', { name: 'New project' }).click();
+    await page.getByRole('button', { name: 'Create from selected idea' }).click();
     await page.getByRole('alert').waitFor();
-    assert.equal(await page.evaluate(() => Object.keys(JSON.parse(sessionStorage.getItem('documents'))).length),1);
+    assert.equal(
+      await page.evaluate(
+        () => Object.keys(JSON.parse(sessionStorage.getItem('documents'))).length,
+      ),
+      1,
+    );
     if (scenario === 'remount') {
       await page.evaluate(() => window.remountHub());
       await page.waitForFunction(() => !document.querySelector('dialog[open]'));
-      await page.getByRole('button',{name:'New project'}).waitFor();
+      await page.getByRole('button', { name: 'New project' }).waitFor();
     } else {
       await page.reload();
-      await page.addScriptTag({content:result.outputFiles[0].text});
+      await page.addScriptTag({ content: result.outputFiles[0].text });
       // The harness reselects the same idea after reload; the real workspace store is in memory.
     }
-    await page.getByRole('button',{name:'New project'}).click();
-    await page.getByRole('button',{name:'Retry saving selected project'}).click();
+    await page.getByRole('button', { name: 'New project' }).click();
+    await page.getByRole('button', { name: 'Retry saving selected project' }).click();
     await page.waitForFunction(() => !document.querySelector('dialog[open]'));
-    assert.equal(await page.evaluate(() => Object.keys(JSON.parse(sessionStorage.getItem('documents'))).length),1);
-    const ids = await page.evaluate(() => Object.keys(JSON.parse(sessionStorage.getItem('documents'))));
-    console.log(`${scenario}: ambiguous committed create followed by retry retained ${ids.join(', ')}`);
+    assert.equal(
+      await page.evaluate(
+        () => Object.keys(JSON.parse(sessionStorage.getItem('documents'))).length,
+      ),
+      1,
+    );
+    const ids = await page.evaluate(() =>
+      Object.keys(JSON.parse(sessionStorage.getItem('documents'))),
+    );
+    console.log(
+      `${scenario}: ambiguous committed create followed by retry retained ${ids.join(', ')}`,
+    );
   }
   await page.close();
-} finally { await browser.close(); }
+} finally {
+  await browser.close();
+}

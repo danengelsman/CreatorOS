@@ -12,7 +12,11 @@ export const Route = createFileRoute('/_auth/studio/$projectId')({
   component: StudioProject,
 });
 
-type ProjectResult = { scope: string; kind: 'loading' | 'missing' | 'error' | 'ready'; project?: any };
+type ProjectResult = {
+  scope: string;
+  kind: 'loading' | 'missing' | 'error' | 'ready';
+  project?: any;
+};
 
 function StudioProject() {
   const { projectId } = Route.useParams();
@@ -41,7 +45,11 @@ function StudioProject() {
     const fail = (kind: 'missing' | 'error') => {
       unavailable = true;
       access.writable = false;
-      setResult((previous) => ({ scope, kind, project: previous.scope === scope ? previous.project : undefined }));
+      setResult((previous) => ({
+        scope,
+        kind,
+        project: previous.scope === scope ? previous.project : undefined,
+      }));
     };
     const unsubscribe = onSnapshot(
       doc(db, 'projects', projectId),
@@ -85,11 +93,15 @@ function StudioProject() {
             ? 'This project may no longer exist or may not be available to this account.'
             : 'Check your connection and try again.'}
         </p>
-        {token && user?.uid && projectId && !projectId.includes('/') && <>
-          <LegacyDraftWarning userId={user.uid} projectId={projectId} />
-          <UnavailableDraftRecovery key={scope} userId={user.uid} projectId={projectId} />
-        </>}
-        <Link to="/studio" className="text-[var(--accent)] underline">Back to Studio</Link>
+        {token && user?.uid && projectId && !projectId.includes('/') && (
+          <>
+            <LegacyDraftWarning userId={user.uid} projectId={projectId} />
+            <UnavailableDraftRecovery key={scope} userId={user.uid} projectId={projectId} />
+          </>
+        )}
+        <Link to="/studio" className="text-[var(--accent)] underline">
+          Back to Studio
+        </Link>
       </div>
     );
   }
@@ -100,7 +112,9 @@ function StudioProject() {
       project={result.project}
       brand={brand}
       isCurrentOwner={() => isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)}
-      canWriteProject={() => access.writable && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)}
+      canWriteProject={() =>
+        access.writable && isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token)
+      }
       unavailable={result.kind === 'missing' || result.kind === 'error' ? result.kind : undefined}
       initialInspector={inspector}
       onBack={() => navigate({ to: '/studio' })}

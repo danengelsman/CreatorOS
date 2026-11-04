@@ -26,7 +26,9 @@ export default function SignalCard({ signal }: { signal: Signal }) {
 
       <Link
         to={signal.action.path}
-        search={signal.action.params?.inspector ? { inspector: signal.action.params.inspector } : {}}
+        search={
+          signal.action.params?.inspector ? { inspector: signal.action.params.inspector } : {}
+        }
         className="ios-button ios-button-tinted w-full flex items-center justify-center gap-2 py-3"
       >
         Act on Signal <ArrowRight size={18} />
