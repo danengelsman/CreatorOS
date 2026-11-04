@@ -732,7 +732,9 @@ test('real SDK refresh expiration returns to login and recovers only the same UI
   await input.press('Enter');
   await expect.poll(() => page.evaluate(() => (window as any).test.navigation)).toBe('/login');
   expect(await page.evaluate(() => (window as any).test.sdkAuth.currentUser)).toBeNull();
-  expect(await page.evaluate(() => (window as any).test.pendingAuthReturn())).toBe('/studio?project=local#draft');
+  // Involuntary sign-out no longer records a return path (deliberate): a
+  // deep link navigated to while signed out is remembered instead.
+  expect(await page.evaluate(() => (window as any).test.pendingAuthReturn())).toBeNull();
   expect(await page.evaluate(() => (window as any).test.transport.some((url: string) => url.includes('/token?')))).toBe(true);
   await page.evaluate(() => (window as any).test.signInSDK('B'));
   await expect(page.getByRole('heading', { name: "Let's Build Your Channel Style" })).toBeVisible();
