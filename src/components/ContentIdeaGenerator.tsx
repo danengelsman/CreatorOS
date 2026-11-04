@@ -8,16 +8,18 @@ import {
   ArrowsClockwise as RefreshCw,
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
-import { authorizedFetch, apiFetch } from '../firebase';
+import { authorizedFetch, apiFetch, auth } from '../firebase';
 import { cn } from '../lib/utils';
 import { getFriendlyError } from '../lib/friendlyError';
 
 export default function ContentIdeaGenerator({
   brand,
   onSelectIdea,
+  isCurrentOwner,
 }: {
   brand: any;
   onSelectIdea: (idea: any) => void;
+  isCurrentOwner?: () => boolean;
 }) {
   const [ideas, setIdeas] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +32,9 @@ export default function ContentIdeaGenerator({
   const [isIdle, setIsIdle] = useState(false);
   const [isGeneratingQuickIdea, setIsGeneratingQuickIdea] = useState(false);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lifecycle = useRef(0);
+  // Bind work to the account at mount; input provenance is the parent's responsibility.
+  const ownerUid = useRef(auth.currentUser?.uid || '');
 
   // IDLE TIMER: 30 seconds for demo purposes
   const IDLE_TIMEOUT = 30000;
@@ -44,6 +49,7 @@ export default function ContentIdeaGenerator({
   };
 
   useEffect(() => {
+    lifecycle.current++;
     // Initial fetch of analytics and ideas
     fetchAnalyticsAndIdeas();
 
@@ -56,6 +62,7 @@ export default function ContentIdeaGenerator({
     // resetIdleTimer();
 
     return () => {
+      lifecycle.current++;
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       // window.removeEventListener('mousemove', resetIdleTimer);
       // window.removeEventListener('keypress', resetIdleTimer);
@@ -65,26 +72,32 @@ export default function ContentIdeaGenerator({
   }, []);
 
   const fetchAnalyticsAndIdeas = async () => {
+    const generation = lifecycle.current;
+    const isCurrent = () => !!ownerUid.current && auth.currentUser?.uid === ownerUid.current && lifecycle.current === generation && (isCurrentOwner?.() ?? true);
+    if (!isCurrent()) return;
     try {
       setIsLoading(true);
       setLoadingText('Analyzing trends and performance...');
-      const res = await authorizedFetch('/api/analytics/summary');
+      const res = await authorizedFetch('/api/analytics/summary', {}, { uid: ownerUid.current, isCurrent });
+      if (!isCurrent()) return;
       let currentAnalytics = null;
       if (res && res.success) {
         setAnalytics(res.summary);
         currentAnalytics = res.summary;
       }
-      await generateWeeklyIdeas(currentAnalytics);
+      await generateWeeklyIdeas(currentAnalytics, isCurrent);
     } catch (err) {
+      if (!isCurrent()) return;
       console.warn('Failed to fetch analytics:', err);
       // Generate ideas without analytics if it fails
-      await generateWeeklyIdeas(null);
+      await generateWeeklyIdeas(null, isCurrent);
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   };
 
-  const generateWeeklyIdeas = async (currentAnalytics: any) => {
+  const generateWeeklyIdeas = async (currentAnalytics: any, isCurrent: () => boolean) => {
+    if (!isCurrent()) return;
     setLoadingText('Generating your weekly content ideas...');
     setIsLoading(true);
     setLoadingText('Analyzing trends and performance...');
@@ -149,28 +162,31 @@ export default function ContentIdeaGenerator({
             },
           },
         }),
-      });
+      }, { uid: ownerUid.current, isCurrent });
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to generate ideas.');
       }
       const data = await response.json();
+      if (!isCurrent()) return;
 
       if (data.text) {
         const parsed = JSON.parse(data.text);
         setIdeas(parsed.ideas || []);
       }
     } catch (err: any) {
-      setErrorMsg(getFriendlyError(err));
+      if (isCurrent()) setErrorMsg(getFriendlyError(err));
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   };
 
   const generateQuickIdea = async () => {
+    const generation = lifecycle.current;
+    const isCurrent = () => !!ownerUid.current && auth.currentUser?.uid === ownerUid.current && lifecycle.current === generation && (isCurrentOwner?.() ?? true);
     // Only generate if we don't already have one showing
-    if (quickIdea || isGeneratingQuickIdea) return;
+    if (!isCurrent() || quickIdea || isGeneratingQuickIdea) return;
 
     setIsGeneratingQuickIdea(true);
     try {
@@ -198,10 +214,11 @@ export default function ContentIdeaGenerator({
             },
           },
         }),
-      });
+      }, { uid: ownerUid.current, isCurrent });
 
       if (response.ok) {
         const data = await response.json();
+        if (!isCurrent()) return;
         if (data.text) {
           const parsed = JSON.parse(data.text);
           setQuickIdea(parsed);
@@ -210,7 +227,7 @@ export default function ContentIdeaGenerator({
     } catch (err) {
       console.warn('Quick idea generation failed:', err);
     } finally {
-      setIsGeneratingQuickIdea(false);
+      if (isCurrent()) setIsGeneratingQuickIdea(false);
     }
   };
 

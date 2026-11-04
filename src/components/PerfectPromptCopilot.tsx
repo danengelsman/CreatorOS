@@ -1,5 +1,5 @@
 import { apiFetch } from '../firebase';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useId, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Copy,
@@ -110,6 +110,15 @@ export default function PerfectPromptCopilot({ user }: { user: any }) {
   const [activeTab, setActiveTab] = useState<'generator' | 'templates' | 'history'>('generator');
   const [generatorInput, setGeneratorInput] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const generatorInputRef = useRef<HTMLTextAreaElement>(null);
+  const focusGeneratorRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (activeTab === 'generator' && focusGeneratorRef.current) {
+      generatorInputRef.current?.focus();
+      focusGeneratorRef.current = false;
+    }
+  }, [activeTab]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -164,7 +173,7 @@ export default function PerfectPromptCopilot({ user }: { user: any }) {
 
       <div className="px-4">
         {activeTab === 'generator' && (
-          <GeneratorView user={user} input={generatorInput} setInput={setGeneratorInput} />
+          <GeneratorView user={user} input={generatorInput} setInput={setGeneratorInput} inputRef={generatorInputRef} />
         )}
         {activeTab === 'templates' && (
           <TemplatesView
@@ -172,6 +181,7 @@ export default function PerfectPromptCopilot({ user }: { user: any }) {
             onSelect={(text, autoSwitch = false) => {
               setGeneratorInput(text);
               if (autoSwitch) {
+                focusGeneratorRef.current = true;
                 setActiveTab('generator');
                 showToast('Template loaded into Prompt Generator!');
               } else {
@@ -190,14 +200,17 @@ function GeneratorView({
   user,
   input,
   setInput,
+  inputRef,
 }: {
   user: any;
   input: string;
   setInput: (v: string) => void;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState('');
   const [copied, setCopied] = useState(false);
+  const inputId = useId();
 
   const handleGenerate = async () => {
     if (!input.trim() || !user) return;
@@ -260,8 +273,10 @@ function GeneratorView({
   return (
     <div className="space-y-6">
       <div className="bg-[var(--bg-tertiary)] ios-card p-6 space-y-4">
-        <span className="ios-label px-0">Rough Idea</span>
+        <label htmlFor={inputId} className="ios-label px-0">Rough Idea</label>
         <textarea
+          id={inputId}
+          ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="e.g., A video about productivity hacks for busy parents..."
@@ -334,6 +349,56 @@ function TemplatesView({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModalTemplate, setSelectedModalTemplate] = useState<any | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const detailContentRef = useRef<HTMLDivElement>(null);
+  const detailCloseRef = useRef<HTMLButtonElement>(null);
+  const detailOpenerRef = useRef<HTMLButtonElement | null>(null);
+  const detailTitleId = useId();
+
+  const closeDetail = () => {
+    setSelectedModalTemplate(null);
+    const opener = detailOpenerRef.current;
+    requestAnimationFrame(() => {
+      if (opener?.isConnected && opener.getClientRects().length) opener.focus();
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!selectedModalTemplate) return;
+    detailCloseRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      // The assistant stays mounted when hidden; only the visible detail gets priority.
+      if (event.defaultPrevented || !detailRef.current?.getClientRects().length) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeDetail();
+      } else if (event.key === 'Tab') {
+        const buttons = detailContentRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
+        if (!buttons?.length) return;
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        if (event.shiftKey && (document.activeElement === first || !detailContentRef.current?.contains(document.activeElement))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !detailContentRef.current?.contains(document.activeElement))) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    const onFocusIn = (event: FocusEvent) => {
+      if (detailRef.current?.getClientRects().length && !detailContentRef.current?.contains(event.target as Node)) {
+        detailCloseRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('focusin', onFocusIn);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('focusin', onFocusIn);
+    };
+  }, [selectedModalTemplate]);
 
   useEffect(() => {
     loadTemplates(platform.id, page);
@@ -476,12 +541,17 @@ function TemplatesView({
           templates.map((tpl, i) => (
             <div
               key={i}
-              onClick={() => setSelectedModalTemplate(tpl)}
+              onClick={(e) => {
+                detailOpenerRef.current = e.currentTarget.querySelector('button[data-template-opener]');
+                setSelectedModalTemplate(tpl);
+              }}
               className="bg-[var(--bg-tertiary)] ios-card p-5 ios-card-clickable cursor-pointer hover:border-[var(--accent)] transition-all group relative"
             >
               <div className="flex justify-between items-start gap-4 mb-2">
                 <h3 className="font-semibold text-[17px] text-[var(--label-primary)] group-hover:text-[var(--accent)] transition-colors">
-                  {tpl.title}
+                  <button type="button" data-template-opener aria-haspopup="dialog" className="text-left rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">
+                    {tpl.title}
+                  </button>
                 </h3>
                 <div className="flex items-center gap-2 shrink-0">
                   <button
@@ -502,6 +572,7 @@ function TemplatesView({
                     }}
                     className="ios-button ios-button-tinted text-[12px] h-7 px-2.5 font-bold flex items-center gap-1"
                     title="Use in Generator"
+                    aria-label={`Use ${tpl.title} in Generator`}
                   >
                     Use <ArrowRight size={12} weight="bold" />
                   </button>
@@ -544,17 +615,22 @@ function TemplatesView({
       <AnimatePresence>
         {selectedModalTemplate && (
           <motion.div
+            ref={detailRef}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            onClick={() => setSelectedModalTemplate(null)}
+            onClick={closeDetail}
           >
             <motion.div
+              ref={detailContentRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={detailTitleId}
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-[var(--bg-tertiary)] border border-[var(--separator)] rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-2xl"
+              className="bg-[var(--bg-tertiary)] border border-[var(--separator)] rounded-2xl p-6 max-w-lg w-full max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain space-y-5 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-start gap-3 border-b border-[var(--separator)] pb-3">
@@ -562,12 +638,15 @@ function TemplatesView({
                   <span className="text-[10px] uppercase tracking-wider font-bold text-[var(--accent)] block">
                     {platform.name} Template
                   </span>
-                  <h2 className="font-serif text-[20px] font-bold text-[var(--label-primary)]">
+                  <h2 id={detailTitleId} className="font-serif text-[20px] font-bold text-[var(--label-primary)]">
                     {selectedModalTemplate.title}
                   </h2>
                 </div>
                 <button
-                  onClick={() => setSelectedModalTemplate(null)}
+                  ref={detailCloseRef}
+                  type="button"
+                  aria-label="Close template details"
+                  onClick={closeDetail}
                   className="p-1.5 rounded-full hover:bg-[var(--bg-secondary)] text-[var(--label-secondary)]"
                 >
                   <X size={18} weight="bold" />

@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useWorkspaceStore } from '../src/store/workspaceStore';
+import { useWorkspaceStore, type WorkspaceToken } from '../src/store/workspaceStore';
 
 describe('useWorkspaceStore domain slices (D8-A)', () => {
+  let token: WorkspaceToken;
   beforeEach(() => {
+    token = useWorkspaceStore.getState().changeAccount('test')!;
     // Reset state before each test
     useWorkspaceStore.setState({
       brand: null,
@@ -17,7 +19,7 @@ describe('useWorkspaceStore domain slices (D8-A)', () => {
   it('manages brand slice state correctly', () => {
     expect(useWorkspaceStore.getState().brand).toBeNull();
     const testBrand = { name: 'Test Brand', archetype: 'The Creator' };
-    useWorkspaceStore.getState().setBrand(testBrand);
+    useWorkspaceStore.getState().setBrand(token, testBrand);
     expect(useWorkspaceStore.getState().brand).toEqual(testBrand);
   });
 
@@ -26,9 +28,8 @@ describe('useWorkspaceStore domain slices (D8-A)', () => {
     expect(useWorkspaceStore.getState().isProjectsLoading).toBe(true);
 
     const testProjects = [{ id: 'p1', title: 'Video Project 1' }];
-    useWorkspaceStore.getState().setProjects(testProjects);
-    useWorkspaceStore.getState().setIsProjectsLoading(false);
-    useWorkspaceStore.getState().setIsProjectsLoadError(false);
+    useWorkspaceStore.getState().setProjects(token, testProjects);
+    useWorkspaceStore.getState().setProjectsStatus(token, false, false);
 
     expect(useWorkspaceStore.getState().projects).toEqual(testProjects);
     expect(useWorkspaceStore.getState().isProjectsLoading).toBe(false);
@@ -42,8 +43,8 @@ describe('useWorkspaceStore domain slices (D8-A)', () => {
     const idea = { id: 'i1', title: 'Idea 1' };
     const project = { id: 'p2', title: 'Project 2' };
 
-    useWorkspaceStore.getState().setSelectedIdea(idea);
-    useWorkspaceStore.getState().setSelectedProject(project);
+    useWorkspaceStore.getState().setSelectedIdea(token, idea);
+    useWorkspaceStore.getState().setSelectedProject(token, project);
 
     expect(useWorkspaceStore.getState().selectedIdea).toEqual(idea);
     expect(useWorkspaceStore.getState().selectedProject).toEqual(project);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import {
   Sparkle,
   ArrowRight,
@@ -13,7 +13,9 @@ import {
   X,
   Cards,
 } from '@phosphor-icons/react';
-import { apiFetch } from '../firebase';
+import { apiFetch, auth } from '../firebase';
+import type { ApiRequestOwner } from '../lib/apiClient';
+import { useBoundRequestOwner } from '../hooks/useBoundRequestOwner';
 import { cn } from '../lib/utils';
 import { getFriendlyError } from '../lib/friendlyError';
 
@@ -85,10 +87,13 @@ const PLATFORM_ICONS: Record<string, any> = {
 export default function ViralTemplatesLibrary({
   brand,
   onSelectTemplate,
+  owner: inputOwner,
 }: {
   brand: any;
   onSelectTemplate: (template: any) => void;
+  owner?: ApiRequestOwner;
 }) {
+  const owner = useBoundRequestOwner(inputOwner);
   const [selectedPlatform, setSelectedPlatform] = useState<string>('All');
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
 
@@ -104,7 +109,7 @@ export default function ViralTemplatesLibrary({
       : TEMPLATES.filter((t) => t.platform === selectedPlatform);
 
   const handleTailorToBrand = async () => {
-    if (!selectedTemplate) return;
+    if (!selectedTemplate || !owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
 
     setIsTailoring(true);
     setErrorMsg('');
@@ -149,13 +154,14 @@ export default function ViralTemplatesLibrary({
             },
           },
         }),
-      });
+      }, owner);
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to tailor template.');
       }
       const data = await response.json();
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
 
       if (data.text) {
         const parsed = JSON.parse(data.text);
@@ -167,9 +173,10 @@ export default function ViralTemplatesLibrary({
         });
       }
     } catch (err: any) {
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       setErrorMsg(getFriendlyError(err));
     } finally {
-      setIsTailoring(false);
+      if (auth.currentUser?.uid === owner.uid && owner.isCurrent()) setIsTailoring(false);
     }
   };
 
@@ -179,6 +186,7 @@ export default function ViralTemplatesLibrary({
     } else if (selectedTemplate) {
       onSelectTemplate(selectedTemplate);
     }
+    setSelectedTemplate(null);
   };
 
   return (
@@ -217,7 +225,8 @@ export default function ViralTemplatesLibrary({
         {filteredTemplates.map((template, idx) => {
           const Icon = PLATFORM_ICONS[template.platform] || FileText;
           return (
-            <motion.div
+            <motion.button
+              type="button"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
@@ -227,7 +236,7 @@ export default function ViralTemplatesLibrary({
                 setTailoredVersion(null);
                 setErrorMsg('');
               }}
-              className="bg-[var(--bg-secondary)] border border-[var(--separator)] rounded-2xl p-5 hover:border-[var(--accent)] hover:shadow-lg transition-all cursor-pointer group flex flex-col h-full"
+              className="bg-[var(--bg-secondary)] border border-[var(--separator)] rounded-2xl p-5 hover:border-[var(--accent)] hover:shadow-lg transition-all cursor-pointer group flex flex-col h-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -256,19 +265,18 @@ export default function ViralTemplatesLibrary({
                   "{template.hook}"
                 </p>
               </div>
-            </motion.div>
+            </motion.button>
           );
         })}
       </div>
 
       {/* Detail / Customization Modal */}
-      <AnimatePresence>
         {selectedTemplate && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          <dialog
+            ref={(element) => { if (element && !element.open) element.showModal(); }}
+            aria-label="Template details"
+            onCancel={(event) => { event.preventDefault(); event.stopPropagation(); setSelectedTemplate(null); }}
+            className="m-auto max-h-[90vh] w-[min(95vw,42rem)] rounded-[24px] bg-transparent p-0 backdrop:bg-black/50"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -295,6 +303,8 @@ export default function ViralTemplatesLibrary({
                 </div>
                 <button
                   onClick={() => setSelectedTemplate(null)}
+                  aria-label="Close template details"
+                  autoFocus
                   className="p-2 text-[var(--label-secondary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors"
                 >
                   <X size={20} />
@@ -383,9 +393,8 @@ export default function ViralTemplatesLibrary({
                 </button>
               </div>
             </motion.div>
-          </motion.div>
+          </dialog>
         )}
-      </AnimatePresence>
     </div>
   );
 }

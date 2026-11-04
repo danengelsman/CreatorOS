@@ -21,7 +21,8 @@ import { doc, updateDoc } from 'firebase/firestore';
 import AvatarGenerator from './AvatarGenerator';
 import Integrations from './Integrations';
 import { authorizedFetch } from '../firebase';
-import { revokeAllSessions } from '../lib/apiClient';
+import { revokeAllSessions, type ApiRequestOwner } from '../lib/apiClient';
+import { useBoundRequestOwner } from '../hooks/useBoundRequestOwner';
 import { fetchDailyGoalsFromCloud, getLocalDailyGoals } from '../services/dailyGoals';
 
 import { User as FirebaseUser } from 'firebase/auth';
@@ -31,12 +32,15 @@ export default function Profile({
   userData,
   brand,
   projects = [],
+  owner: inputOwner,
 }: {
   user: FirebaseUser;
   userData: any;
   brand: any;
   projects?: any[];
+  owner?: ApiRequestOwner;
 }) {
+  const owner = useBoundRequestOwner(inputOwner);
   const [isUploading, setIsUploading] = useState(false);
   const [showAvatarGenerator, setShowAvatarGenerator] = useState(false);
   const [stats, setStats] = useState({ reach: '---', score: '0', streak: '0' });
@@ -44,20 +48,28 @@ export default function Profile({
   // Phase A — "Sign out of all devices" (revokes every refresh token).
   const [isRevokingAll, setIsRevokingAll] = useState(false);
   const [revokeError, setRevokeError] = useState('');
+  const [revokeSucceeded, setRevokeSucceeded] = useState(false);
+  const revokingRef = useRef(false);
 
   const handleRevokeAllSessions = async () => {
-    if (isRevokingAll) return;
+    if (revokingRef.current || !owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
+    revokingRef.current = true;
     setIsRevokingAll(true);
     setRevokeError('');
+    setRevokeSucceeded(false);
     try {
-      // Server revokes every refresh token for this user and clears the
-      // session cookie; signing out locally returns to the login view.
-      await revokeAllSessions();
-      await auth.signOut();
+      // Server revokes every refresh token for this user. The owned request
+      // ignores cookie writes so a late response cannot clear another session.
+      await revokeAllSessions(owner);
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
+      setRevokeSucceeded(true);
     } catch (error: any) {
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       console.error('Sign out of all devices failed:', error);
-      setRevokeError(error?.message || "Couldn't sign out everywhere. Please try again.");
-      setIsRevokingAll(false);
+      setRevokeError(error?.message || "Couldn't revoke sessions. Please try again.");
+    } finally {
+      revokingRef.current = false;
+      if (auth.currentUser?.uid === owner.uid && owner.isCurrent()) setIsRevokingAll(false);
     }
   };
 
@@ -361,17 +373,6 @@ export default function Profile({
           </div>
           <div className="mt-8">
             <button
-              onClick={() => auth.signOut()}
-              className="ios-button ios-button-tinted w-full mt-6"
-              style={{
-                color: 'var(--system-red)',
-                background: 'color-mix(in srgb, var(--system-red) 8%, transparent)',
-              }}
-            >
-              <LogOut size={17} strokeWidth={1.5} className="mr-2" />
-              Sign Out
-            </button>
-            <button
               onClick={handleRevokeAllSessions}
               disabled={isRevokingAll}
               className="ios-button ios-button-tinted w-full mt-3"
@@ -387,14 +388,25 @@ export default function Profile({
               ) : (
                 <LogOut size={17} strokeWidth={1.5} className="mr-2" />
               )}
-              Sign out of all devices
+              Revoke sessions on all devices
             </button>
             {revokeError && (
               <p className="mt-2 text-[13px] text-[var(--system-red)] font-medium">{revokeError}</p>
             )}
+            {revokeSucceeded && (
+              <p role="status" className="mt-2 text-[13px] text-[var(--system-green)] font-medium">
+                Refresh tokens revoked. This action did not explicitly sign out this browser.
+              </p>
+            )}
             <p className="mt-2 text-[12px] text-[var(--label-tertiary)] leading-relaxed">
-              Revokes every active session — including sessions on other devices. Sessions expire
-              automatically after 14 days.
+              Revokes refresh tokens for this account, including this browser and other devices.
+              An already issued ID token can remain usable for up to an hour. A session cookie
+              authenticated in the same second as revocation may remain usable until expiration
+              (up to 14 days). Cookies remain in this browser until expiration or replacement.
+              Firebase may sign this browser out when a revoked refresh fails.
+              Logout in the navigation signs out of Firebase on this browser, but does not remove
+              or invalidate an existing server cookie. Avoid switching accounts during revocation,
+              token refresh or sign-out: Firebase does not scope sign-out to one account.
             </p>
           </div>
         </section>

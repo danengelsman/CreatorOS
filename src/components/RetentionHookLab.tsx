@@ -17,9 +17,14 @@ import {
 import { cn } from '../lib/utils';
 import { analyzeAndOptimizeRetention } from '../services/gemini';
 import { getFriendlyError } from '../lib/friendlyError';
+import { auth } from '../firebase';
+import type { ApiRequestOwner } from '../lib/apiClient';
+import { useBoundRequestOwner } from '../hooks/useBoundRequestOwner';
 
 interface RetentionHookLabProps {
+  owner?: ApiRequestOwner;
   initialText?: string;
+  currentText?: string;
   showToast?: (msg: string) => void;
   onApplyHookToEditor?: (hookText: string) => void;
   onSendToScenePlanner?: (hookText: string) => void;
@@ -28,19 +33,25 @@ interface RetentionHookLabProps {
 
 export default function RetentionHookLab({
   initialText = '',
+  currentText,
   showToast = (msg: string) => console.log(msg),
   onApplyHookToEditor,
   onSendToScenePlanner: _onSendToScenePlanner,
   brand,
+  owner: inputOwner,
 }: RetentionHookLabProps) {
-  const [inputText, setInputText] = useState(initialText);
+  const owner = useBoundRequestOwner(inputOwner);
+  const [localInput, setInputText] = useState(initialText);
+  const inputText = currentText ?? localInput;
   const [platform, setPlatform] = useState<'youtube' | 'tiktok' | 'reels'>('youtube');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<any | null>(null);
+  const [resultInput, setResultInput] = useState('');
   const [, setError] = useState('');
   const [copiedHookIndex, setCopiedHookIndex] = useState<number | null>(null);
 
   const handleAnalyze = async () => {
+    if (!owner || auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
     if (!inputText.trim()) {
       setError('Please provide a hook or intro to analyze.');
       return;
@@ -48,14 +59,17 @@ export default function RetentionHookLab({
     setError('');
     setIsAnalyzing(true);
     try {
-      const data = await analyzeAndOptimizeRetention(inputText, platform, brand);
+      const data = await analyzeAndOptimizeRetention(inputText, platform, brand, owner);
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       setResult(data?.retention_analysis || data);
+      setResultInput(inputText);
       showToast('Retention analysis complete!');
     } catch (err: any) {
+      if (auth.currentUser?.uid !== owner.uid || !owner.isCurrent()) return;
       console.error('Retention Analysis failed:', err);
       showToast(getFriendlyError(err));
     } finally {
-      setIsAnalyzing(false);
+      if (auth.currentUser?.uid === owner.uid && owner.isCurrent()) setIsAnalyzing(false);
     }
   };
 
@@ -121,12 +135,16 @@ export default function RetentionHookLab({
         <label className="text-[13px] font-bold text-[var(--label-primary)] flex items-center justify-between">
           <span>Draft Hook or Video Script</span>
           <span className="text-[11px] text-[var(--label-tertiary)] font-normal">
-            Paste your intro or spoken opening lines
+            {currentText !== undefined
+              ? 'Live editor script'
+              : 'Paste your intro or spoken opening lines'}
           </span>
         </label>
 
         <textarea
           value={inputText}
+          readOnly={currentText !== undefined}
+          aria-label="Draft hook or video script"
           onChange={(e) => setInputText(e.target.value)}
           placeholder="E.g., Hey guys welcome back to my channel! Today I'm going to talk about 5 simple ways to save money when you're starting out..."
           className="w-full h-32 bg-[var(--bg-secondary)] border border-[var(--separator)] rounded-xl p-3.5 text-[13px] font-medium text-[var(--label-primary)] outline-none focus:border-[var(--accent)] transition-colors resize-none leading-relaxed"
@@ -165,6 +183,7 @@ export default function RetentionHookLab({
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
+          {resultInput !== inputText && <p role="status">The script changed since this analysis. Run it again for the current draft.</p>}
           {/* Top Score Banner */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
             {/* Score Box */}

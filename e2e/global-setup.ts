@@ -222,5 +222,5 @@ async function warmDevServer() {
 
 export default async function globalSetup() {
   await seedEmulatorUser();
-  await warmDevServer();
+  if (process.env.E2E_SKIP_WARMUP !== '1') await warmDevServer();
 }

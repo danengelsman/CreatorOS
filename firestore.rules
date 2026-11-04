@@ -168,7 +168,9 @@ service cloud.firestore {
     match /projects/{projectId} {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidProject(request.resource.data);
+      // Reserve all brand_ IDs, including IDs containing newlines, for their UID.
+      allow create: if isAuthenticated() && isValidProject(request.resource.data) &&
+        (!projectId.matches('(?s)brand_.*') || projectId == 'brand_' + request.auth.uid);
       allow update: if isAuthenticated() && (isAdmin() ||
         (resource.data.userId == request.auth.uid && isUnchangedOwner()));
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());

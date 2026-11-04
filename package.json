@@ -14,6 +14,7 @@
     "lint": "tsc --noEmit && eslint .",
     "check:artifact": "node scripts/check-artifact-freshness.mjs",
     "test:unit": "vitest run",
+    "test:rules": "firebase --non-interactive --project demo-brand-rules --config firebase.rules-test.json emulators:exec --only firestore \"node --test tests/firestoreBrandRules.integration.mjs\"",
     "test:e2e": "playwright test",
     "prepare": "husky"
   },

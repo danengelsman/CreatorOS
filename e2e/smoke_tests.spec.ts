@@ -25,6 +25,13 @@ test.describe('CreatorOS End-to-End System Smoke Tests', () => {
     // is mocked below, so any request that would leave the machine is a bug —
     // recorded here and failed at the end of the test.
     const liveFirebaseHits: string[] = [];
+    const blockedExternalRequests: string[] = [];
+    await page.route('**/*', (route) => {
+      const url = new URL(route.request().url());
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.protocol === 'data:' || url.protocol === 'blob:') return route.continue();
+      blockedExternalRequests.push(url.href);
+      return route.abort();
+    });
     page.on('request', (request) => {
       const url = request.url();
       const isFirebaseDataPlane =
@@ -141,17 +148,18 @@ test.describe('CreatorOS End-to-End System Smoke Tests', () => {
     const menuButton = page.locator('header button').first();
     await expect(menuButton).toBeVisible();
 
-    // 6. Navigation to the "Create" Page via the nav drawer (desktop & mobile compatible)
+    // 6. Open the project pipeline from the shared navigation.
     await menuButton.click();
+    const studioNavItem = page.getByRole('link', { name: 'Studio', exact: true }).first();
+    await expect(studioNavItem).toBeVisible();
+    await studioNavItem.click();
+    await expect(page).toHaveURL(/\/studio\/?$/);
+    await expect(page.getByRole('heading', { name: 'In Ideation' })).toBeVisible();
+    await page.getByRole('button', { name: 'New project', exact: true }).click();
+    await page.getByRole('button', { name: 'Create blank project', exact: true }).click();
+    await expect(page).toHaveURL(/\/studio\/[^/?]+/);
 
-    // Select the "Create" navigation item inside drawer. D7-A: nav entries are
-    // router Links (anchors) now, not buttons. Exact name so "Creator Hub"
-    // doesn't match "Create" substring matching.
-    const createNavItem = page.getByRole('link', { name: 'Create', exact: true }).first();
-    await expect(createNavItem).toBeVisible();
-    await createNavItem.click();
-
-    // 7. Verify the Create Workspace loaded successfully
+    // 7. Verify the project canvas loads.
     const scriptEditor = page.locator(
       'textarea[placeholder*="narrative? AI will score your brand voice"]',
     );
@@ -159,6 +167,14 @@ test.describe('CreatorOS End-to-End System Smoke Tests', () => {
 
     // Fill in a sample video script
     await scriptEditor.fill(
+      'This is an automated E2E system check verifying Gemini Video generation, layout boundaries, and reactive workflows.',
+    );
+
+    // Verify the real route writes the new project and restores it after reload.
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('status').first()).toContainText('No unsaved changes.');
+    await page.reload();
+    await expect(scriptEditor).toHaveValue(
       'This is an automated E2E system check verifying Gemini Video generation, layout boundaries, and reactive workflows.',
     );
 
@@ -183,7 +199,7 @@ test.describe('CreatorOS End-to-End System Smoke Tests', () => {
     // Verify the simulated custom video player has rendered the completed video.
     // The completed video appears in BOTH the Gemini Preview panel and Video
     // History; scope to the preview player so the assertion isn't ambiguous.
-    const previewSection = page.locator('section').filter({ hasText: 'Gemini Preview' });
+    const previewSection = page.getByText('Gemini Preview', { exact: true }).locator('xpath=ancestor::section[1]');
     const videoContainer = previewSection.locator('video');
     await expect(videoContainer).toBeVisible();
     await expect(page.locator('video')).toHaveCount(2); // preview + history entry

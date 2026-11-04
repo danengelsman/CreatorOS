@@ -14,9 +14,10 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '../../lib/utils';
 import { CalendarBlock, ConnectedAccount, ReformatSuggestion } from './calendarTypes';
 import { getPlatformStyle, getPlatformIcon, isAutoPublished } from './calendarHelpers';
+import { isScheduleManaged } from '../studio/studioHubHelpers';
 
 interface EventDetailModalProps {
   showDetailModal: boolean;
@@ -38,6 +39,7 @@ interface EventDetailModalProps {
   onSaveAIBlock: (suggestion: ReformatSuggestion) => void;
   onDeleteEvent: (id: string) => void;
   onUnschedule: (event: CalendarBlock) => void;
+  scheduleError?: string;
   onGoToProfile: () => void;
 }
 
@@ -61,6 +63,7 @@ export default function EventDetailModal({
   onSaveAIBlock,
   onDeleteEvent,
   onUnschedule,
+  scheduleError,
   onGoToProfile,
 }: EventDetailModalProps) {
   if (!showDetailModal || !selectedEvent) return null;
@@ -89,7 +92,7 @@ export default function EventDetailModal({
             <span className="text-[13px] text-[var(--label-secondary)] font-bold">
               {selectedEvent.scheduledDate
                 ? `Scheduled on ${format(selectedEvent.scheduledDate, 'MMMM d, yyyy')} at ${selectedEvent.publishTime || '12:00'}`
-                : 'Unscheduled Draft'}
+                : 'No scheduled date'}
             </span>
           </div>
           <button
@@ -473,6 +476,7 @@ export default function EventDetailModal({
 
         {/* Footer Actions */}
         <div className="p-6 bg-[var(--bg-secondary)]/40 border-t border-[var(--separator)] flex flex-wrap gap-3 items-center justify-between">
+          {scheduleError && <p role="alert" className="w-full text-sm text-red-500">{scheduleError}</p>}
           <button
             onClick={() => onDeleteEvent(selectedEvent.id)}
             className="px-4 py-3 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 text-[13px] font-bold transition-colors flex items-center gap-2"
@@ -481,12 +485,12 @@ export default function EventDetailModal({
           </button>
 
           <div className="flex items-center gap-2">
-            {selectedEvent.scheduledDate && (
+            {isScheduleManaged(selectedEvent) && (
               <button
                 onClick={() => onUnschedule(selectedEvent)}
                 className="px-4 py-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--separator)]/60 text-[var(--label-secondary)] hover:text-[var(--label-primary)] text-[13px] font-bold transition-colors"
               >
-                Unschedule Draft
+                Clear scheduling
               </button>
             )}
             <button

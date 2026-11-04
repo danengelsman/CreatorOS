@@ -1,16 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   collection,
   query,
   where,
   getDocs,
-  updateDoc,
   doc,
   addDoc,
   serverTimestamp,
-  deleteDoc,
 } from 'firebase/firestore';
-import { db, authorizedFetch, apiFetch } from '../firebase';
+import { auth, db, authorizedFetch, apiFetch } from '../firebase';
 import {
   startOfWeek,
   addDays,
@@ -34,6 +32,8 @@ import CalendarGrid from './calendar/CalendarGrid';
 import AutoPublishModal from './calendar/AutoPublishModal';
 import NewEventModal from './calendar/NewEventModal';
 import EventDetailModal from './calendar/EventDetailModal';
+import { scheduleProject, unscheduleProject } from './calendar/calendarPersistence';
+import { deleteOwnedContentProject, updateOwnedContentProject, STUDIO_JOURNEY_UNAVAILABLE } from './studio/studioOwnerFence';
 
 export { getPlatformStyle } from './calendar/calendarHelpers';
 
@@ -66,10 +66,14 @@ export default function CalendarView({
   const [draggedBlock, setDraggedBlock] = useState<CalendarBlock | null>(null);
   const [publishTime, setPublishTime] = useState('12:00');
   const [autoPublishEnabled, setAutoPublishEnabled] = useState(true);
+  const [autoPublishError, setAutoPublishError] = useState('');
+  const [isScheduling, setIsScheduling] = useState(false);
+  const schedulingLock = useRef(false);
 
   // Selected detail modal
   const [selectedEvent, setSelectedEvent] = useState<CalendarBlock | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [scheduleError, setScheduleError] = useState('');
 
   // AI Reformatting states
   const [isGeneratingReformat, setIsGeneratingReformat] = useState(false);
@@ -98,7 +102,9 @@ export default function CalendarView({
   };
 
   const handleSyncToPlatforms = async () => {
-    if (!selectedEvent || selectedSyncPlatforms.length === 0) return;
+    if (!user?.uid || !selectedEvent || selectedEvent.userId !== user.uid || selectedSyncPlatforms.length === 0) return;
+    const owner = { uid: user.uid, isCurrent: () => auth.currentUser?.uid === user.uid };
+    if (!owner.isCurrent()) return;
     setIsSyncing(true);
     setSyncResults(null);
     setSyncError('');
@@ -109,22 +115,25 @@ export default function CalendarView({
     try {
       const result = await authorizedFetch('/api/publish', {
         method: 'POST',
+        credentials: 'omit',
         body: JSON.stringify({
           title: originalTitle,
           body: originalBody,
           platforms: selectedSyncPlatforms,
         }),
-      });
+      }, owner);
+      if (!owner.isCurrent()) throw new Error('Account changed');
 
       if (result.success) {
         setSyncResults(result.results);
 
         const hasSuccess = Object.values(result.results).some((r: any) => r.status === 'success');
         if (hasSuccess) {
-          await updateDoc(doc(db, 'projects', selectedEvent.id), {
+          await updateOwnedContentProject(db, doc(db, 'projects', selectedEvent.id), owner.uid, {
             status: 'Published',
             updatedAt: serverTimestamp(),
-          });
+          }, owner.isCurrent);
+          if (!owner.isCurrent()) throw new Error('Account changed');
 
           await fetchAllBlocks();
 
@@ -138,7 +147,7 @@ export default function CalendarView({
       }
     } catch (err: any) {
       console.error(err);
-      setSyncError(getFriendlyError(err));
+      setSyncError(err instanceof Error && err.message === STUDIO_JOURNEY_UNAVAILABLE ? `${err.message} Publishing may already have succeeded; check the destination before publishing again.` : getFriendlyError(err));
     } finally {
       setIsSyncing(false);
     }
@@ -247,14 +256,17 @@ export default function CalendarView({
   // Delete event
   const handleDeleteEvent = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (!user?.uid) return;
     try {
-      await deleteDoc(doc(db, 'projects', id));
+      setScheduleError('');
+      await deleteOwnedContentProject(db, doc(db, 'projects', id), user.uid);
       setAllBlocks((prev) => prev.filter((b) => b.id !== id));
       setScheduledEvents((prev) => prev.filter((b) => b.id !== id));
       setUnscheduledBlocks((prev) => prev.filter((b) => b.id !== id));
       setShowDetailModal(false);
     } catch (error) {
       console.error('Error deleting block:', error);
+      setScheduleError(error instanceof Error && error.message === STUDIO_JOURNEY_UNAVAILABLE ? error.message : 'This item could not be deleted. Refresh the calendar and try again.');
     }
   };
 
@@ -273,6 +285,7 @@ export default function CalendarView({
   const handleDropOnDay = (day: Date, e: React.DragEvent) => {
     e.preventDefault();
     e.currentTarget.classList.remove('bg-[var(--bg-secondary)]/50');
+    if (schedulingLock.current) return;
 
     const blockId = e.dataTransfer.getData('blockId');
     if (!blockId) return;
@@ -282,6 +295,7 @@ export default function CalendarView({
 
     setSelectedDate(day);
     setDraggedBlock(block);
+    setAutoPublishError('');
 
     // Set default auto-publish settings
     setPublishTime(block.publishTime || '12:00');
@@ -293,7 +307,10 @@ export default function CalendarView({
 
   // Confirm Drag and Drop Auto-Publish Settings
   const handleConfirmAutoPublish = async () => {
-    if (!selectedDate || !draggedBlock) return;
+    if (!selectedDate || !draggedBlock || !user?.uid || schedulingLock.current) return;
+    schedulingLock.current = true;
+    setIsScheduling(true);
+    setAutoPublishError('');
 
     try {
       const [hours, minutes] = publishTime.split(':').map(Number);
@@ -308,38 +325,38 @@ export default function CalendarView({
         status: autoPublishEnabled ? 'Scheduled' : 'Draft',
       };
 
-      setAllBlocks((prev) => prev.map((b) => (b.id === draggedBlock.id ? updatedBlock : b)));
-      setScheduledEvents((prev) => [...prev.filter((b) => b.id !== draggedBlock.id), updatedBlock]);
-      setUnscheduledBlocks((prev) => prev.filter((b) => b.id !== draggedBlock.id));
-
-      await updateDoc(doc(db, 'projects', draggedBlock.id), {
+      await scheduleProject(db, doc(db, 'projects', draggedBlock.id), user.uid, draggedBlock, {
         scheduledDate: finalDateTime,
         publishTime,
         autoPublish: autoPublishEnabled,
-        status: autoPublishEnabled ? 'Scheduled' : 'Draft',
-        updatedAt: serverTimestamp(),
       });
+
+      setAllBlocks((prev) => prev.map((b) => (b.id === draggedBlock.id ? updatedBlock : b)));
+      setScheduledEvents((prev) => [...prev.filter((b) => b.id !== draggedBlock.id), updatedBlock]);
+      setUnscheduledBlocks((prev) => prev.filter((b) => b.id !== draggedBlock.id));
 
       setShowAutoPublishModal(false);
       setDraggedBlock(null);
     } catch (error) {
       console.error('Error setting auto-publish date:', error);
-      fetchAllBlocks();
+      setAutoPublishError(error instanceof Error && error.message === STUDIO_JOURNEY_UNAVAILABLE ? error.message : 'Could not schedule this item. It may have been published or changed. Refresh the calendar and try again.');
+    } finally {
+      schedulingLock.current = false;
+      setIsScheduling(false);
     }
   };
 
   // Unschedule a scheduled event (return to sidebar)
   const handleUnschedule = async (event: CalendarBlock) => {
+    if (!user?.uid) return;
     try {
-      await updateDoc(doc(db, 'projects', event.id), {
-        scheduledDate: null,
-        status: 'Draft',
-        updatedAt: serverTimestamp(),
-      });
+      setScheduleError('');
+      await unscheduleProject(db, doc(db, 'projects', event.id), user.uid, event);
       await fetchAllBlocks();
       setShowDetailModal(false);
     } catch (error) {
       console.error('Error unscheduling block:', error);
+      setScheduleError(error instanceof Error && error.message === STUDIO_JOURNEY_UNAVAILABLE ? error.message : 'Scheduling could not be cleared. Refresh the calendar and try again.');
     }
   };
 
@@ -485,6 +502,7 @@ Return your response strictly in the following JSON format:
         }}
         onSelectEvent={(block) => {
           setSelectedEvent(block);
+          setScheduleError('');
           setReformatSuggestions([]);
           setReformatError('');
           setSelectedTargetPlatforms([]);
@@ -520,6 +538,7 @@ Return your response strictly in the following JSON format:
           onDropOnDay={handleDropOnDay}
           onSelectEvent={(event) => {
             setSelectedEvent(event);
+            setScheduleError('');
             setReformatSuggestions([]);
             setReformatError('');
             setSelectedTargetPlatforms([]);
@@ -539,7 +558,10 @@ Return your response strictly in the following JSON format:
             setPublishTime={setPublishTime}
             autoPublishEnabled={autoPublishEnabled}
             setAutoPublishEnabled={setAutoPublishEnabled}
+            error={autoPublishError}
+            isScheduling={isScheduling}
             onClose={() => {
+              if (schedulingLock.current) return;
               setShowAutoPublishModal(false);
               setDraggedBlock(null);
             }}
@@ -571,6 +593,7 @@ Return your response strictly in the following JSON format:
             onSaveAIBlock={handleSaveAIBlock}
             onDeleteEvent={handleDeleteEvent}
             onUnschedule={handleUnschedule}
+            scheduleError={scheduleError}
             onGoToProfile={() => setActiveTab('profile')}
           />
         )}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useId, useLayoutEffect } from 'react';
 import { motion } from 'motion/react';
 import {
   VideoCamera,
@@ -24,6 +24,28 @@ export default function VideoAnalyzer() {
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const extractRef = useRef<HTMLButtonElement>(null);
+  const pendingRef = useRef<HTMLHeadingElement>(null);
+  const resultRef = useRef<HTMLHeadingElement>(null);
+  const focusTransitionRef = useRef(false);
+  const hadFileRef = useRef(false);
+  const uploadHintId = useId();
+
+  useLayoutEffect(() => {
+    if (file && !hadFileRef.current) cancelRef.current?.focus();
+    if (!file && hadFileRef.current) uploadRef.current?.focus();
+    hadFileRef.current = !!file;
+  }, [file]);
+
+  useLayoutEffect(() => {
+    if (!focusTransitionRef.current) return;
+    focusTransitionRef.current = false;
+    if (isAnalyzing) pendingRef.current?.focus();
+    else if (result) resultRef.current?.focus();
+    else extractRef.current?.focus();
+  }, [isAnalyzing, result, error]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -65,6 +87,7 @@ export default function VideoAnalyzer() {
 
   const handleAnalyze = async () => {
     if (!file) return;
+    focusTransitionRef.current = document.activeElement === extractRef.current;
     setIsAnalyzing(true);
     setError(null);
     try {
@@ -74,12 +97,17 @@ export default function VideoAnalyzer() {
       console.error(err);
       setError(getFriendlyError(err));
     } finally {
+      // Do not pull focus back if the user moved elsewhere while analysis ran.
+      focusTransitionRef.current = document.activeElement === pendingRef.current;
       setIsAnalyzing(false);
     }
   };
 
   return (
     <div className="max-w-5xl mx-auto w-full pb-24">
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {isAnalyzing ? 'Analyzing video.' : error ? `Analysis failed. ${error}` : result ? 'Analysis complete. Results are ready.' : ''}
+      </div>
       <div className="pt-4 border-b border-[var(--separator)] pb-6 mb-8 flex items-center justify-between px-2">
         <div>
           <h1 className="font-serif text-[36px] font-semibold tracking-[-0.015em] text-[var(--label-primary)]">
@@ -182,28 +210,31 @@ export default function VideoAnalyzer() {
 
         <div className="lg:col-span-2">
           {!file && !result ? (
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-3xl h-[400px] flex flex-col items-center justify-center p-8 text-center cursor-pointer transition-all
-                ${isDragging ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--separator)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)]'}`}
-            >
-              <div className="w-16 h-16 rounded-full bg-[var(--bg-primary)] border border-[var(--separator)] flex items-center justify-center mb-4 shadow-sm">
-                <UploadSimple
-                  size={28}
-                  className="text-[var(--label-secondary)]"
-                  weight="regular"
-                />
-              </div>
-              <h3 className="font-bold text-[18px] text-[var(--label-primary)] mb-2">
-                Upload Video Content
-              </h3>
-              <p className="text-[14px] text-[var(--label-secondary)] max-w-sm mb-6">
-                Drag and drop a video file here, or click to browse. Max size 1GB. MP4, MOV, or WEBM
-                format.
-              </p>
+            <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+              <button
+                type="button"
+                ref={uploadRef}
+                aria-label="Upload Video Content"
+                aria-describedby={uploadHintId}
+                onClick={() => fileInputRef.current?.click()}
+                className={`w-full border-2 border-dashed rounded-3xl h-[400px] flex flex-col items-center justify-center p-8 text-center cursor-pointer transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]
+                  ${isDragging ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--separator)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)]'}`}
+              >
+                <span className="w-16 h-16 rounded-full bg-[var(--bg-primary)] border border-[var(--separator)] flex items-center justify-center mb-4 shadow-sm">
+                  <UploadSimple
+                    size={28}
+                    className="text-[var(--label-secondary)]"
+                    weight="regular"
+                  />
+                </span>
+                <span className="font-bold text-[18px] text-[var(--label-primary)] mb-2">
+                  Upload Video Content
+                </span>
+                <span id={uploadHintId} className="text-[14px] text-[var(--label-secondary)] max-w-sm mb-6">
+                  Drag and drop a video file here, or click to browse. Max size 1GB. MP4, MOV, or WEBM
+                  format.
+                </span>
+              </button>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -224,7 +255,7 @@ export default function VideoAnalyzer() {
                 className="text-[var(--accent)] mb-4 animate-pulse"
                 weight="fill"
               />
-              <h3 className="font-bold text-[20px] text-[var(--label-primary)] mb-2">
+              <h3 ref={pendingRef} tabIndex={-1} className="font-bold text-[20px] text-[var(--label-primary)] mb-2">
                 Analyzing Video
               </h3>
               <p className="text-[14px] text-[var(--label-secondary)] max-w-sm">
@@ -239,6 +270,7 @@ export default function VideoAnalyzer() {
                     <CheckCircle size={18} weight="fill" />
                   </div>
                   <div>
+                    <h3 ref={resultRef} tabIndex={-1} className="font-bold text-[14px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">Analysis results</h3>
                     <div className="font-bold text-[14px]">{file?.name}</div>
                     <div className="text-[12px] text-[var(--label-secondary)] capitalize">
                       {analysisType} Generated
@@ -274,12 +306,14 @@ export default function VideoAnalyzer() {
               </p>
               <div className="flex items-center gap-3">
                 <button
+                  ref={cancelRef}
                   onClick={() => setFile(null)}
                   className="ios-button ios-button-tinted h-10 px-6 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
+                  ref={extractRef}
                   onClick={handleAnalyze}
                   className="ios-button ios-button-filled h-10 px-8 font-semibold flex items-center gap-2 shadow-lg shadow-[#007AFF33]"
                 >

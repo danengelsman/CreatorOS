@@ -1,11 +1,3 @@
-import { StateCreator } from 'zustand';
+import type { WorkspaceState } from '../ownedWorkspaceStore';
 
-export interface BrandSlice {
-  brand: any | null;
-  setBrand: (brand: any) => void;
-}
-
-export const createBrandSlice: StateCreator<BrandSlice, [], [], BrandSlice> = (set) => ({
-  brand: null,
-  setBrand: (brand) => set({ brand }),
-});
+export type BrandSlice = Pick<WorkspaceState, 'brand' | 'setBrand'>;

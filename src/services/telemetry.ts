@@ -9,19 +9,20 @@ export type Signal = {
   action: {
     type: 'navigate';
     path: string;
-    params?: any;
+    params?: { projectId?: string; inspector?: 'retention' | 'repurpose' };
   };
   priority: 'high' | 'medium' | 'low';
 };
 
 export function calculateOneLever(user: UserData, projects: Project[]): Signal | null {
-  if (projects.length === 0) {
+  const recentProject = projects.find((project) => project?.type === 'content');
+  if (!recentProject) {
     return {
       id: 'onboarding-lever',
       title: 'Start Your First Project',
       description: "You haven't created any content yet. Let's set up your first niche strategy.",
       impact: 'Foundation',
-      action: { type: 'navigate', path: '/create' },
+      action: { type: 'navigate', path: '/studio' },
       priority: 'high',
     };
   }
@@ -30,19 +31,17 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
   // In a real world scenario, this would hit a Gemini-powered analysis endpoint.
   // Here we implement the "Heuristic Engine" for the MVP.
 
-  const recentProject = projects[0];
-
   // Signal 1: Retention Dip (High Priority)
   if (recentProject.data?.retentionScore && recentProject.data.retentionScore < 40) {
     return {
       id: 'retention-signal',
       title: 'Retention Dip Detected',
-      description: `Your latest project "${recentProject.title}" has a retention drop at the 30s mark.`,
-      impact: '+20% Watch Time',
+      description: `Your latest project has a low retention score. Review its hook and script.`,
+      impact: 'Review retention',
       action: {
         type: 'navigate',
-        path: '/retention',
-        params: { projectId: recentProject.id },
+        path: recentProject.id ? `/studio/${encodeURIComponent(recentProject.id)}` : '/studio',
+        params: { projectId: recentProject.id, inspector: 'retention' },
       },
       priority: 'high',
     };
@@ -64,9 +63,13 @@ export function calculateOneLever(user: UserData, projects: Project[]): Signal |
   return {
     id: 'growth-signal',
     title: 'Scale Your Reach',
-    description: "Your current scripts are performing well. Let's repurpose them for Shorts.",
-    impact: 'Increased Reach',
-    action: { type: 'navigate', path: '/repurpose' },
+    description: 'Turn an existing script into additional formats.',
+    impact: 'Explore formats',
+    action: {
+      type: 'navigate',
+      path: recentProject.id ? `/studio/${encodeURIComponent(recentProject.id)}` : '/studio',
+      params: { projectId: recentProject.id, inspector: 'repurpose' },
+    },
     priority: 'low',
   };
 }

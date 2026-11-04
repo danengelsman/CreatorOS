@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { loadOnboardingRecovery, saveOnboardingRecovery, clearOnboardingRecovery } from '@/lib/onboardingRecovery';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   PaperPlaneRight as Send,
@@ -10,21 +11,29 @@ import {
 } from '@phosphor-icons/react';
 import BrandIcon from './BrandIcon';
 import { cn } from '../lib/utils';
+import { AuthExpiredError } from '../lib/apiClient';
 import {
   db,
   serverTimestamp,
   handleFirestoreError,
   OperationType,
-  authorizedFetch,
+  apiFetch,
 } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, runTransaction } from 'firebase/firestore';
 import Confetti from './Confetti';
+import {
+  ONBOARDING_IN_PROGRESS,
+  OnboardingConflictError,
+  type OnboardingAnswers,
+  type OnboardingBrandKit,
+} from '@/lib/onboardingState';
 import MysticalNicheSparks, { NicheSpark, NicheSparksData } from './MysticalNicheSparks';
 
 interface OnboardingProps {
   // Phase 1: async so the app can ensure the saved First Dollar journey
   // exists (first_dollar_journeys/{uid}) before the modal closes into Today.
-  onComplete: () => Promise<void>;
+  onComplete: (answers?: OnboardingAnswers, kit?: OnboardingBrandKit) => Promise<void>;
+  isCurrent: () => boolean;
   user: any;
 }
 
@@ -39,71 +48,167 @@ interface Summary {
   vibe: string;
 }
 
+function repliesSummary(messages: Message[]): Summary {
+  const replies = messages.filter((message) => message.role === 'user');
+  return {
+    niche: replies[0]?.content.replace(/^I'd love to make videos about:\s*/i, '') || '',
+    audience: replies[1]?.content || '',
+    vibe: replies[2]?.content || '',
+  };
+}
+
+function safeSummary(value: any, messages: Message[]): Summary {
+  if (
+    value &&
+    ['niche', 'audience', 'vibe'].every(
+      (key) => typeof value[key] === 'string' && value[key].length <= 1000,
+    )
+  )
+    return { niche: value.niche, audience: value.audience, vibe: value.vibe };
+  return repliesSummary(messages);
+}
+
 /**
  * Caches the user's chosen niche spark into their local branding project profile
  * document (`projects/brand_${user.uid}`) in Firestore with `status: 'draft'`.
  * This preserves the selection across reloads and tab navigations while preventing premature modal closure.
  */
-export const cacheNicheToBrandProfile = async (user: any, spark: NicheSpark) => {
-  if (!user?.uid) return;
+export const cacheNicheToBrandProfile = async (
+  user: any,
+  spark: NicheSpark,
+  isCurrent: () => boolean = () => true,
+) => {
+  if (!user?.uid || !isCurrent()) return;
   try {
     const brandRef = doc(db, 'projects', `brand_${user.uid}`);
-    await setDoc(
-      brandRef,
-      {
-        userId: user.uid,
-        name: spark.title?.slice(0, 95) || 'Draft Brand Profile',
-        type: 'brand_kit',
-        status: 'draft',
-        draft: {
-          niche: spark.title,
-          pitch: spark.pitch || '',
-          dreamViewer: spark.dreamViewer || '',
-          vibe: spark.vibe || '',
-          badge: spark.badge || '',
-          type: spark.type || 'trending',
-          cachedAt: new Date().toISOString(),
+    const userRef = doc(db, 'users', user.uid);
+    await runTransaction(db, async (transaction) => {
+      if (!isCurrent()) return;
+      const profile = await transaction.get(userRef);
+      if (!isCurrent()) return;
+      const brand = await transaction.get(brandRef);
+      if (!isCurrent() || !profile.exists()) return;
+      const answers = profile.data().onboardingAnswers;
+      if (answers?.summary !== ONBOARDING_IN_PROGRESS || Object.keys(answers).length !== 1) return;
+      if (
+        brand.exists() &&
+        (brand.data().userId !== user.uid || brand.data().status === 'completed')
+      )
+        return;
+      transaction.set(
+        brandRef,
+        {
+          userId: user.uid,
+          name: spark.title?.slice(0, 95) || 'Draft Brand Profile',
+          type: 'brand_kit',
+          status: 'draft',
+          draft: {
+            niche: spark.title,
+            pitch: spark.pitch || '',
+            dreamViewer: spark.dreamViewer || '',
+            vibe: spark.vibe || '',
+            badge: spark.badge || '',
+            type: spark.type || 'trending',
+            cachedAt: new Date().toISOString(),
+          },
+          ...(!brand.exists() ? { createdAt: serverTimestamp() } : {}),
+          updatedAt: serverTimestamp(),
         },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    );
+        { merge: true },
+      );
+    });
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`);
   }
 };
 
-export default function Onboarding({ onComplete, user }: OnboardingProps) {
-  const [phase, setPhase] = useState<'welcome' | 'interview' | 'success' | 'generating'>('welcome');
-  const [messages, setMessages] = useState<Message[]>([
+export default function Onboarding({ onComplete, isCurrent, user }: OnboardingProps) {
+  const activityRevision = useRef(0);
+  const [recovery] = useState(() => loadOnboardingRecovery(user.uid));
+  const recoveredMessages = recovery?.pendingReply ? recovery.messages.slice(0, -1) : recovery?.messages;
+  const recoveredInput = recovery?.pendingReply && recovery.messages.at(-1)?.role === 'user'
+    ? recovery.messages.at(-1)?.content || '' : recovery?.inputValue || '';
+  const [phase, setPhase] = useState<'welcome' | 'interview' | 'success' | 'generating'>(recovery?.phase || 'welcome');
+  const [messages, setMessages] = useState<Message[]>(recoveredMessages || [
     {
       role: 'assistant',
       content:
         "Welcome! Let's build your perfect Creator Profile together. To start, what topic or niche excites you the most for your channel?",
     },
   ]);
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState(recoveredInput);
   const [isAiTyping, setIsAiTyping] = useState(false);
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [summary, setSummary] = useState<Summary | null>(recovery?.summary || null);
   const [transitionBusy, setTransitionBusy] = useState(false);
   const [transitionError, setTransitionError] = useState('');
+  const [inputError, setInputError] = useState('');
+  const pendingKit = useRef<OnboardingBrandKit | null>(recovery?.pendingKit || null);
+  const [storageError, setStorageError] = useState(false);
+  const completed = useRef(false);
+  useLayoutEffect(() => {
+    if (!isCurrent() || completed.current || phase === 'welcome') return;
+    const saved = saveOnboardingRecovery(user.uid, {
+      phase: summary || phase === 'generating' ? 'success' : phase, messages, inputValue, summary,
+      pendingKit: pendingKit.current, pendingReply: isAiTyping,
+    });
+    setStorageError(!saved);
+  }, [user.uid, phase, messages, inputValue, summary, isAiTyping, isCurrent]);
+  const useExistingProfile = useRef(false);
+  const requestController = useRef(new AbortController());
+  const requestOnboarding = async (url: string, options: RequestInit) => {
+    const uid = user?.uid;
+    const ownerIsCurrent = isCurrent;
+    if (!uid || !ownerIsCurrent()) throw new DOMException('Account changed', 'AbortError');
+    const response = await apiFetch(url, options, { uid, isCurrent: ownerIsCurrent });
+    return response.json();
+  };
+  useEffect(() => {
+    const controller = new AbortController();
+    requestController.current = controller;
+    return () => controller.abort();
+  }, [user?.uid]);
 
   // Phase 1: every "go to Today" path funnels through onComplete, which
   // ensures the journey doc before resolving. A failure here keeps the
   // onboarding open with a retry-able error instead of stranding the user.
   const continueToToday = async () => {
-    if (transitionBusy) return;
+    if (transitionBusy || !isCurrent()) return;
     setTransitionBusy(true);
     setTransitionError('');
     try {
-      await onComplete();
+      const replies = messages.filter((message) => message.role === 'user');
+      const answers = summary
+        ? {
+            niche: summary.niche || '',
+            audience: summary.audience || '',
+            vibe: summary.vibe || '',
+            summary: '',
+          }
+        : replies.length
+          ? {
+              niche: replies[0]?.content.replace(/^I'd love to make videos about:\s*/i, '') || '',
+              audience: replies[1]?.content || '',
+              vibe: replies[2]?.content || '',
+              summary: '',
+            }
+          : undefined;
+      if (answers && pendingKit.current) answers.summary = pendingKit.current.tagline || '';
+      await onComplete(
+        useExistingProfile.current ? undefined : answers,
+        pendingKit.current || undefined,
+      );
+      if (isCurrent()) { completed.current = true; clearOnboardingRecovery(user.uid); }
     } catch (error) {
+      if (!isCurrent()) return;
+      if (error instanceof OnboardingConflictError) {
+        pendingKit.current = null;
+        useExistingProfile.current = true;
+      }
       setTransitionError(
         `Your journey could not be saved. Please try again. ${error instanceof Error ? error.message : ''}`,
       );
     } finally {
-      setTransitionBusy(false);
+      if (isCurrent()) setTransitionBusy(false);
     }
   };
 
@@ -123,12 +228,15 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
   // Automatically restore previously cached niche from brand profile if user refreshed
   useEffect(() => {
     let isMounted = true;
+    const revision = activityRevision.current;
     const restorePersistedNiche = async () => {
-      if (!user?.uid) return;
+      if (!user?.uid || recovery || !isMounted || !isCurrent()) return;
       try {
         const brandRef = doc(db, 'projects', `brand_${user.uid}`);
+        if (!isMounted || !isCurrent()) return;
         const snap = await getDoc(brandRef);
-        if (snap.exists() && isMounted) {
+        if (!isMounted || !isCurrent() || activityRevision.current !== revision) return;
+        if (snap.exists()) {
           const projectData = snap.data();
           if (projectData.status === 'draft' && projectData.draft?.niche) {
             const draft = projectData.draft;
@@ -153,7 +261,8 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
           }
         }
       } catch (error) {
-        console.warn('Could not restore cached branding project draft:', error);
+        if (isMounted && isCurrent())
+          console.warn('Could not restore cached branding project draft:', error);
       }
     };
     restorePersistedNiche();
@@ -210,15 +319,24 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
   }, [phase, messages.length, hasTriggeredSparks, inputValue]);
 
   const triggerSparks = async () => {
+    if (!isCurrent()) return;
     setHasTriggeredSparks(true);
     setShowSparks(true);
     setIsLoadingSparks(true);
     try {
-      const res = await authorizedFetch('/api/onboarding/niche-sparks');
+      const res = await requestOnboarding('/api/onboarding/niche-sparks', {
+        signal: requestController.current.signal,
+      });
+      if (!isCurrent()) return;
       if (res && res.sparks) {
         setSparksData(res);
       }
     } catch (err) {
+      if (!isCurrent()) return;
+      if (err instanceof AuthExpiredError) {
+        setShowSparks(false);
+        return;
+      }
       console.warn('Sparks fetch error:', err);
       setSparksData({
         museMessage:
@@ -259,14 +377,21 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
   };
 
   const handleSelectSpark = async (spark: NicheSpark) => {
-    if (isAiTyping) return;
+    if (isAiTyping || !isCurrent()) return;
+    if (spark.title.length > 1000) {
+      setInputError(
+        'That suggestion exceeds 1000 characters. Please choose another or type a shorter response.',
+      );
+      return;
+    }
+    setInputError('');
     setSelectedSparkTitle(spark.title);
 
     // Automatically cache the selected niche into the user's branding project profile in Firestore
-    cacheNicheToBrandProfile(user, spark);
+    cacheNicheToBrandProfile(user, spark, isCurrent);
 
     // Smoothly dismiss the sparks card after brief affirmation
-    setTimeout(() => {
+    const dismissTimer = setTimeout(() => {
       setShowSparks(false);
     }, 1000);
 
@@ -277,28 +402,32 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
     setIsAiTyping(true);
 
     try {
-      const data = await authorizedFetch('/api/onboarding/chat', {
+      const data = await requestOnboarding('/api/onboarding/chat', {
         method: 'POST',
+        signal: requestController.current.signal,
         body: JSON.stringify({ messages: updatedMessages }),
       });
+      if (!isCurrent()) return;
 
       if (data?.message) {
         setMessages((prev) => [...prev, { role: 'assistant', content: data.message }]);
       }
 
       if (data?.isComplete) {
-        setSummary(
-          data.summary || {
-            niche: spark.title,
-            audience: spark.dreamViewer || 'Content Creators',
-            vibe: spark.vibe || 'Friendly & Encouraging',
-          },
-        );
+        setSummary(safeSummary(data.summary, updatedMessages));
         setTimeout(() => {
           setPhase('success');
         }, 2200);
       }
     } catch (error) {
+      if (!isCurrent()) return;
+      if (error instanceof AuthExpiredError) {
+        clearTimeout(dismissTimer);
+        setMessages(messages);
+        setShowSparks(true);
+        setInputError('Sign in again, then select your idea to retry.');
+        return;
+      }
       console.warn(
         'Network issue during onboarding chat after selecting spark, using local fallback:',
         error,
@@ -317,9 +446,14 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isAiTyping) return;
+    if (!inputValue.trim() || isAiTyping || !isCurrent()) return;
 
     const userText = inputValue.trim();
+    if (userText.length > 1000) {
+      setInputError('Please shorten your response to 1000 characters or fewer before sending.');
+      return;
+    }
+    setInputError('');
     setInputValue('');
 
     // Add user message
@@ -328,10 +462,12 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
     setIsAiTyping(true);
 
     try {
-      const data = await authorizedFetch('/api/onboarding/chat', {
+      const data = await requestOnboarding('/api/onboarding/chat', {
         method: 'POST',
+        signal: requestController.current.signal,
         body: JSON.stringify({ messages: updatedMessages }),
       });
+      if (!isCurrent()) return;
 
       // Add AI reply
       if (data?.message) {
@@ -339,22 +475,32 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
       }
 
       if (data?.isComplete) {
-        setSummary(
-          data.summary || {
-            niche: userText,
-            audience: 'Content Creators',
-            vibe: 'Friendly & Encouraging',
-          },
-        );
+        setSummary(safeSummary(data.summary, updatedMessages));
         // Transition after a brief delay so they see the final message
         setTimeout(() => {
           setPhase('success');
         }, 2200);
       }
     } catch (error) {
+      if (!isCurrent()) return;
+      if (error instanceof AuthExpiredError) {
+        setMessages(messages);
+        setInputValue(userText);
+        setInputError('Sign in again, then send your reply to retry.');
+        return;
+      }
       console.warn('Network issue during onboarding chat, using local fallback:', error);
       const userCount = updatedMessages.filter((m) => m.role === 'user').length;
-      if (userCount === 2) {
+      if (userCount === 1) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content:
+              'The AI is unavailable, but your reply is kept. Who is your dream audience or target viewer?',
+          },
+        ]);
+      } else if (userCount === 2) {
         setMessages((prev) => [
           ...prev,
           {
@@ -372,13 +518,7 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
               "Fantastic! I have all the details needed to architect your custom Creator Profile. Click 'Build My Brand Kit' below!",
           },
         ]);
-        setSummary({
-          niche:
-            updatedMessages[1]?.content?.replace(/^I'd love to make videos about:\s*/i, '') ||
-            userText,
-          audience: updatedMessages[2]?.content || 'Audience & Viewers',
-          vibe: userText || 'Authentic & Engaging',
-        });
+        setSummary(repliesSummary(updatedMessages));
         setTimeout(() => {
           setPhase('success');
         }, 2200);
@@ -389,11 +529,13 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
   };
 
   const handleBuildBrandKit = async () => {
+    if (!isCurrent()) return;
     setPhase('generating');
     try {
       // 1. Call `/api/onboarding/generate-brand` with the gathered info
-      const kit = await authorizedFetch('/api/onboarding/generate-brand', {
+      const kit = await requestOnboarding('/api/onboarding/generate-brand', {
         method: 'POST',
+        signal: requestController.current.signal,
         body: JSON.stringify({
           niche: summary?.niche || '',
           audience: summary?.audience || '',
@@ -401,43 +543,31 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
         }),
       });
 
-      // 2. Save the brand kit to Firestore
-      const brandRef = doc(db, 'projects', `brand_${user.uid}`);
-      await setDoc(
-        brandRef,
+      if (!isCurrent()) return;
+      if (kit.tagline != null && (typeof kit.tagline !== 'string' || kit.tagline.length > 1000)) {
+        throw new Error(
+          'The generated tagline exceeds 1000 characters. Please retry or continue without it.',
+        );
+      }
+      // Keep the generated kit for an exact retry if journey or transaction fails.
+      pendingKit.current = kit;
+      saveOnboardingRecovery(user.uid, { phase: 'success', messages, inputValue, summary, pendingKit: kit, pendingReply: false });
+      await onComplete(
         {
-          userId: user.uid,
-          name: kit.name || 'Untitled Brand',
-          type: 'brand_kit',
-          status: 'completed',
-          data: kit,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          niche: summary?.niche || '',
+          audience: summary?.audience || '',
+          vibe: summary?.vibe || '',
+          summary: kit.tagline || '',
         },
-        { merge: true },
-      ).catch((err) =>
-        handleFirestoreError(err, OperationType.WRITE, `projects/brand_${user.uid}`),
+        kit,
       );
-
-      // 3. Save onboardingAnswers to User document in Firestore
-      const userRef = doc(db, 'users', user.uid);
-      await setDoc(
-        userRef,
-        {
-          onboardingAnswers: {
-            niche: summary?.niche || '',
-            audience: summary?.audience || '',
-            vibe: summary?.vibe || '',
-            summary: kit.tagline || '',
-          },
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      ).catch((err) => handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`));
-
-      // 4. Start or resume the First Dollar path and open Today.
-      await onComplete();
+      if (isCurrent()) { completed.current = true; clearOnboardingRecovery(user.uid); }
     } catch (error) {
+      if (!isCurrent()) return;
+      if (error instanceof OnboardingConflictError) {
+        pendingKit.current = null;
+        useExistingProfile.current = true;
+      }
       console.error('Error generating brand kit during onboarding:', error);
       setTransitionError(
         `Could not finish the brand kit. You can still go to Today. ${error instanceof Error ? error.message : ''}`,
@@ -451,7 +581,7 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
   const progressPercent = Math.min(100, Math.round((userMessagesCount / 3) * 100));
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 overflow-hidden">
+    <div onClickCapture={() => { activityRevision.current++; }} onChangeCapture={() => { activityRevision.current++; }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-12 overflow-hidden">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -529,6 +659,7 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
 
         {/* Right Side: Interactive Panel */}
         <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-secondary)] relative h-full overflow-y-auto">
+          {storageError && <p role="alert" className="p-3 text-sm text-red-300">Browser draft storage is unavailable. Your answers can survive sign-in in this tab, but copy them before reloading or closing it.</p>}
           <AnimatePresence mode="wait">
             {/* WELCOME PHASE */}
             {phase === 'welcome' && (
@@ -717,6 +848,11 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                     {transitionError}
                   </p>
                 )}
+                {inputError && (
+                  <p role="alert" className="px-6 py-2 text-sm text-red-300">
+                    {inputError}
+                  </p>
+                )}
                 {/* Input Bar */}
                 <div className="p-4 border-t border-[var(--separator)] bg-[var(--bg-tertiary)]/30 backdrop-blur-md flex gap-2 items-center">
                   <input
@@ -757,11 +893,14 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                     <CheckCircle2 size={32} weight="duotone" />
                   </div>
                   <h2 className="font-serif text-[36px] sm:text-[40px] font-semibold tracking-[-0.020em] leading-tight">
-                    Your Profile is Ready!
+                    {summary?.niche && summary?.audience && summary?.vibe
+                      ? 'Your Profile is Ready!'
+                      : 'Your Profile is Incomplete'}
                   </h2>
                   <p className="text-[16px] text-[var(--label-secondary)] leading-relaxed font-medium">
-                    We've gathered all details to construct your personalized Channel Style profile.
-                    Here's a summary of what we've discovered:
+                    {summary?.niche && summary?.audience && summary?.vibe
+                      ? "Here's a summary of what we've discovered:"
+                      : 'Some details are missing. You can continue to Today with the information provided.'}
                   </p>
                 </div>
 
@@ -803,7 +942,7 @@ export default function Onboarding({ onComplete, user }: OnboardingProps) {
                   </button>
                   <button
                     onClick={handleBuildBrandKit}
-                    disabled={transitionBusy}
+                    disabled={transitionBusy || useExistingProfile.current}
                     className="ios-button ios-button-tinted w-full h-12 mt-3 text-sm font-semibold"
                   >
                     Build my channel style first

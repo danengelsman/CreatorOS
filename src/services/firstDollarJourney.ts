@@ -26,10 +26,20 @@ function parseJourney(uid: string, value: unknown): FirstDollarJourney {
 }
 
 /** Existing users without a record start at step one; never infer completion from brand or analytics. */
-export async function ensureFirstDollarJourney(uid: string): Promise<FirstDollarJourney> {
+export async function ensureFirstDollarJourney(
+  uid: string,
+  isCurrent: () => boolean = () => true,
+): Promise<FirstDollarJourney> {
+  const assertCurrent = () => {
+    if (!isCurrent()) throw new Error('The workspace account changed.');
+  };
+  assertCurrent();
   return runTransaction(db, async (transaction) => {
+    // Firestore may retry the callback after an account change.
+    assertCurrent();
     const ref = journeyRef(uid);
     const snap = await transaction.get(ref);
+    assertCurrent();
     if (snap.exists()) return parseJourney(uid, snap.data());
     const initial = createInitialJourney(uid);
     transaction.set(ref, {
@@ -45,10 +55,17 @@ export async function ensureFirstDollarJourney(uid: string): Promise<FirstDollar
 export async function updateFirstDollarJourney(
   uid: string,
   action: JourneyAction,
+  isCurrent: () => boolean = () => true,
 ): Promise<FirstDollarJourney> {
+  const assertCurrent = () => {
+    if (!isCurrent()) throw new Error('The workspace account changed.');
+  };
+  assertCurrent();
   return runTransaction(db, async (transaction) => {
+    assertCurrent();
     const ref = journeyRef(uid);
     const snap = await transaction.get(ref);
+    assertCurrent();
     if (!snap.exists()) throw new Error('Journey not found. Reload Today and try again.');
     const current = parseJourney(uid, snap.data());
     const next = transitionJourney(current, action);

@@ -13,6 +13,7 @@ interface VideoStudioProps {
   showToast: (msg: string) => void;
   user?: any;
   onVideoSaved?: () => void;
+  isCurrentOwner?: () => boolean;
 }
 
 export default function VideoStudio({
@@ -23,6 +24,7 @@ export default function VideoStudio({
   showToast,
   user,
   onVideoSaved,
+  isCurrentOwner,
 }: VideoStudioProps) {
   const [showSettings, setShowSettings] = useState(false);
 
@@ -34,6 +36,7 @@ export default function VideoStudio({
     user,
     showToast,
     onVideoSaved,
+    isCurrentOwner,
   });
 
   return (

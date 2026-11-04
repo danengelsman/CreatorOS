@@ -1,16 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
-import PerfectPromptCopilot from '@/components/PerfectPromptCopilot';
-import LayoutShell from '@/components/LayoutShell';
-import { useAuth } from '@/contexts/AuthContext';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
+// Preserve old bookmarks while opening the assistant in the Studio context.
 export const Route = createFileRoute('/_auth/prompts')({
-  component: () => {
-    const auth = useAuth();
-
-    return (
-      <LayoutShell user={auth.user}>
-        <PerfectPromptCopilot user={auth.user} />
-      </LayoutShell>
-    );
+  beforeLoad: () => {
+    throw redirect({ to: '/studio', search: { assistant: 'copilot' } });
   },
 });

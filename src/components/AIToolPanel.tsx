@@ -35,6 +35,7 @@ export interface AIToolPanelProps {
   onSelectVideo: (video: any) => void;
   isScoring: boolean;
   scoreData: any;
+  canvasMode?: boolean;
 }
 
 export default function AIToolPanel({
@@ -53,6 +54,7 @@ export default function AIToolPanel({
   onSelectVideo,
   isScoring,
   scoreData,
+  canvasMode = false,
 }: AIToolPanelProps) {
   const [isAnalyzingSuggestions, setIsAnalyzingSuggestions] = useState(false);
   const [suggestionsData, setSuggestionsData] = useState<any>(null);
@@ -284,6 +286,7 @@ export default function AIToolPanel({
                           </div>
                           <button
                             onClick={() => {
+                              if (canvasMode && body && !window.confirm('Replace the current project draft with this topic?')) return;
                               setTitle(t.topic);
                               setBody(
                                 `${t.angle}\n\n[Topic Context / Target Justification]:\n${t.justification}`,

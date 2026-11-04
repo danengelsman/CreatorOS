@@ -1,0 +1,10 @@
+@media (prefers-reduced-motion: no-preference) {
+  .studio-assistants-drawer[open] {
+    animation: studio-assistants-enter 180ms ease-out;
+  }
+
+  @keyframes studio-assistants-enter {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+}
