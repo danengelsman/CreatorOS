@@ -11,6 +11,7 @@ import {
 
 import { validatePassword } from '../lib/passwordPolicy';
 import { getFriendlyError } from '../lib/friendlyError';
+import { useAuth } from '../contexts/AuthContext';
 import {
   ShieldCheck,
   Globe,
@@ -81,6 +82,7 @@ export default function Login({
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [error, setError] = useState('');
+  const { redirectError, setRedirectError } = useAuth();
   const [info, setInfo] = useState('');
 
   const switchView = (next: AuthView) => {
@@ -123,6 +125,7 @@ export default function Login({
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError('');
+    setRedirectError(null);
     try {
       const res = await loginWithGoogle();
       if (res?.user) {
@@ -214,6 +217,7 @@ export default function Login({
 
     setIsLoading(true);
     setError('');
+    setRedirectError(null);
     try {
       if (view === 'register') {
         const credential = await registerWithEmail(email, password);
@@ -346,9 +350,9 @@ export default function Login({
               </p>
             </div>
 
-            {error && (
+            {(error || redirectError) && (
               <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-sm">
-                {error}
+                {error || redirectError}
               </div>
             )}
 
