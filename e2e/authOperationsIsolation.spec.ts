@@ -89,7 +89,7 @@ function View({ mode }) {
     : <Brand user={auth.user} key={token?.generation} brand={brand} setBrand={setBrand} />;
 }
 window.test.mount = async mode => { await act(async () => { createRoot(document.getElementById('root')).render(mode === 'onboarding' ? <AppRoot /> : <AuthProvider><View mode={mode} /></AuthProvider>); }); };
-window.test.mountLogin = async () => { await act(async () => { createRoot(document.getElementById('root')).render(<Login navigate={path => window.test.navigations.push(path)} />); }); };
+window.test.mountLogin = async () => { await act(async () => { createRoot(document.getElementById('root')).render(<AuthProvider><Login navigate={path => window.test.navigations.push(path)} /></AuthProvider>); }); };
 window.test.event = async uid => { await act(async () => { window.test.auth(uid ? { uid, email: uid + '@example.test' } : null); }); };
 window.test.lookup = async (uid, exists = true, data = {}) => { await act(async () => { const x = window.test.lookups.find(x => x.key === 'users/' + uid && !x.done); x.done = true; x.resolve({ exists: () => exists, data: () => data }); }); };
 window.test.rejectLookup = async uid => { await act(async () => { const x = window.test.lookups.find(x => x.key === 'users/' + uid && !x.done); x.done = true; x.reject(new Error('lookup failed')); }); };

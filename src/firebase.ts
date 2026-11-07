@@ -109,7 +109,11 @@ export const loginWithGoogle = async () => {
     throw error;
   }
 };
-/** Completes a pending full-page Google redirect after the app reloads with timeout safety. */
+/** Completes a pending full-page Google redirect after the app reloads with timeout safety.
+ * Resolves with the redirect result (or null when no redirect happened). Rejects when the
+ * redirect itself failed — callers must surface the error, because a silent null strands the
+ * user on the login screen with no explanation (notably on iOS, which uses the full-page
+ * redirect flow instead of a popup). */
 export const completeGoogleRedirect = async () => {
   try {
     const redirectPromise = getRedirectResult(auth);
@@ -121,7 +125,7 @@ export const completeGoogleRedirect = async () => {
     return result;
   } catch (error) {
     console.error('Redirect sign-in error:', error);
-    return null;
+    throw error;
   }
 };
 

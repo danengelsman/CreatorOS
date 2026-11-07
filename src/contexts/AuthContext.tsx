@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '@/firebase';
 import { ONBOARDING_IN_PROGRESS } from '@/lib/onboardingState';
+import { getFriendlyError } from '@/lib/friendlyError';
 import {
   useWorkspaceStore,
   isWorkspaceTokenCurrent,
@@ -23,6 +24,8 @@ export interface AuthContextType {
   userData: any;
   isAuthLoading: boolean;
   authError: boolean;
+  redirectError: string | null;
+  setRedirectError: (val: string | null) => void;
   showOnboarding: boolean;
   setShowOnboarding: (val: boolean) => void;
   setActiveTab: (tab: string) => void;
@@ -37,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userData, setUserData] = useState<any>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [authError, setAuthError] = useState(false);
+  const [redirectError, setRedirectError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
   const [workspaceToken, setWorkspaceToken] = useState<WorkspaceToken | null>(null);
@@ -74,9 +78,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // The auth observer is authoritative. A redirect result is not a session:
     // it may finish after a sign-out or another sign-in.
-    void completeGoogleRedirect().catch((err) => {
-      if (isActive) console.warn('Google redirect check completed:', err);
-    });
+    // A failed Google redirect must be visible: a silent failure strands the
+    // user on the login screen with no explanation (notably on iOS, which
+    // uses the full-page redirect flow instead of a popup).
+    completeGoogleRedirect()
+      .then(() => {
+        if (isActive) setRedirectError(null);
+      })
+      .catch((err) => {
+        if (isActive) setRedirectError(getFriendlyError(err, { isGoogle: true }));
+      });
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!isActive) return;
       const uid = currentUser?.uid || null;
@@ -136,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setWorkspaceToken(token);
             setUser(currentUser);
             setAuthError(false);
+            setRedirectError(null);
           }
         } else {
           setActiveTab('home');
@@ -245,6 +257,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userData,
         isAuthLoading,
         authError,
+        redirectError,
+        setRedirectError,
         showOnboarding,
         setShowOnboarding,
         activeTab,
