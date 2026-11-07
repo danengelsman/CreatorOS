@@ -5,10 +5,8 @@ import {
   where,
   getDocs,
   doc,
-  addDoc,
-  serverTimestamp,
 } from 'firebase/firestore';
-import { auth, db, authorizedFetch, apiFetch } from '../firebase';
+import { db } from '../firebase';
 import {
   startOfWeek,
   addDays,
@@ -19,27 +17,18 @@ import {
   subMonths,
 } from 'date-fns';
 import { AnimatePresence } from 'motion/react';
-import { getFriendlyError } from '../lib/friendlyError';
-import {
-  CalendarBlock,
-  HeatmapMode,
-  ConnectedAccount,
-  ReformatSuggestion,
-} from './calendar/calendarTypes';
+import { CalendarBlock, HeatmapMode } from './calendar/calendarTypes';
 import UnscheduledSidebar from './calendar/UnscheduledSidebar';
 import CalendarHeader from './calendar/CalendarHeader';
 import CalendarGrid from './calendar/CalendarGrid';
-import AutoPublishModal from './calendar/AutoPublishModal';
-import NewEventModal from './calendar/NewEventModal';
+import AutoPublishPanel from './calendar/AutoPublishPanel';
 import EventDetailModal from './calendar/EventDetailModal';
-import { scheduleProject, unscheduleProject } from './calendar/calendarPersistence';
+import EventCreationForm from './calendar/EventCreationForm';
+import { unscheduleProject } from './calendar/calendarPersistence';
 import {
   deleteOwnedContentProject,
-  updateOwnedContentProject,
   STUDIO_JOURNEY_UNAVAILABLE,
 } from './studio/studioOwnerFence';
-
-export { getPlatformStyle } from './calendar/calendarHelpers';
 
 export default function CalendarView({
   user,
@@ -59,19 +48,9 @@ export default function CalendarView({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
 
-  // Create state fields
-  const [newEventTitle, setNewEventTitle] = useState('');
-  const [newEventPlatform, setNewEventPlatform] = useState('youtube');
-  const [newEventStatus, setNewEventStatus] = useState('Draft');
-  const [newEventBody, setNewEventBody] = useState('');
-
   // Drag and Drop pop-out state
   const [showAutoPublishModal, setShowAutoPublishModal] = useState(false);
   const [draggedBlock, setDraggedBlock] = useState<CalendarBlock | null>(null);
-  const [publishTime, setPublishTime] = useState('12:00');
-  const [autoPublishEnabled, setAutoPublishEnabled] = useState(true);
-  const [autoPublishError, setAutoPublishError] = useState('');
-  const [isScheduling, setIsScheduling] = useState(false);
   const schedulingLock = useRef(false);
 
   // Selected detail modal
@@ -79,121 +58,8 @@ export default function CalendarView({
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [scheduleError, setScheduleError] = useState('');
 
-  // AI Reformatting states
-  const [isGeneratingReformat, setIsGeneratingReformat] = useState(false);
-  const [selectedTargetPlatforms, setSelectedTargetPlatforms] = useState<string[]>([]);
-  const [reformatSuggestions, setReformatSuggestions] = useState<ReformatSuggestion[]>([]);
-  const [reformatError, setReformatError] = useState('');
-
   // Search sidebar
   const [sidebarSearch, setSidebarSearch] = useState('');
-
-  // Instant Sync states
-  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncResults, setSyncResults] = useState<any>(null);
-  const [syncError, setSyncError] = useState('');
-  const [selectedSyncPlatforms, setSelectedSyncPlatforms] = useState<string[]>([]);
-
-  const fetchConnectedAccounts = async () => {
-    if (!user) return;
-    try {
-      const accounts = await authorizedFetch('/api/accounts');
-      setConnectedAccounts(accounts || []);
-    } catch (error) {
-      console.error('Failed to fetch connected accounts:', error);
-    }
-  };
-
-  const handleSyncToPlatforms = async () => {
-    if (
-      !user?.uid ||
-      !selectedEvent ||
-      selectedEvent.userId !== user.uid ||
-      selectedSyncPlatforms.length === 0
-    )
-      return;
-    const owner = { uid: user.uid, isCurrent: () => auth.currentUser?.uid === user.uid };
-    if (!owner.isCurrent()) return;
-    setIsSyncing(true);
-    setSyncResults(null);
-    setSyncError('');
-
-    const originalTitle = selectedEvent.name || selectedEvent.data?.title || 'Draft Content';
-    const originalBody = selectedEvent.data?.body || selectedEvent.body || '';
-
-    try {
-      const result = await authorizedFetch(
-        '/api/publish',
-        {
-          method: 'POST',
-          credentials: 'omit',
-          body: JSON.stringify({
-            title: originalTitle,
-            body: originalBody,
-            platforms: selectedSyncPlatforms,
-          }),
-        },
-        owner,
-      );
-      if (!owner.isCurrent()) throw new Error('Account changed');
-
-      if (result.success) {
-        setSyncResults(result.results);
-
-        const hasSuccess = Object.values(result.results).some((r: any) => r.status === 'success');
-        if (hasSuccess) {
-          await updateOwnedContentProject(
-            db,
-            doc(db, 'projects', selectedEvent.id),
-            owner.uid,
-            {
-              status: 'Published',
-              updatedAt: serverTimestamp(),
-            },
-            owner.isCurrent,
-          );
-          if (!owner.isCurrent()) throw new Error('Account changed');
-
-          await fetchAllBlocks();
-
-          setSelectedEvent((prev: any) => ({
-            ...prev,
-            status: 'Published',
-          }));
-        }
-      } else {
-        throw new Error(result.error || 'Failed to sync content');
-      }
-    } catch (err: any) {
-      console.error(err);
-      setSyncError(
-        err instanceof Error && err.message === STUDIO_JOURNEY_UNAVAILABLE
-          ? `${err.message} Publishing may already have succeeded; check the destination before publishing again.`
-          : getFriendlyError(err),
-      );
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedEvent) {
-      setSyncResults(null);
-      setSyncError('');
-      const currentPlatform = (
-        selectedEvent.platform ||
-        selectedEvent.data?.platform ||
-        ''
-      ).toLowerCase();
-      const isConnected = connectedAccounts.some((acc) => acc.platform === currentPlatform);
-      if (isConnected) {
-        setSelectedSyncPlatforms([currentPlatform]);
-      } else {
-        setSelectedSyncPlatforms([]);
-      }
-    }
-  }, [selectedEvent, connectedAccounts]);
 
   const fetchAllBlocks = async () => {
     if (!user) return;
@@ -229,9 +95,6 @@ export default function CalendarView({
 
   useEffect(() => {
     fetchAllBlocks();
-    if (user) {
-      fetchConnectedAccounts();
-    }
   }, [user]);
 
   const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -245,36 +108,59 @@ export default function CalendarView({
   const dateFormat = 'MMMM yyyy';
   const days = eachDayOfInterval({ start: startDate, end: addDays(endDate, 6) });
 
-  // Add standard new event
-  const handleAddEvent = async () => {
-    if (!newEventTitle || !selectedDate || !user) return;
+  // Drag over day cell
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.currentTarget.classList.add('bg-[var(--bg-secondary)]/50');
+  };
 
-    try {
-      await addDoc(collection(db, 'projects'), {
-        userId: user.uid,
-        name: newEventTitle,
-        type: 'content',
-        scheduledDate: selectedDate,
-        status: newEventStatus,
-        autoPublish: newEventStatus === 'Scheduled',
-        publishTime: '12:00',
-        data: {
-          title: newEventTitle,
-          body: newEventBody,
-          platform: newEventPlatform,
-        },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+  // Drag leave day cell
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.currentTarget.classList.remove('bg-[var(--bg-secondary)]/50');
+  };
 
-      await fetchAllBlocks();
+  // Drop content block onto day cell -> open the auto-publish panel
+  const handleDropOnDay = (day: Date, e: React.DragEvent) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('bg-[var(--bg-secondary)]/50');
+    if (schedulingLock.current) return;
 
-      setNewEventTitle('');
-      setNewEventBody('');
-      setShowEventModal(false);
-    } catch (error) {
-      console.error('Error adding event:', error);
-    }
+    const blockId = e.dataTransfer.getData('blockId');
+    if (!blockId) return;
+
+    const block = allBlocks.find((b) => b.id === blockId);
+    if (!block) return;
+
+    setSelectedDate(day);
+    setDraggedBlock(block);
+    setShowAutoPublishModal(true);
+  };
+
+  // Apply the block scheduling confirmed in AutoPublishPanel
+  const handleBlockScheduled = (updatedBlock: CalendarBlock) => {
+    setAllBlocks((prev) =>
+      prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)),
+    );
+    setScheduledEvents((prev) => [
+      ...prev.filter((b) => b.id !== updatedBlock.id),
+      updatedBlock,
+    ]);
+    setUnscheduledBlocks((prev) => prev.filter((b) => b.id !== updatedBlock.id));
+    setShowAutoPublishModal(false);
+    setDraggedBlock(null);
+  };
+
+  const closeAutoPublish = () => {
+    setShowAutoPublishModal(false);
+    setDraggedBlock(null);
+  };
+
+  // Confirm sync completion: mirror local status + refresh
+  const handlePublished = async () => {
+    setSelectedEvent((prev) =>
+      prev ? { ...prev, status: 'Published' } : prev,
+    );
+    await fetchAllBlocks();
   };
 
   // Delete event
@@ -298,86 +184,6 @@ export default function CalendarView({
     }
   };
 
-  // Drag over day cell
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.currentTarget.classList.add('bg-[var(--bg-secondary)]/50');
-  };
-
-  // Drag leave day cell
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.currentTarget.classList.remove('bg-[var(--bg-secondary)]/50');
-  };
-
-  // Drop content block onto day cell
-  const handleDropOnDay = (day: Date, e: React.DragEvent) => {
-    e.preventDefault();
-    e.currentTarget.classList.remove('bg-[var(--bg-secondary)]/50');
-    if (schedulingLock.current) return;
-
-    const blockId = e.dataTransfer.getData('blockId');
-    if (!blockId) return;
-
-    const block = allBlocks.find((b) => b.id === blockId);
-    if (!block) return;
-
-    setSelectedDate(day);
-    setDraggedBlock(block);
-    setAutoPublishError('');
-
-    // Set default auto-publish settings
-    setPublishTime(block.publishTime || '12:00');
-    setAutoPublishEnabled(block.autoPublish !== undefined ? block.autoPublish : true);
-
-    // Open the pop-out auto-publish configuration window
-    setShowAutoPublishModal(true);
-  };
-
-  // Confirm Drag and Drop Auto-Publish Settings
-  const handleConfirmAutoPublish = async () => {
-    if (!selectedDate || !draggedBlock || !user?.uid || schedulingLock.current) return;
-    schedulingLock.current = true;
-    setIsScheduling(true);
-    setAutoPublishError('');
-
-    try {
-      const [hours, minutes] = publishTime.split(':').map(Number);
-      const finalDateTime = new Date(selectedDate);
-      finalDateTime.setHours(hours, minutes, 0, 0);
-
-      const updatedBlock: CalendarBlock = {
-        ...draggedBlock,
-        scheduledDate: finalDateTime,
-        publishTime,
-        autoPublish: autoPublishEnabled,
-        status: autoPublishEnabled ? 'Scheduled' : 'Draft',
-      };
-
-      await scheduleProject(db, doc(db, 'projects', draggedBlock.id), user.uid, draggedBlock, {
-        scheduledDate: finalDateTime,
-        publishTime,
-        autoPublish: autoPublishEnabled,
-      });
-
-      setAllBlocks((prev) => prev.map((b) => (b.id === draggedBlock.id ? updatedBlock : b)));
-      setScheduledEvents((prev) => [...prev.filter((b) => b.id !== draggedBlock.id), updatedBlock]);
-      setUnscheduledBlocks((prev) => prev.filter((b) => b.id !== draggedBlock.id));
-
-      setShowAutoPublishModal(false);
-      setDraggedBlock(null);
-    } catch (error) {
-      console.error('Error setting auto-publish date:', error);
-      setAutoPublishError(
-        error instanceof Error && error.message === STUDIO_JOURNEY_UNAVAILABLE
-          ? error.message
-          : 'Could not schedule this item. It may have been published or changed. Refresh the calendar and try again.',
-      );
-    } finally {
-      schedulingLock.current = false;
-      setIsScheduling(false);
-    }
-  };
-
   // Unschedule a scheduled event (return to sidebar)
   const handleUnschedule = async (event: CalendarBlock) => {
     if (!user?.uid) return;
@@ -393,122 +199,6 @@ export default function CalendarView({
           ? error.message
           : 'Scheduling could not be cleared. Refresh the calendar and try again.',
       );
-    }
-  };
-
-  // Gemini AI content reformatting generator
-  const handleGenerateAIReformat = async () => {
-    if (!selectedEvent || selectedTargetPlatforms.length === 0) return;
-    setIsGeneratingReformat(true);
-    setReformatSuggestions([]);
-    setReformatError('');
-
-    const originalTitle = selectedEvent.name || selectedEvent.data?.title || 'Draft Content';
-    const originalBody = selectedEvent.data?.body || selectedEvent.body || '';
-    const originalPlatform = selectedEvent.data?.platform || selectedEvent.platform || 'youtube';
-
-    try {
-      const response = await apiFetch('/api/gemini/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gemini-3.8-flash',
-          contents: `You are an expert social media copywriter and content strategist.
-Your task is to reformat the following content block for multiple target platforms: ${selectedTargetPlatforms.join(', ')}.
-
-Original Platform: ${originalPlatform}
-Original Title: ${originalTitle}
-Original Content:
-${originalBody}
-
-Generate fully rewritten, native, and engaging content tailored specifically for each of the requested target platforms:
-- TikTok: Needs a bold, attention-grabbing opening hook, script style paragraphs, and 3-4 viral hashtags.
-- Instagram: Needs spacing, visual emoticons/emojis, strong caption aesthetic, call-to-action, and hashtag block.
-- X (Twitter): Needs a very punchy, thought-provoking single post or clean 2-post micro-thread, maximizing engagement within character constraints.
-- YouTube: Needs an optimized description with clickable hook chapters, title ideas, and tag recommendations.
-
-Return your response strictly in the following JSON format:
-{
-  "suggestions": [
-    {
-      "platform": "tiktok",
-      "title": "TikTok Hook/Title",
-      "body": "TikTok formatted text body..."
-    },
-    {
-      "platform": "instagram",
-      "title": "Instagram Caption Title",
-      "body": "Instagram formatted text body..."
-    }
-  ]
-}`,
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: 'OBJECT',
-              properties: {
-                suggestions: {
-                  type: 'ARRAY',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      platform: { type: 'STRING' },
-                      title: { type: 'STRING' },
-                      body: { type: 'STRING' },
-                    },
-                    required: ['platform', 'title', 'body'],
-                  },
-                },
-              },
-              required: ['suggestions'],
-            },
-          },
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to generate suggestions');
-      const result = await response.json();
-
-      const parsed = JSON.parse(result.text);
-      if (parsed?.suggestions) {
-        setReformatSuggestions(parsed.suggestions);
-      } else {
-        throw new Error('Invalid formatting response');
-      }
-    } catch (err: any) {
-      console.error(err);
-      setReformatError(getFriendlyError(err));
-    } finally {
-      setIsGeneratingReformat(false);
-    }
-  };
-
-  // Save selected AI suggestions as new Unscheduled drafts
-  const handleSaveAIBlock = async (suggestion: ReformatSuggestion) => {
-    if (!user) return;
-    try {
-      await addDoc(collection(db, 'projects'), {
-        userId: user.uid,
-        name: suggestion.title,
-        type: 'content',
-        status: 'Draft',
-        scheduledDate: null,
-        data: {
-          title: suggestion.title,
-          body: suggestion.body,
-          platform: suggestion.platform,
-          score: 80,
-          score_feedback: 'AI Reformatted Draft',
-        },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      await fetchAllBlocks();
-
-      setReformatSuggestions((prev) => prev.filter((s) => s !== suggestion));
-    } catch (error) {
-      console.error('Error saving AI draft:', error);
     }
   };
 
@@ -539,9 +229,6 @@ Return your response strictly in the following JSON format:
         onSelectEvent={(block) => {
           setSelectedEvent(block);
           setScheduleError('');
-          setReformatSuggestions([]);
-          setReformatError('');
-          setSelectedTargetPlatforms([]);
           setShowDetailModal(true);
         }}
         onDeleteEvent={handleDeleteEvent}
@@ -565,8 +252,6 @@ Return your response strictly in the following JSON format:
           heatmapMode={heatmapMode}
           onSelectDay={(day) => {
             setSelectedDate(day);
-            setNewEventTitle('');
-            setNewEventBody('');
             setShowEventModal(true);
           }}
           onDragOver={handleDragOver}
@@ -575,84 +260,50 @@ Return your response strictly in the following JSON format:
           onSelectEvent={(event) => {
             setSelectedEvent(event);
             setScheduleError('');
-            setReformatSuggestions([]);
-            setReformatError('');
-            setSelectedTargetPlatforms([]);
             setShowDetailModal(true);
           }}
         />
       </div>
 
-      {/* 3. Drag and Drop Auto-Publish Confirmation Modal */}
+      {/* 3. Drag and Drop Auto-Publish Panel */}
       <AnimatePresence>
-        {showAutoPublishModal && draggedBlock && (
-          <AutoPublishModal
-            showAutoPublishModal={showAutoPublishModal}
-            draggedBlock={draggedBlock}
-            selectedDate={selectedDate}
-            publishTime={publishTime}
-            setPublishTime={setPublishTime}
-            autoPublishEnabled={autoPublishEnabled}
-            setAutoPublishEnabled={setAutoPublishEnabled}
-            error={autoPublishError}
-            isScheduling={isScheduling}
-            onClose={() => {
-              if (schedulingLock.current) return;
-              setShowAutoPublishModal(false);
-              setDraggedBlock(null);
-            }}
-            onConfirm={handleConfirmAutoPublish}
-          />
-        )}
+        <AutoPublishPanel
+          user={user}
+          open={showAutoPublishModal}
+          block={draggedBlock}
+          day={selectedDate}
+          onClose={closeAutoPublish}
+          onScheduled={handleBlockScheduled}
+        />
       </AnimatePresence>
 
-      {/* 4. Event Detail & AI Reformatting Modal */}
+      {/* 4. Event Detail Panel (sync + reformat extracted to sub-panels) */}
       <AnimatePresence>
         {showDetailModal && selectedEvent && (
           <EventDetailModal
+            user={user}
             showDetailModal={showDetailModal}
             selectedEvent={selectedEvent}
-            connectedAccounts={connectedAccounts}
-            selectedSyncPlatforms={selectedSyncPlatforms}
-            setSelectedSyncPlatforms={setSelectedSyncPlatforms}
-            isSyncing={isSyncing}
-            syncError={syncError}
-            syncResults={syncResults}
-            selectedTargetPlatforms={selectedTargetPlatforms}
-            setSelectedTargetPlatforms={setSelectedTargetPlatforms}
-            isGeneratingReformat={isGeneratingReformat}
-            reformatError={reformatError}
-            reformatSuggestions={reformatSuggestions}
             onClose={() => setShowDetailModal(false)}
-            onSyncToPlatforms={handleSyncToPlatforms}
-            onGenerateAIReformat={handleGenerateAIReformat}
-            onSaveAIBlock={handleSaveAIBlock}
             onDeleteEvent={handleDeleteEvent}
             onUnschedule={handleUnschedule}
             scheduleError={scheduleError}
             onGoToProfile={() => setActiveTab('profile')}
+            onPublished={handlePublished}
+            onSaved={fetchAllBlocks}
           />
         )}
       </AnimatePresence>
 
-      {/* 5. Standard New Event / Click Day to Create Block Modal */}
+      {/* 5. Standard New Event / Click Day to Create Block Form */}
       <AnimatePresence>
-        {showEventModal && selectedDate && (
-          <NewEventModal
-            showEventModal={showEventModal}
-            selectedDate={selectedDate}
-            newEventTitle={newEventTitle}
-            setNewEventTitle={setNewEventTitle}
-            newEventBody={newEventBody}
-            setNewEventBody={setNewEventBody}
-            newEventPlatform={newEventPlatform}
-            setNewEventPlatform={setNewEventPlatform}
-            newEventStatus={newEventStatus}
-            setNewEventStatus={setNewEventStatus}
-            onClose={() => setShowEventModal(false)}
-            onAddEvent={handleAddEvent}
-          />
-        )}
+        <EventCreationForm
+          user={user}
+          showEventModal={showEventModal}
+          selectedDate={selectedDate}
+          onClose={() => setShowEventModal(false)}
+          onAdded={fetchAllBlocks}
+        />
       </AnimatePresence>
     </div>
   );
