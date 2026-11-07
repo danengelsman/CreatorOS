@@ -26,6 +26,7 @@ import {
 } from 'firebase/firestore';
 // Storage not available
 import firebaseConfig from '../firebase-applet-config.json';
+import { clearAuthReturn } from './lib/authReturn';
 
 // Ensure the authDomain matches the active runtime host:
 // In Vercel deployments, use the configured Vercel domain with its /__/auth rewrites.
@@ -129,7 +130,10 @@ export const loginWithEmail = (email: string, pass: string) =>
   signInWithEmailAndPassword(auth, email, pass);
 export const registerWithEmail = (email: string, pass: string) =>
   createUserWithEmailAndPassword(auth, email, pass);
-export const logout = () => signOut(auth);
+export const logout = () => {
+  clearAuthReturn();
+  return signOut(auth);
+};
 
 /**
  * Phase A — email-verification nudge (soft, never a hard block). Sent right
@@ -290,7 +294,11 @@ export { apiFetch, AuthExpiredError, RateLimitError, AUTH_EXPIRED_EVENT } from '
 import { apiFetch as unifiedApiFetch } from './lib/apiClient';
 
 /** Legacy helper: authenticated fetch that parses JSON (throws on non-OK, including 401/429). */
-export async function authorizedFetch(url: string, options: RequestInit = {}, owner?: import('./lib/apiClient').ApiRequestOwner) {
+export async function authorizedFetch(
+  url: string,
+  options: RequestInit = {},
+  owner?: import('./lib/apiClient').ApiRequestOwner,
+) {
   const response = await unifiedApiFetch(url, options, owner);
   return response.json();
 }
