@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import NewEventModal from './NewEventModal';
@@ -27,6 +27,15 @@ export default function EventCreationForm({
   const [newEventBody, setNewEventBody] = useState('');
   const [newEventPlatform, setNewEventPlatform] = useState('youtube');
   const [newEventStatus, setNewEventStatus] = useState('Draft');
+
+  // The form stays mounted while hidden; each opening starts fresh content,
+  // without resetting the user's platform or publishing-status preferences.
+  useEffect(() => {
+    if (showEventModal) {
+      setNewEventTitle('');
+      setNewEventBody('');
+    }
+  }, [showEventModal, selectedDate]);
 
   const handleAddEvent = async () => {
     if (!newEventTitle || !selectedDate || !user) return;

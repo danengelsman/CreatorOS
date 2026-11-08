@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-} from 'firebase/firestore';
+import { collection, query, where, getDocs, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   startOfWeek,
@@ -25,10 +19,7 @@ import AutoPublishPanel from './calendar/AutoPublishPanel';
 import EventDetailModal from './calendar/EventDetailModal';
 import EventCreationForm from './calendar/EventCreationForm';
 import { unscheduleProject } from './calendar/calendarPersistence';
-import {
-  deleteOwnedContentProject,
-  STUDIO_JOURNEY_UNAVAILABLE,
-} from './studio/studioOwnerFence';
+import { deleteOwnedContentProject, STUDIO_JOURNEY_UNAVAILABLE } from './studio/studioOwnerFence';
 
 export default function CalendarView({
   user,
@@ -138,13 +129,8 @@ export default function CalendarView({
 
   // Apply the block scheduling confirmed in AutoPublishPanel
   const handleBlockScheduled = (updatedBlock: CalendarBlock) => {
-    setAllBlocks((prev) =>
-      prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)),
-    );
-    setScheduledEvents((prev) => [
-      ...prev.filter((b) => b.id !== updatedBlock.id),
-      updatedBlock,
-    ]);
+    setAllBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
+    setScheduledEvents((prev) => [...prev.filter((b) => b.id !== updatedBlock.id), updatedBlock]);
     setUnscheduledBlocks((prev) => prev.filter((b) => b.id !== updatedBlock.id));
     setShowAutoPublishModal(false);
     setDraggedBlock(null);
@@ -157,9 +143,7 @@ export default function CalendarView({
 
   // Confirm sync completion: mirror local status + refresh
   const handlePublished = async () => {
-    setSelectedEvent((prev) =>
-      prev ? { ...prev, status: 'Published' } : prev,
-    );
+    setSelectedEvent((prev) => (prev ? { ...prev, status: 'Published' } : prev));
     await fetchAllBlocks();
   };
 

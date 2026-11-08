@@ -5,12 +5,7 @@ import { getFriendlyError } from '../../lib/friendlyError';
 import { CalendarBlock, ReformatSuggestion } from './calendarTypes';
 import { getPlatformStyle, getPlatformIcon } from './calendarHelpers';
 import { cn } from '@/lib/utils';
-import {
-  Sparkles,
-  RefreshCw,
-  AlertCircle,
-  Plus,
-} from 'lucide-react';
+import { Sparkles, RefreshCw, AlertCircle, Plus } from 'lucide-react';
 
 interface ReformatPanelProps {
   user: any;
@@ -25,11 +20,7 @@ interface ReformatPanelProps {
  * the Gemini call and Firestore draft writes. Renders the reformat UI
  * previously inline in EventDetailModal.
  */
-export default function ReformatPanel({
-  user,
-  selectedEvent,
-  onSaved,
-}: ReformatPanelProps) {
+export default function ReformatPanel({ user, selectedEvent, onSaved }: ReformatPanelProps) {
   const [isGeneratingReformat, setIsGeneratingReformat] = useState(false);
   const [selectedTargetPlatforms, setSelectedTargetPlatforms] = useState<string[]>([]);
   const [reformatSuggestions, setReformatSuggestions] = useState<ReformatSuggestion[]>([]);
@@ -161,8 +152,8 @@ Return your response strictly in the following JSON format:
         </h4>
       </div>
       <p className="text-[12px] text-[var(--label-secondary)] font-medium leading-relaxed">
-        Instantly rewrite and format this content block into separate native drafts for your
-        other social channels using Gemini.
+        Instantly rewrite and format this content block into separate native drafts for your other
+        social channels using Gemini.
       </p>
 
       {/* Platforms selection toggles */}
@@ -180,9 +171,7 @@ Return your response strictly in the following JSON format:
               type="button"
               onClick={() => {
                 if (isSelected) {
-                  setSelectedTargetPlatforms(
-                    selectedTargetPlatforms.filter((item) => item !== p),
-                  );
+                  setSelectedTargetPlatforms(selectedTargetPlatforms.filter((item) => item !== p));
                 } else {
                   setSelectedTargetPlatforms([...selectedTargetPlatforms, p]);
                 }
@@ -268,9 +257,7 @@ Return your response strictly in the following JSON format:
                       <Plus size={14} /> Save Draft
                     </button>
                   </div>
-                  <h6 className="text-[13px] font-bold text-[var(--label-primary)]">
-                    {s.title}
-                  </h6>
+                  <h6 className="text-[13px] font-bold text-[var(--label-primary)]">{s.title}</h6>
                   <p className="text-[12px] text-[var(--label-secondary)] whitespace-pre-wrap leading-relaxed font-medium">
                     {s.body}
                   </p>

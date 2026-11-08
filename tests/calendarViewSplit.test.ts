@@ -1,6 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+
+// The Node-only Vitest config has no Vite @ alias; use the actual utility.
+vi.mock('@/lib/utils', () => import('../src/lib/utils'));
 
 vi.mock('../src/firebase', () => ({
   db: {},
@@ -22,6 +25,7 @@ vi.mock('../src/components/studio/studioOwnerFence', () => ({
   prepareStudioOwnerFence: vi.fn().mockResolvedValue(() => {}),
 }));
 
+import { authorizedFetch } from '../src/firebase';
 import CalendarView from '../src/components/CalendarView';
 import EventCreationForm from '../src/components/calendar/EventCreationForm';
 import AutoPublishPanel from '../src/components/calendar/AutoPublishPanel';
@@ -43,13 +47,22 @@ const sampleBlock = {
 };
 
 describe('CalendarView split (F5.4)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 7, 12));
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('CalendarView renders as a thin orchestrator with calendar subcomponents', () => {
-    const html = renderToStaticMarkup(
-      React.createElement(CalendarView, { user, setActiveTab }),
-    );
+    const html = renderToStaticMarkup(React.createElement(CalendarView, { user, setActiveTab }));
     expect(html).toContain('Unscheduled Content');
     expect(html).toContain('lg:col-span-9');
-    expect(html).toContain('MMMM yyyy');
+    expect(html).toContain('November 2026');
+    expect(html).not.toContain('MMMM yyyy');
   });
 
   it('EventCreationForm renders the new-event form UI', () => {
@@ -57,14 +70,15 @@ describe('CalendarView split (F5.4)', () => {
       React.createElement(EventCreationForm, {
         user,
         showEventModal: true,
-        selectedDate: new Date('2026-11-07'),
+        selectedDate: new Date(2026, 10, 7),
         onClose: vi.fn(),
         onAdded: vi.fn(),
       }),
     );
     expect(html).toContain('Schedule Content');
     expect(html).toContain('Title / Hook');
-    expect(html).toContain('Confirm & Add');
+    expect(html).toContain('For November 7, 2026');
+    expect(html).toContain('Confirm &amp; Add');
   });
 
   it('AutoPublishPanel renders the auto-publish confirmation UI', () => {
@@ -73,7 +87,7 @@ describe('CalendarView split (F5.4)', () => {
         user,
         open: true,
         block: sampleBlock,
-        day: new Date('2026-11-07'),
+        day: new Date(2026, 10, 7),
         onClose: vi.fn(),
         onScheduled: vi.fn(),
       }),
@@ -83,7 +97,7 @@ describe('CalendarView split (F5.4)', () => {
     expect(html).toContain('Enable Auto-Publish');
   });
 
-  it('SyncPanel renders the sync-to-platforms section', () => {
+  it('SyncPanel server-renders connection prompts before accounts load', () => {
     const html = renderToStaticMarkup(
       React.createElement(SyncPanel, {
         user,
@@ -94,7 +108,10 @@ describe('CalendarView split (F5.4)', () => {
     );
     expect(html).toContain('Push and Sync to Connected Social Networks');
     expect(html).toContain('YouTube');
-    expect(html).toContain('Sync to Platforms');
+    expect(html).toContain('No connected channels detected');
+    expect(html).toContain('Go to Profile');
+    expect(html).not.toContain('Sync to Platforms');
+    expect(authorizedFetch).not.toHaveBeenCalled();
   });
 
   it('ReformatPanel renders the AI reformat section', () => {
@@ -110,9 +127,7 @@ describe('CalendarView split (F5.4)', () => {
   });
 
   it('CalendarView composition delegates to extracted panels', () => {
-    const html = renderToStaticMarkup(
-      React.createElement(CalendarView, { user, setActiveTab }),
-    );
+    const html = renderToStaticMarkup(React.createElement(CalendarView, { user, setActiveTab }));
     // Panels are rendered conditionally by state; with no events and no modal
     // open they render null, but the orchestrator shell must still render.
     expect(html).toContain('Unscheduled Content');

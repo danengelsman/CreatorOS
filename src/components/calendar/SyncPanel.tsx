@@ -148,8 +148,7 @@ export default function SyncPanel({
         </h4>
       </div>
       <p className="text-[12px] text-[var(--label-secondary)] font-medium leading-relaxed">
-        Instantly push this scheduled content block to your connected social channels via
-        OAuth.
+        Instantly push this scheduled content block to your connected social channels via OAuth.
       </p>
 
       <div className="space-y-3">
@@ -229,9 +228,7 @@ export default function SyncPanel({
         </div>
 
         {connectedAccounts.length === 0 ? (
-          <div
-            className="bg-[var(--bg-secondary)] border border-[var(--separator)]/60 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left"
-          >
+          <div className="bg-[var(--bg-secondary)] border border-[var(--separator)]/60 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
             <div className="space-y-1">
               <p className="text-[13px] font-bold text-[var(--label-primary)]">
                 No connected channels detected

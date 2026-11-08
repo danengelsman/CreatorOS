@@ -1,12 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
-import {
-  X,
-  CheckCircle,
-  Clock,
-  Trash2,
-} from 'lucide-react';
+import { X, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { CalendarBlock } from './calendarTypes';
 import { getPlatformStyle, isAutoPublished } from './calendarHelpers';
@@ -128,11 +123,7 @@ export default function EventDetailModal({
           />
 
           {/* AI Reformatting Section (extracted to ReformatPanel) */}
-          <ReformatPanel
-            user={user}
-            selectedEvent={selectedEvent}
-            onSaved={onSaved}
-          />
+          <ReformatPanel user={user} selectedEvent={selectedEvent} onSaved={onSaved} />
         </div>
 
         {/* Footer Actions */}
