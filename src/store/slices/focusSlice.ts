@@ -16,6 +16,5 @@ export const focusSlice: StateCreator<WorkspaceState, [], [], Partial<WorkspaceS
   setActiveSignal: (signal: string | null) => set({ activeSignal: signal }),
   setFocusMode: (focusMode: boolean) => set({ focusMode }),
   setOneLever: (oneLever: string | null) => set({ oneLever }),
-  setMomentumBar: (value: number) =>
-    set({ momentumBar: Math.min(100, Math.max(0, value)) }),
+  setMomentumBar: (value: number) => set({ momentumBar: Math.min(100, Math.max(0, value)) }),
 });

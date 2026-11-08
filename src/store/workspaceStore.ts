@@ -2,7 +2,13 @@ import { create } from 'zustand';
 
 import { brandSlice } from './slices/brandSlice';
 import { focusSlice } from './slices/focusSlice';
-import { isWorkspaceTokenCurrent, owned, type Owned, type Field, type WorkspaceToken } from './slices/sessionSlice';
+import {
+  isWorkspaceTokenCurrent,
+  owned,
+  type Owned,
+  type Field,
+  type WorkspaceToken,
+} from './slices/sessionSlice';
 import { projectsSlice } from './slices/projectsSlice';
 import { sessionSlice } from './slices/sessionSlice';
 
@@ -40,12 +46,15 @@ export interface WorkspaceState {
  * Slice order matters only for same-key overrides; here slices own disjoint
  * state keys, so each slice's setters update only its own fields.
  */
-export const useWorkspaceStore = create<WorkspaceState>()((...a) => ({
-  ...sessionSlice(...a),
-  ...brandSlice(...a),
-  ...projectsSlice(...a),
-  ...focusSlice(...a),
-}) as WorkspaceState);
+export const useWorkspaceStore = create<WorkspaceState>()(
+  (...a) =>
+    ({
+      ...sessionSlice(...a),
+      ...brandSlice(...a),
+      ...projectsSlice(...a),
+      ...focusSlice(...a),
+    }) as WorkspaceState,
+);
 
 export type { WorkspaceToken };
 export { isWorkspaceTokenCurrent };

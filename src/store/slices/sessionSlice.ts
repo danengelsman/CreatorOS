@@ -30,8 +30,7 @@ export const isWorkspaceTokenCurrent = (
  * store. A setter is a no-op unless the caller holds the current token.
  */
 export const guardedWrite =
-  (set: SetStateOf<WorkspaceState>) =>
-  (field: Field, token: WorkspaceToken | null, value: any) =>
+  (set: SetStateOf<WorkspaceState>) => (field: Field, token: WorkspaceToken | null, value: any) =>
     set((s) => {
       if (!isWorkspaceTokenCurrent(s, token)) return s;
       return { [field]: value, owners: { ...s.owners, [field]: { token: token!, value } } };
@@ -51,7 +50,9 @@ function owned(s: WorkspaceState, token: WorkspaceToken | null | undefined, fiel
 export { owned };
 
 /** Account lifecycle + ownership receipts + active selections (session-scoped state). */
-export const sessionSlice: StateCreator<WorkspaceState, [], [], Partial<WorkspaceState>> = (set) => {
+export const sessionSlice: StateCreator<WorkspaceState, [], [], Partial<WorkspaceState>> = (
+  set,
+) => {
   const write = guardedWrite(set);
   return {
     uid: null,
@@ -79,11 +80,7 @@ export const sessionSlice: StateCreator<WorkspaceState, [], [], Partial<Workspac
       write('selectedIdea', token, value),
     setSelectedProject: (token: WorkspaceToken | null, value: any) =>
       write('selectedProject', token, value),
-    clearSelectedIdea: (
-      token: WorkspaceToken | null,
-      expected: any,
-      receipt: Owned,
-    ) =>
+    clearSelectedIdea: (token: WorkspaceToken | null, expected: any, receipt: Owned) =>
       set((s) => {
         if (
           !receipt ||

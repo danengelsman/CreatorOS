@@ -6,8 +6,7 @@ export const brandSlice: StateCreator<WorkspaceState, [], [], Partial<WorkspaceS
   const write = guardedWrite(set);
   return {
     brand: null,
-    setBrand: (token: WorkspaceToken | null, value: any) =>
-      write('brand', token, value),
+    setBrand: (token: WorkspaceToken | null, value: any) => write('brand', token, value),
   };
 };
 
