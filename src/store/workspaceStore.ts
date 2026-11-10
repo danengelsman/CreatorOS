@@ -59,8 +59,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 export type { WorkspaceToken };
 export { isWorkspaceTokenCurrent };
 
-// Keep the fallback stable for Zustand's useSyncExternalStore snapshot checks.
+// Keep the fallback stable for Zustand's snapshot checks and prevent one
+// consumer from contaminating the shared empty result for another account.
+// Keep the existing mutable-array signature for selector compatibility.
 const EMPTY_PROJECTS: any[] = [];
+Object.freeze(EMPTY_PROJECTS);
 
 /** Account-scoped selectors — same ownership-guard contract as before the slice split. */
 export const selectBrand = (s: WorkspaceState, token: WorkspaceToken | null | undefined) =>

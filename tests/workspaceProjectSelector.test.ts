@@ -46,6 +46,16 @@ describe('project selector snapshot stability', () => {
     expect(selectProjects(state(), a2)).toBe(projects);
   });
 
+  it('does not allow a fallback mutation to contaminate another account', () => {
+    const a = state().changeAccount('A')!;
+    const fallback = selectProjects(state(), a);
+    expect(() => fallback.push({ id: 'foreign' })).toThrow();
+    const b = state().changeAccount('B')!;
+    expect(selectProjects(state(), b)).toEqual([]);
+    expect(selectProjects(state(), a)).toEqual([]);
+    expect(selectProjects(state(), null)).toEqual([]);
+  });
+
   it('returns each current owned projects array by reference, including an empty array', () => {
     const token = state().changeAccount('A')!;
     const empty: unknown[] = [];
