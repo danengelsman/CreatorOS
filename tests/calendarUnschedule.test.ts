@@ -5,6 +5,8 @@ const h = vi.hoisted(() => ({
   slots: [] as any[],
   index: 0,
   update: vi.fn(),
+  directUpdate: vi.fn(),
+  set: vi.fn(),
   fetch: vi.fn(),
   publish: vi.fn(),
   current: null as any,
@@ -16,11 +18,12 @@ vi.mock('react', async (importOriginal) => {
     ...real,
     useState: (initial: any) => {
       const i = h.index++;
-      if (!(i in h.slots)) h.slots[i] = typeof initial === 'function' ? initial() : initial;
+      const slots = h.slots;
+      if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial;
       return [
-        h.slots[i],
+        slots[i],
         (next: any) => {
-          h.slots[i] = typeof next === 'function' ? next(h.slots[i]) : next;
+          slots[i] = typeof next === 'function' ? next(slots[i]) : next;
         },
       ];
     },
@@ -36,25 +39,28 @@ vi.mock('../src/firebase', () => ({
   auth: { currentUser: { uid: 'owner' } },
   authorizedFetch: h.publish,
   apiFetch: vi.fn(),
+  serverTimestamp: () => 'timestamp',
 }));
-vi.mock('../src/components/studio/studioOwnerFence', () => ({
-  STUDIO_JOURNEY_UNAVAILABLE: 'journey unavailable',
-  prepareStudioOwnerFence: async () => () => {},
-}));
+vi.mock('@/lib/utils', async () => await import('../src/lib/utils'));
 vi.mock('firebase/firestore', () => ({
   collection: (...args: any[]) => args,
   query: (...args: any[]) => args,
   where: (...args: any[]) => args,
   getDocs: h.fetch,
-  updateDoc: h.update,
+  updateDoc: h.directUpdate,
   doc: (_db: any, collection: string, id: string) => ({ collection, id }),
   serverTimestamp: () => 'timestamp',
+  Timestamp: class Timestamp {},
   addDoc: vi.fn(),
   deleteDoc: vi.fn(),
   runTransaction: async (_db: any, callback: any) => {
     const result = await callback({
-      get: async () => ({ exists: () => true, data: () => h.current }),
+      get: async (ref: any) =>
+        ref.collection === 'first_dollar_journeys'
+          ? { exists: () => false }
+          : { exists: () => true, data: () => h.current },
       update: h.update,
+      set: h.set,
     });
     if (h.transactionWait) await h.transactionWait;
     return result;
@@ -80,6 +86,8 @@ vi.mock('../src/components/calendar/EventDetailModal', () => ({
   },
 }));
 import CalendarView from '../src/components/CalendarView';
+import AutoPublishPanel from '../src/components/calendar/AutoPublishPanel';
+import SyncPanel from '../src/components/calendar/SyncPanel';
 import { isScheduleManaged } from '../src/components/studio/studioHubHelpers';
 
 function find(node: any, name: string): any {
@@ -99,8 +107,30 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ success: true, results: { youtube: { status: 'success' } } });
   h.update.mockReset().mockResolvedValue(undefined);
+  h.directUpdate.mockReset();
+  h.set.mockReset();
   h.fetch.mockReset().mockResolvedValue({ docs: [] });
 });
+function renderChild(component: (props: any) => any, props: any, slots: any[]) {
+  h.slots = slots;
+  h.index = 0;
+  return component(props);
+}
+
+function findSyncButton(node: any): any {
+  if (!node || typeof node !== 'object') return undefined;
+  if (
+    node.type === 'button' &&
+    typeof node.props.onClick === 'function' &&
+    node.props.className?.includes('w-full h-11')
+  )
+    return node;
+  for (const child of React.Children.toArray(node.props?.children)) {
+    const result = findSyncButton(child);
+    if (result) return result;
+  }
+}
+
 it('unschedules through the calendar detail action and removes the Studio schedule lock', async () => {
   const render = () => {
     h.index = 0;
@@ -120,6 +150,10 @@ it('unschedules through the calendar detail action and removes the Studio schedu
       autoPublish: false,
       updatedAt: 'timestamp',
     },
+  );
+  expect(h.set).toHaveBeenCalledWith(
+    { collection: 'first_dollar_journeys', id: 'owner' },
+    expect.objectContaining({ uid: 'owner' }),
   );
   expect(isScheduleManaged({ ...event, ...h.update.mock.calls[0][1] })).toBe(false);
   expect(h.fetch).toHaveBeenCalledTimes(1);
@@ -151,13 +185,29 @@ it('updates calendar state only after the scheduling transaction commits', async
     currentTarget: { classList: { remove: vi.fn() } },
     dataTransfer: { getData: () => 'abc' },
   });
-  const pending = find(render(), 'AutoPublishModal').props.onConfirm();
-  expect(h.slots[3]).toEqual([]);
-  expect(h.slots[4]).toEqual([event]);
+  const panelProps = find(render(), 'AutoPublishPanel').props;
+  const parentSlots = h.slots;
+  const panelSlots: any[] = [];
+  const pending = renderChild(AutoPublishPanel, panelProps, panelSlots).props.onConfirm();
+  expect(parentSlots[3]).toEqual([]);
+  expect(parentSlots[4]).toEqual([event]);
   finish();
   await pending;
-  expect(h.slots[3][0].status).toBe('Draft');
-  expect(h.slots[4]).toEqual([]);
+  expect(h.update).toHaveBeenCalledWith(
+    { collection: 'projects', id: 'abc' },
+    expect.objectContaining({
+      status: 'Draft',
+      autoPublish: false,
+      publishTime: '12:00',
+      scheduledDate: new Date(2030, 0, 1, 12),
+    }),
+  );
+  expect(h.set).toHaveBeenCalledWith(
+    { collection: 'first_dollar_journeys', id: 'owner' },
+    expect.objectContaining({ uid: 'owner' }),
+  );
+  expect(parentSlots[3][0].status).toBe('Draft');
+  expect(parentSlots[4]).toEqual([]);
 });
 
 it('leaves the calendar unchanged and shows an error when a dragged draft was published', async () => {
@@ -176,14 +226,20 @@ it('leaves the calendar unchanged and shows an error when a dragged draft was pu
     currentTarget: { classList: { remove: vi.fn() } },
     dataTransfer: { getData: () => 'abc' },
   });
-  await find(render(), 'AutoPublishModal').props.onConfirm();
+  const panelProps = find(render(), 'AutoPublishPanel').props;
+  const parentSlots = h.slots;
+  const panelSlots: any[] = [];
+  await renderChild(AutoPublishPanel, panelProps, panelSlots).props.onConfirm();
   expect(h.update).not.toHaveBeenCalled();
-  expect(h.slots[3]).toEqual([]);
-  expect(h.slots[4]).toEqual([event]);
-  expect(find(render(), 'AutoPublishModal').props.error).toContain('published or changed');
+  expect(h.set).not.toHaveBeenCalled();
+  expect(parentSlots[3]).toEqual([]);
+  expect(parentSlots[4]).toEqual([event]);
+  expect(renderChild(AutoPublishPanel, panelProps, panelSlots).props.error).toContain(
+    'published or changed',
+  );
 });
 
-it('marks a successful Calendar publish through an owner transaction, not updateDoc', async () => {
+it('rejects a foreign project after publishing without writing its status', async () => {
   const event = {
     id: 'abc',
     userId: 'owner',
@@ -198,14 +254,62 @@ it('marks a successful Calendar publish through an owner transaction, not update
     return CalendarView({ user: { uid: 'owner' }, setActiveTab: vi.fn() });
   };
   find(render(), 'CalendarGrid').props.onSelectEvent(event);
-  find(render(), 'EventDetailModal').props.setSelectedSyncPlatforms(['youtube']);
+  const detail = find(render(), 'EventDetailModal').props;
+  const panelSlots: any[] = [[{ platform: 'youtube' }], false, null, '', ['youtube']];
+  const panel = renderChild(SyncPanel, detail, panelSlots);
   // A foreign document must be rejected by the persistence transaction after publishing.
   h.current = { ...event, userId: 'other' };
-  await find(render(), 'EventDetailModal').props.onSyncToPlatforms();
+  const button = findSyncButton(panel);
+  expect(button).toBeTruthy();
+  await button.props.onClick();
   expect(h.publish).toHaveBeenCalledWith(
     '/api/publish',
     expect.any(Object),
     expect.objectContaining({ uid: 'owner', isCurrent: expect.any(Function) }),
   );
   expect(h.update).not.toHaveBeenCalled();
+  expect(h.directUpdate).not.toHaveBeenCalled();
+  expect(h.set).not.toHaveBeenCalled();
+});
+
+it('persists a successful publish through the owner transaction and refreshes', async () => {
+  const event = {
+    id: 'abc',
+    userId: 'owner',
+    type: 'content',
+    status: 'Draft',
+    name: 'Owner title',
+    data: { body: 'Owner draft' },
+  };
+  h.current = event;
+  const onPublished = vi.fn();
+  const props = {
+    user: { uid: 'owner' },
+    selectedEvent: event,
+    onPublished,
+    onGoToProfile: vi.fn(),
+  };
+  const slots: any[] = [[{ platform: 'youtube' }], false, null, '', ['youtube']];
+  const button = findSyncButton(renderChild(SyncPanel, props, slots));
+  expect(button).toBeTruthy();
+  await button.props.onClick();
+  expect(h.publish).toHaveBeenCalledWith(
+    '/api/publish',
+    {
+      method: 'POST',
+      credentials: 'omit',
+      body: JSON.stringify({ title: 'Owner title', body: 'Owner draft', platforms: ['youtube'] }),
+    },
+    expect.objectContaining({ uid: 'owner', isCurrent: expect.any(Function) }),
+  );
+  expect(h.set).toHaveBeenCalledWith(
+    { collection: 'first_dollar_journeys', id: 'owner' },
+    expect.objectContaining({ uid: 'owner' }),
+  );
+  expect(h.update).toHaveBeenCalledWith(
+    { collection: 'projects', id: 'abc' },
+    { status: 'Published', updatedAt: 'timestamp' },
+  );
+  expect(h.directUpdate).not.toHaveBeenCalled();
+  expect(onPublished).toHaveBeenCalledTimes(1);
 });

@@ -6,6 +6,9 @@ import AutoPublishModal from '../src/components/calendar/AutoPublishModal';
 import { scheduleProject, unscheduleProject } from '../src/components/calendar/calendarPersistence';
 
 vi.mock('@/lib/utils', () => ({ cn: (...args: any[]) => args.filter(Boolean).join(' ') }));
+// The detail shell is under test here; extracted panels have their own tests.
+vi.mock('../src/components/calendar/SyncPanel', () => ({ default: () => null }));
+vi.mock('../src/components/calendar/ReformatPanel', () => ({ default: () => null }));
 vi.mock('../src/components/studio/studioOwnerFence', () => ({
   prepareStudioOwnerFence: async () => () => {},
 }));
