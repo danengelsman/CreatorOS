@@ -157,12 +157,13 @@ it('unschedules through the calendar detail action and removes the Studio schedu
   );
   expect(isScheduleManaged({ ...event, ...h.update.mock.calls[0][1] })).toBe(false);
   expect(h.fetch).toHaveBeenCalledTimes(1);
-  expect(find(render(), 'EventDetailModal')).toBeUndefined();
+  expect(find(render(), 'EventDetailModal').props.showDetailModal).toBe(false);
 });
 
 it('updates calendar state only after the scheduling transaction commits', async () => {
   const event = {
     id: 'abc',
+    userId: 'owner',
     status: 'Draft',
     scheduledDate: null,
     autoPublish: false,
@@ -211,7 +212,13 @@ it('updates calendar state only after the scheduling transaction commits', async
 });
 
 it('leaves the calendar unchanged and shows an error when a dragged draft was published', async () => {
-  const event = { id: 'abc', status: 'Draft', scheduledDate: null, autoPublish: false };
+  const event = {
+    id: 'abc',
+    userId: 'owner',
+    status: 'Draft',
+    scheduledDate: null,
+    autoPublish: false,
+  };
   h.current = { ...event, userId: 'owner', type: 'content', status: 'Published' };
   vi.spyOn(console, 'error').mockImplementation(() => {});
   const render = () => {
@@ -255,7 +262,12 @@ it('rejects a foreign project after publishing without writing its status', asyn
   };
   find(render(), 'CalendarGrid').props.onSelectEvent(event);
   const detail = find(render(), 'EventDetailModal').props;
-  const panelSlots: any[] = [[{ platform: 'youtube' }], false, null, '', ['youtube']];
+  const panelSlots: any[] = [
+    { uid: 'owner', accounts: [{ platform: 'youtube' }] },
+    false,
+    {},
+    ['youtube'],
+  ];
   const panel = renderChild(SyncPanel, detail, panelSlots);
   // A foreign document must be rejected by the persistence transaction after publishing.
   h.current = { ...event, userId: 'other' };
@@ -289,7 +301,12 @@ it('persists a successful publish through the owner transaction and refreshes', 
     onPublished,
     onGoToProfile: vi.fn(),
   };
-  const slots: any[] = [[{ platform: 'youtube' }], false, null, '', ['youtube']];
+  const slots: any[] = [
+    { uid: 'owner', accounts: [{ platform: 'youtube' }] },
+    false,
+    {},
+    ['youtube'],
+  ];
   const button = findSyncButton(renderChild(SyncPanel, props, slots));
   expect(button).toBeTruthy();
   await button.props.onClick();

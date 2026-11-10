@@ -51,13 +51,22 @@ export default function CalendarView({
 
   // Search sidebar
   const [sidebarSearch, setSidebarSearch] = useState('');
+  const calendarOwner = useRef({ uid: user?.uid, generation: 0 });
+  if (calendarOwner.current.uid !== user?.uid) {
+    calendarOwner.current = { uid: user?.uid, generation: calendarOwner.current.generation + 1 };
+  }
 
   const fetchAllBlocks = async () => {
-    if (!user) return;
+    if (!user?.uid) return;
+    const generation = calendarOwner.current.generation;
+    const isCurrent = () =>
+      calendarOwner.current.uid === user.uid && calendarOwner.current.generation === generation;
+    if (!isCurrent()) return;
     setIsLoading(true);
     try {
       const q = query(collection(db, 'projects'), where('userId', '==', user.uid));
       const snapshot = await getDocs(q);
+      if (!isCurrent()) return;
       const fetched = snapshot.docs
         .filter((d) => d.data().type === 'content')
         .map((d) => {
@@ -80,7 +89,7 @@ export default function CalendarView({
     } catch (error) {
       console.error('Error fetching content blocks:', error);
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   };
 
@@ -119,7 +128,7 @@ export default function CalendarView({
     const blockId = e.dataTransfer.getData('blockId');
     if (!blockId) return;
 
-    const block = allBlocks.find((b) => b.id === blockId);
+    const block = allBlocks.find((b) => b.id === blockId && b.userId === user?.uid);
     if (!block) return;
 
     setSelectedDate(day);
@@ -142,8 +151,10 @@ export default function CalendarView({
   };
 
   // Confirm sync completion: mirror local status + refresh
-  const handlePublished = async () => {
-    setSelectedEvent((prev) => (prev ? { ...prev, status: 'Published' } : prev));
+  const handlePublished = async (eventId: string) => {
+    setSelectedEvent((prev) =>
+      prev?.id === eventId && prev.userId === user?.uid ? { ...prev, status: 'Published' } : prev,
+    );
     await fetchAllBlocks();
   };
 
@@ -187,6 +198,7 @@ export default function CalendarView({
   };
 
   const filteredUnscheduled = unscheduledBlocks.filter((block) => {
+    if (!user?.uid || block.userId !== user.uid) return false;
     const title = block.name || block.data?.title || '';
     const body = block.data?.body || '';
     const platform = block.platform || block.data?.platform || '';
@@ -232,7 +244,9 @@ export default function CalendarView({
         <CalendarGrid
           days={days}
           monthStart={monthStart}
-          scheduledEvents={scheduledEvents}
+          scheduledEvents={scheduledEvents.filter(
+            (event) => !!user?.uid && event.userId === user.uid,
+          )}
           heatmapMode={heatmapMode}
           onSelectDay={(day) => {
             setSelectedDate(day);
@@ -262,22 +276,18 @@ export default function CalendarView({
       </AnimatePresence>
 
       {/* 4. Event Detail Panel (sync + reformat extracted to sub-panels) */}
-      <AnimatePresence>
-        {showDetailModal && selectedEvent && (
-          <EventDetailModal
-            user={user}
-            showDetailModal={showDetailModal}
-            selectedEvent={selectedEvent}
-            onClose={() => setShowDetailModal(false)}
-            onDeleteEvent={handleDeleteEvent}
-            onUnschedule={handleUnschedule}
-            scheduleError={scheduleError}
-            onGoToProfile={() => setActiveTab('profile')}
-            onPublished={handlePublished}
-            onSaved={fetchAllBlocks}
-          />
-        )}
-      </AnimatePresence>
+      <EventDetailModal
+        user={user}
+        showDetailModal={showDetailModal}
+        selectedEvent={selectedEvent}
+        onClose={() => setShowDetailModal(false)}
+        onDeleteEvent={handleDeleteEvent}
+        onUnschedule={handleUnschedule}
+        scheduleError={scheduleError}
+        onGoToProfile={() => setActiveTab('profile')}
+        onPublished={handlePublished}
+        onSaved={fetchAllBlocks}
+      />
 
       {/* 5. Standard New Event / Click Day to Create Block Form */}
       <AnimatePresence>

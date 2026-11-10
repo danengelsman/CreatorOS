@@ -24,6 +24,7 @@ const transaction = {
 
 const props: any = {
   showDetailModal: true,
+  user: { uid: 'owner' },
   connectedAccounts: [],
   selectedSyncPlatforms: [],
   setSelectedSyncPlatforms: vi.fn(),
@@ -48,14 +49,17 @@ it.each([{ status: 'Scheduled' }, { status: 'Draft', autoPublish: true }])(
   'offers schedule removal for a dateless locked item %#',
   (data) => {
     const html = renderToStaticMarkup(
-      React.createElement(EventDetailModal, { ...props, selectedEvent: { id: 'x', ...data } }),
+      React.createElement(EventDetailModal, {
+        ...props,
+        selectedEvent: { id: 'x', userId: 'owner', ...data },
+      }),
     );
     expect(html).toContain('Clear scheduling');
   },
 );
 
 it('invokes the detail action for a dateless scheduled item', () => {
-  const event = { id: 'x', status: 'Scheduled' };
+  const event = { id: 'x', userId: 'owner', status: 'Scheduled' };
   const onUnschedule = vi.fn();
   const tree = EventDetailModal({ ...props, selectedEvent: event, onUnschedule });
   const findButton = (node: any): any => {

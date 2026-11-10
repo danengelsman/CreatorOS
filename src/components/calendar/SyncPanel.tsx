@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, authorizedFetch, serverTimestamp } from '../../firebase';
 import { doc } from 'firebase/firestore';
 import { updateOwnedContentProject, STUDIO_JOURNEY_UNAVAILABLE } from '../studio/studioOwnerFence';
@@ -19,7 +19,7 @@ interface SyncPanelProps {
   user: any;
   selectedEvent: CalendarBlock | null;
   onGoToProfile: () => void;
-  onPublished: () => void;
+  onPublished: (eventId: string) => void;
 }
 
 /**
@@ -34,35 +34,43 @@ export default function SyncPanel({
   onGoToProfile,
   onPublished,
 }: SyncPanelProps) {
-  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
+  const [accountsState, setAccountsState] = useState<{ uid: string; accounts: ConnectedAccount[] }>(
+    { uid: '', accounts: [] },
+  );
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncResults, setSyncResults] = useState<any>(null);
-  const [syncError, setSyncError] = useState('');
+  const [outcomes, setOutcomes] = useState<Record<string, { results: any; error: string }>>({});
   const [selectedSyncPlatforms, setSelectedSyncPlatforms] = useState<string[]>([]);
-
-  const fetchConnectedAccounts = async () => {
-    if (!user) return;
-    try {
-      const accounts = await authorizedFetch('/api/accounts');
-      setConnectedAccounts(accounts || []);
-    } catch (error) {
-      console.error('Failed to fetch connected accounts:', error);
-    }
-  };
+  const lock = useRef(false);
+  const lifecycle = useRef({ uid: user?.uid, generation: 0 });
+  if (lifecycle.current.uid !== user?.uid) {
+    lifecycle.current = { uid: user?.uid, generation: lifecycle.current.generation + 1 };
+  }
+  const uid = user?.uid || '';
+  const connectedAccounts = accountsState.uid === uid ? accountsState.accounts : [];
+  const eventKey = JSON.stringify([uid, selectedEvent?.id]);
+  const outcome = outcomes[eventKey];
+  const syncResults = outcome?.results;
+  const syncError = outcome?.error;
 
   const handleSyncToPlatforms = async () => {
     if (
+      lock.current ||
       !user?.uid ||
       !selectedEvent ||
       selectedEvent.userId !== user.uid ||
       selectedSyncPlatforms.length === 0
     )
       return;
-    const owner = { uid: user.uid, isCurrent: () => auth.currentUser?.uid === user.uid };
+    const generation = lifecycle.current.generation;
+    const owner = {
+      uid: user.uid,
+      isCurrent: () =>
+        lifecycle.current.generation === generation && auth.currentUser?.uid === user.uid,
+    };
     if (!owner.isCurrent()) return;
+    lock.current = true;
     setIsSyncing(true);
-    setSyncResults(null);
-    setSyncError('');
+    setOutcomes((prev) => ({ ...prev, [eventKey]: { results: null, error: '' } }));
 
     const originalTitle = selectedEvent.name || selectedEvent.data?.title || 'Draft Content';
     const originalBody = selectedEvent.data?.body || selectedEvent.body || '';
@@ -84,7 +92,7 @@ export default function SyncPanel({
       if (!owner.isCurrent()) throw new Error('Account changed');
 
       if (result.success) {
-        setSyncResults(result.results);
+        setOutcomes((prev) => ({ ...prev, [eventKey]: { results: result.results, error: '' } }));
 
         const hasSuccess = Object.values(result.results).some((r: any) => r.status === 'success');
         if (hasSuccess) {
@@ -100,33 +108,49 @@ export default function SyncPanel({
           );
           if (!owner.isCurrent()) throw new Error('Account changed');
 
-          onPublished();
+          onPublished(selectedEvent.id);
         }
       } else {
         throw new Error(result.error || 'Failed to sync content');
       }
     } catch (err: any) {
       console.error(err);
-      setSyncError(
-        err instanceof Error && err.message === STUDIO_JOURNEY_UNAVAILABLE
-          ? `${err.message} Publishing may already have succeeded; check the destination before publishing again.`
-          : getFriendlyError(err),
-      );
+      if (owner.isCurrent()) {
+        const error =
+          err instanceof Error && err.message === STUDIO_JOURNEY_UNAVAILABLE
+            ? `${err.message} Publishing may already have succeeded; check the destination before publishing again.`
+            : getFriendlyError(err);
+        setOutcomes((prev) => ({
+          ...prev,
+          [eventKey]: { results: prev[eventKey]?.results ?? null, error },
+        }));
+      }
     } finally {
+      lock.current = false;
       setIsSyncing(false);
     }
   };
 
   useEffect(() => {
-    if (user) {
-      fetchConnectedAccounts();
-    }
-  }, [user]);
+    if (!uid) return;
+    const generation = lifecycle.current.generation;
+    let active = true;
+    const isCurrent = () =>
+      active && lifecycle.current.generation === generation && auth.currentUser?.uid === uid;
+    authorizedFetch('/api/accounts', {}, { uid, isCurrent })
+      .then((accounts) => {
+        if (isCurrent()) {
+          setAccountsState({ uid, accounts: accounts || [] });
+        }
+      })
+      .catch((error) => console.error('Failed to fetch connected accounts:', error));
+    return () => {
+      active = false;
+    };
+  }, [uid]);
 
   useEffect(() => {
-    if (selectedEvent) {
-      setSyncResults(null);
-      setSyncError('');
+    if (selectedEvent && selectedEvent.userId === uid) {
       const currentPlatform = (
         selectedEvent.platform ||
         selectedEvent.data?.platform ||
@@ -135,7 +159,7 @@ export default function SyncPanel({
       const isConnected = connectedAccounts.some((acc) => acc.platform === currentPlatform);
       setSelectedSyncPlatforms(isConnected ? [currentPlatform] : []);
     }
-  }, [selectedEvent, connectedAccounts]);
+  }, [eventKey, accountsState]);
 
   if (!selectedEvent) return null;
 

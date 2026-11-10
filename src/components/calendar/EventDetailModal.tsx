@@ -18,13 +18,13 @@ interface EventDetailModalProps {
   onUnschedule: (event: CalendarBlock) => void;
   scheduleError?: string;
   onGoToProfile: () => void;
-  onPublished: () => void;
+  onPublished: (eventId: string) => void;
   onSaved: () => void;
 }
 
 export default function EventDetailModal({
   showDetailModal,
-  selectedEvent,
+  selectedEvent: event,
   user,
   onClose,
   onDeleteEvent,
@@ -34,10 +34,17 @@ export default function EventDetailModal({
   onPublished,
   onSaved,
 }: EventDetailModalProps) {
-  if (!showDetailModal || !selectedEvent) return null;
+  if (!event) return null;
+  // Keep sync mounted, but remove the previous owner's fields from the DOM.
+  const owned = !!user?.uid && event.userId === user.uid;
+  const selectedEvent = owned ? event : ({ id: '' } as CalendarBlock);
+  const visible = showDetailModal && owned;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
+    <div
+      style={visible ? undefined : { display: 'none' }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto"
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -123,12 +130,12 @@ export default function EventDetailModal({
           />
 
           {/* AI Reformatting Section (extracted to ReformatPanel) */}
-          <ReformatPanel user={user} selectedEvent={selectedEvent} onSaved={onSaved} />
+          {visible && <ReformatPanel user={user} selectedEvent={selectedEvent} onSaved={onSaved} />}
         </div>
 
         {/* Footer Actions */}
         <div className="p-6 bg-[var(--bg-secondary)]/40 border-t border-[var(--separator)] flex flex-wrap gap-3 items-center justify-between">
-          {scheduleError && (
+          {owned && scheduleError && (
             <p role="alert" className="w-full text-sm text-red-500">
               {scheduleError}
             </p>
