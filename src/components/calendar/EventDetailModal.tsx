@@ -1,10 +1,10 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
-import { X, CheckCircle, Clock, Trash2 } from 'lucide-react';
+import { X, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { CalendarBlock } from './calendarTypes';
-import { getPlatformStyle, isAutoPublished } from './calendarHelpers';
+import { getPlatformStyle } from './calendarHelpers';
 import { isScheduleManaged } from '../studio/studioHubHelpers';
 import SyncPanel from './SyncPanel';
 import ReformatPanel from './ReformatPanel';
@@ -17,8 +17,6 @@ interface EventDetailModalProps {
   onDeleteEvent: (id: string) => void;
   onUnschedule: (event: CalendarBlock) => void;
   scheduleError?: string;
-  onGoToProfile: () => void;
-  onPublished: (eventId: string) => void;
   onSaved: () => void;
 }
 
@@ -30,12 +28,10 @@ export default function EventDetailModal({
   onDeleteEvent,
   onUnschedule,
   scheduleError,
-  onGoToProfile,
-  onPublished,
   onSaved,
 }: EventDetailModalProps) {
   if (!event) return null;
-  // Keep sync mounted, but remove the previous owner's fields from the DOM.
+  // Remove the previous owner's fields from the DOM.
   const owned = !!user?.uid && event.userId === user.uid;
   const selectedEvent = owned ? event : ({ id: '' } as CalendarBlock);
   const visible = showDetailModal && owned;
@@ -93,41 +89,15 @@ export default function EventDetailModal({
             )}
           </div>
 
-          {/* Auto Publish Status Indicators */}
-          {selectedEvent.scheduledDate && (
-            <div className="p-4 rounded-2xl bg-zinc-100/50 dark:bg-zinc-800/30 border border-[var(--separator)] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500">
-                  {isAutoPublished(selectedEvent) ? <CheckCircle size={20} /> : <Clock size={20} />}
-                </div>
-                <div>
-                  <span className="text-[13px] font-bold text-[var(--label-primary)] block">
-                    {isAutoPublished(selectedEvent)
-                      ? 'Successfully Auto-Published'
-                      : 'Linked to Auto-Publish'}
-                  </span>
-                  <p className="text-[11px] text-[var(--label-secondary)] font-medium leading-tight mt-0.5">
-                    {isAutoPublished(selectedEvent)
-                      ? `Content went live automatically on ${getPlatformStyle(selectedEvent.platform || selectedEvent.data?.platform).name}.`
-                      : `Automatic API integration triggers on ${format(selectedEvent.scheduledDate, 'MMM d, yyyy')} at ${selectedEvent.publishTime || '12:00'}.`}
-                  </p>
-                </div>
-              </div>
-              {isAutoPublished(selectedEvent) && (
-                <span className="text-[11px] font-bold text-green-500 uppercase tracking-wider bg-green-500/10 px-2.5 py-1 rounded-full">
-                  Live
-                </span>
-              )}
-            </div>
+          {/* Publishing is unavailable; recorded claims are never provider evidence. */}
+          {owned && (
+            <SyncPanel
+              key={`${user.uid}:${selectedEvent.id}`}
+              user={user}
+              selectedEvent={selectedEvent}
+              onSaved={onSaved}
+            />
           )}
-
-          {/* Sync to Platforms Section (extracted to SyncPanel) */}
-          <SyncPanel
-            user={user}
-            selectedEvent={selectedEvent}
-            onGoToProfile={onGoToProfile}
-            onPublished={onPublished}
-          />
 
           {/* AI Reformatting Section (extracted to ReformatPanel) */}
           {visible && <ReformatPanel user={user} selectedEvent={selectedEvent} onSaved={onSaved} />}

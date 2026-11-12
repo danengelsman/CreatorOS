@@ -62,7 +62,7 @@ describe('StudioHub rendering', () => {
       }),
     );
     expect(html.indexOf('Calendar draft')).toBeGreaterThan(html.indexOf('pipeline-production'));
-    expect(html).toContain('Manage it in Calendar');
+    expect(html).toContain('Dates are manual plans');
     expect(html).not.toContain('Mark ready');
   });
 
@@ -83,7 +83,7 @@ describe('StudioHub rendering', () => {
       }),
     );
     expect(html.indexOf('Legacy live')).toBeGreaterThan(html.indexOf('pipeline-published'));
-    expect(html).toContain('Publication status is managed outside the Studio workflow');
+    expect(html).toContain('This saved publication claim is not verified');
     expect(html).not.toContain('Change stage for Legacy live');
   });
 
@@ -117,7 +117,7 @@ describe('StudioHub rendering', () => {
     expect(html.indexOf('Live item')).toBeGreaterThan(published);
     expect(html).not.toContain('Hidden workflow');
     expect(html).toContain('Status: Scheduled');
-    expect(html).toContain('Manage it in Calendar');
+    expect(html).toContain('Dates are manual plans');
     expect(html).toContain('does not publish content');
     expect(html).not.toContain('Mark as published');
     expect(html).toContain('Mark ready');

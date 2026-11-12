@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { doc } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { auth, db } from '../../firebase';
 import { scheduleProject } from './calendarPersistence';
 import { STUDIO_JOURNEY_UNAVAILABLE } from '../studio/studioOwnerFence';
 import AutoPublishModal from './AutoPublishModal';
@@ -16,8 +16,8 @@ interface AutoPublishPanelProps {
 }
 
 /**
- * F5.4: extracted auto-publish panel.
- * Owns showAutoPublishModal/draggedBlock/publishTime/autoPublishEnabled state +
+ * F5.4: extracted manual-planning panel.
+ * Owns showAutoPublishModal/draggedBlock/publishTime state +
  * handleConfirmAutoPublish. CalendarView only orchestrates visibility + the
  * resulting block-list updates.
  */
@@ -30,23 +30,41 @@ export default function AutoPublishPanel({
   onScheduled,
 }: AutoPublishPanelProps) {
   const [publishTime, setPublishTime] = useState(block?.publishTime || '12:00');
-  const [autoPublishEnabled, setAutoPublishEnabled] = useState(
-    block?.autoPublish !== undefined ? block.autoPublish : true,
-  );
   const [autoPublishError, setAutoPublishError] = useState('');
   const [isScheduling, setIsScheduling] = useState(false);
   const schedulingLock = useRef(false);
+  const lifecycle = useRef({ uid: user?.uid, id: block?.id, generation: 0, mounted: true });
+  if (lifecycle.current.uid !== user?.uid || lifecycle.current.id !== block?.id) {
+    lifecycle.current = {
+      uid: user?.uid,
+      id: block?.id,
+      generation: lifecycle.current.generation + 1,
+      mounted: lifecycle.current.mounted,
+    };
+  }
+  useEffect(() => {
+    lifecycle.current.mounted = true;
+    return () => {
+      lifecycle.current.mounted = false;
+      lifecycle.current.generation++;
+    };
+  }, []);
 
   // Re-derive defaults whenever a new block is opened (mirrors the previous
   // handleDropOnDay behaviour that set these from the dragged block each time).
   useEffect(() => {
     setPublishTime(block?.publishTime || '12:00');
-    setAutoPublishEnabled(block?.autoPublish !== undefined ? block.autoPublish : true);
     setAutoPublishError('');
   }, [block?.id, day]);
 
   const handleConfirmAutoPublish = async () => {
     if (!day || !block || !user?.uid || schedulingLock.current) return;
+    const generation = lifecycle.current.generation;
+    const isCurrent = () =>
+      lifecycle.current.mounted &&
+      lifecycle.current.generation === generation &&
+      auth.currentUser?.uid === user.uid;
+    if (block.userId !== user.uid || !isCurrent()) return;
     schedulingLock.current = true;
     setIsScheduling(true);
     setAutoPublishError('');
@@ -60,20 +78,26 @@ export default function AutoPublishPanel({
         ...block,
         scheduledDate: finalDateTime,
         publishTime,
-        autoPublish: autoPublishEnabled,
-        status: autoPublishEnabled ? 'Scheduled' : 'Draft',
       };
 
-      await scheduleProject(db, doc(db, 'projects', block.id), user.uid, block, {
-        scheduledDate: finalDateTime,
-        publishTime,
-        autoPublish: autoPublishEnabled,
-      });
+      await scheduleProject(
+        db,
+        doc(db, 'projects', block.id),
+        user.uid,
+        block,
+        {
+          scheduledDate: finalDateTime,
+          publishTime,
+        },
+        isCurrent,
+      );
 
+      if (!isCurrent()) return;
       onScheduled(updatedBlock);
       onClose();
     } catch (error) {
-      console.error('Error setting auto-publish date:', error);
+      if (!isCurrent()) return;
+      console.error('Error setting planned date:', error);
       setAutoPublishError(
         error instanceof Error && error.message === STUDIO_JOURNEY_UNAVAILABLE
           ? error.message
@@ -99,8 +123,6 @@ export default function AutoPublishPanel({
       selectedDate={day}
       publishTime={publishTime}
       setPublishTime={setPublishTime}
-      autoPublishEnabled={autoPublishEnabled}
-      setAutoPublishEnabled={setAutoPublishEnabled}
       error={autoPublishError}
       isScheduling={isScheduling}
       onClose={handlePanelClose}

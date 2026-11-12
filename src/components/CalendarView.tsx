@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, where, getDocs, doc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
+import { clearSchedulingMessage } from '../lib/publishing';
 import {
   startOfWeek,
   addDays,
@@ -21,13 +22,7 @@ import EventCreationForm from './calendar/EventCreationForm';
 import { unscheduleProject } from './calendar/calendarPersistence';
 import { deleteOwnedContentProject, STUDIO_JOURNEY_UNAVAILABLE } from './studio/studioOwnerFence';
 
-export default function CalendarView({
-  user,
-  setActiveTab,
-}: {
-  user: any;
-  setActiveTab: (tab: string) => void;
-}) {
+export default function CalendarView({ user }: { user: any; setActiveTab: (tab: string) => void }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('off');
 
@@ -51,16 +46,31 @@ export default function CalendarView({
 
   // Search sidebar
   const [sidebarSearch, setSidebarSearch] = useState('');
-  const calendarOwner = useRef({ uid: user?.uid, generation: 0 });
+  const calendarOwner = useRef({ uid: user?.uid, generation: 0, mounted: true });
   if (calendarOwner.current.uid !== user?.uid) {
-    calendarOwner.current = { uid: user?.uid, generation: calendarOwner.current.generation + 1 };
+    calendarOwner.current = {
+      uid: user?.uid,
+      generation: calendarOwner.current.generation + 1,
+      mounted: calendarOwner.current.mounted,
+    };
   }
+
+  useEffect(() => {
+    calendarOwner.current.mounted = true;
+    return () => {
+      calendarOwner.current.mounted = false;
+      calendarOwner.current.generation++;
+    };
+  }, []);
 
   const fetchAllBlocks = async () => {
     if (!user?.uid) return;
     const generation = calendarOwner.current.generation;
     const isCurrent = () =>
-      calendarOwner.current.uid === user.uid && calendarOwner.current.generation === generation;
+      calendarOwner.current.mounted &&
+      calendarOwner.current.uid === user.uid &&
+      calendarOwner.current.generation === generation &&
+      auth.currentUser?.uid === user.uid;
     if (!isCurrent()) return;
     setIsLoading(true);
     try {
@@ -119,7 +129,7 @@ export default function CalendarView({
     e.currentTarget.classList.remove('bg-[var(--bg-secondary)]/50');
   };
 
-  // Drop content block onto day cell -> open the auto-publish panel
+  // Drop content block onto day cell -> open the manual planning panel
   const handleDropOnDay = (day: Date, e: React.DragEvent) => {
     e.preventDefault();
     e.currentTarget.classList.remove('bg-[var(--bg-secondary)]/50');
@@ -150,14 +160,6 @@ export default function CalendarView({
     setDraggedBlock(null);
   };
 
-  // Confirm sync completion: mirror local status + refresh
-  const handlePublished = async (eventId: string) => {
-    setSelectedEvent((prev) =>
-      prev?.id === eventId && prev.userId === user?.uid ? { ...prev, status: 'Published' } : prev,
-    );
-    await fetchAllBlocks();
-  };
-
   // Delete event
   const handleDeleteEvent = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -181,13 +183,21 @@ export default function CalendarView({
 
   // Unschedule a scheduled event (return to sidebar)
   const handleUnschedule = async (event: CalendarBlock) => {
-    if (!user?.uid) return;
+    if (!user?.uid || !window.confirm(clearSchedulingMessage(event))) return;
+    const generation = calendarOwner.current.generation;
+    const isCurrent = () =>
+      calendarOwner.current.mounted &&
+      calendarOwner.current.uid === user.uid &&
+      calendarOwner.current.generation === generation &&
+      auth.currentUser?.uid === user.uid;
     try {
       setScheduleError('');
-      await unscheduleProject(db, doc(db, 'projects', event.id), user.uid, event);
+      await unscheduleProject(db, doc(db, 'projects', event.id), user.uid, event, isCurrent);
+      if (!isCurrent()) return;
       await fetchAllBlocks();
       setShowDetailModal(false);
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('Error unscheduling block:', error);
       setScheduleError(
         error instanceof Error && error.message === STUDIO_JOURNEY_UNAVAILABLE
@@ -263,7 +273,7 @@ export default function CalendarView({
         />
       </div>
 
-      {/* 3. Drag and Drop Auto-Publish Panel */}
+      {/* 3. Drag and Drop Manual Planning Panel */}
       <AnimatePresence>
         <AutoPublishPanel
           user={user}
@@ -275,7 +285,7 @@ export default function CalendarView({
         />
       </AnimatePresence>
 
-      {/* 4. Event Detail Panel (sync + reformat extracted to sub-panels) */}
+      {/* 4. Event Detail Panel (publication notice + reformat extracted to sub-panels) */}
       <EventDetailModal
         user={user}
         showDetailModal={showDetailModal}
@@ -284,8 +294,6 @@ export default function CalendarView({
         onDeleteEvent={handleDeleteEvent}
         onUnschedule={handleUnschedule}
         scheduleError={scheduleError}
-        onGoToProfile={() => setActiveTab('profile')}
-        onPublished={handlePublished}
         onSaved={fetchAllBlocks}
       />
 

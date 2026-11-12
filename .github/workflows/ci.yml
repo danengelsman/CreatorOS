@@ -79,6 +79,14 @@ jobs:
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Offline Calendar form and lifecycle regressions
+        run: |
+          node tests/calendarEventCreation.browser.mjs
+          node tests/calendarSyncLifecycle.browser.mjs
+
+      - name: Offline publishing honesty (real Calendar and Studio components)
+        run: node tests/publishingHonesty.browser.mjs
+
       - name: Run e2e suite (emulators + mocked APIs)
         run: npx playwright test --project=chromium
 

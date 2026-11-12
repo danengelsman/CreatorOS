@@ -30,7 +30,7 @@ export default function CalendarHeader({
             {format(currentDate, dateFormat)}
           </h2>
           <p className="text-[13px] text-[var(--label-secondary)] font-medium mt-1">
-            Plan, visualize and trigger auto-publishing
+            Plan and organize content for manual publishing
           </p>
         </div>
         <div className="flex items-center gap-2">

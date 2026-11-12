@@ -29,7 +29,7 @@ export default function EventCreationForm({
   const [newEventStatus, setNewEventStatus] = useState('Draft');
 
   // The form stays mounted while hidden; each opening starts fresh content,
-  // without resetting the user's platform or publishing-status preferences.
+  // without resetting the user's platform or planning-status preferences.
   useEffect(() => {
     if (showEventModal) {
       setNewEventTitle('');
@@ -47,7 +47,7 @@ export default function EventCreationForm({
         type: 'content',
         scheduledDate: selectedDate,
         status: newEventStatus,
-        autoPublish: newEventStatus === 'Scheduled',
+        autoPublish: false,
         publishTime: '12:00',
         data: {
           title: newEventTitle,

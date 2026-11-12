@@ -63,7 +63,7 @@ export async function updateStudioStage(
     }
     if (isScheduleManaged(project))
       throw new Error(
-        'This project is scheduled or has auto-publish enabled. Manage it in Calendar.',
+        'This project has saved scheduling metadata. Clear it explicitly in Calendar before changing its stage.',
       );
     const stageFence = await prepareStudioOwnerFence(tx, db, userId, isCurrent);
     stageFence();

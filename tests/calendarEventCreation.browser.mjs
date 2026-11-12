@@ -128,7 +128,7 @@ try {
         type: 'content',
         scheduledDate: new Date(2026, 10, day, reopen === 'sidebar' ? 12 : 0).toISOString(),
         status: 'Scheduled',
-        autoPublish: true,
+        autoPublish: false,
         publishTime: '12:00',
         data: { title: 'Fresh title', body: 'Fresh body', platform: 'tiktok' },
         createdAt: { serverTimestamp: true },

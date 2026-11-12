@@ -81,7 +81,7 @@ describe('CalendarView split (F5.4)', () => {
     expect(html).toContain('Confirm &amp; Add');
   });
 
-  it('AutoPublishPanel renders the auto-publish confirmation UI', () => {
+  it('AutoPublishPanel renders the manual planning UI', () => {
     const html = renderToStaticMarkup(
       React.createElement(AutoPublishPanel, {
         user,
@@ -92,24 +92,21 @@ describe('CalendarView split (F5.4)', () => {
         onScheduled: vi.fn(),
       }),
     );
-    expect(html).toContain('Configure Auto-Publish');
+    expect(html).toContain('Plan Content');
     expect(html).toContain('Draft Block');
-    expect(html).toContain('Enable Auto-Publish');
+    expect(html).not.toContain('Enable Auto-Publish');
+    expect(html).toContain('planning only');
   });
 
-  it('SyncPanel server-renders connection prompts before accounts load', () => {
+  it('SyncPanel server-renders unavailable publishing without fetching accounts', () => {
     const html = renderToStaticMarkup(
       React.createElement(SyncPanel, {
         user,
         selectedEvent: sampleBlock,
-        onGoToProfile: vi.fn(),
-        onPublished: vi.fn(),
       }),
     );
-    expect(html).toContain('Push and Sync to Connected Social Networks');
-    expect(html).toContain('YouTube');
-    expect(html).toContain('No connected channels detected');
-    expect(html).toContain('Go to Profile');
+    expect(html).toContain('Publishing from CreatorOS is not available');
+    expect(html).toContain('Saved auto-publish flag');
     expect(html).not.toContain('Sync to Platforms');
     expect(authorizedFetch).not.toHaveBeenCalled();
   });

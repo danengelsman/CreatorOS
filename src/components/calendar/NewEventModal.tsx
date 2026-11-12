@@ -51,6 +51,9 @@ export default function NewEventModal({
           <p className="text-[13px] text-[var(--label-secondary)] mt-0.5">
             For {format(selectedDate, 'MMMM d, yyyy')}
           </p>
+          <p className="text-[13px] text-[var(--label-secondary)] mt-1">
+            This date is for planning only. Publish directly on the destination platform.
+          </p>
         </div>
 
         <div className="space-y-4">
@@ -109,7 +112,7 @@ export default function NewEventModal({
 
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold tracking-wider text-[var(--label-secondary)] uppercase pl-1">
-              Publishing Status
+              Planning Status
             </label>
             <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl gap-1">
               {['Draft', 'Scheduled'].map((s) => (
