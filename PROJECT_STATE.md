@@ -1,8 +1,21 @@
 # CreatorOS — Project State & Handoff
 
-**Updated:** 2026-11-04 · **Purpose:** lossless handoff for any fresh conversation. Read this plus `PRODUCTION_READINESS_PLAN.md` before doing anything. The current checkpoint below supersedes historical in-progress entries.
+**Updated:** 2026-11-12 · **Purpose:** lossless handoff for any fresh conversation. Read this plus `PRODUCTION_READINESS_PLAN.md` before doing anything. The current checkpoint below supersedes historical in-progress entries.
 
-## Current checkpoint — Studio released; reviewed closeout PR #29
+## Current checkpoint — November 12 repair wave
+
+- **Verified baseline:** remote main is `85084b5` (PR #32). Studio release/closeout #28/#29, Google redirect errors #30, video Phase 0 contracts #31 and Zustand/focus slices #32 are merged. Do not repeat those releases. Video contracts do not constitute a finished durable script-to-video/export workflow.
+- **Baseline checks:** main CI run `42790153660` passed typecheck, lint, build, artifact freshness, formatting, 308 unit tests in 34 files, Chromium UI E2E (106 passed, 2 skipped; APIs mocked), and 4 isolated actual-rules tests. The general UI suite is not production authorization or provider evidence.
+- **Selector repair:** local `c9f0068` includes a stable frozen empty-project snapshot and regression tests for missing/current/stale account tokens and A-to-B-to-A transitions. Its actual React/Zustand browser regression is now explicitly wired into CI. This repair still requires exact-head CI and merge verification; do not describe it as released based on this document alone.
+- **Parallel repair ownership:** Calendar and publishing-honesty work share one serial owner because their files overlap; telemetry/editor validation runs in a separate worktree. The integration owner handles selector release, independent exact-snapshot reviews, full gates and sequential PR merges. Existing paused edits and unrelated files remain preserved.
+- **Open PRs:** #33 Calendar still has failing remote quality/format checks; #34 telemetry's older remote head passes but newer local repairs have unresolved review findings. Neither PR's local recovery work is released. Calendar needs lifecycle/race and scheduling-state corrections; telemetry needs malformed-content/editor and valid-target corrections.
+- **Critical publishing limitation:** baseline `/api/publish` can report simulated success without making provider calls. The pending functional fix must return honest unavailability, remove misleading automatic-publishing promises, disclose historical recorded status as unverified and preserve user data. Real social publishing is not implemented by this repair.
+- **Authorization:** the user explicitly requested finishing the errors, pushing and merging on November 12. Normal main-triggered production deployment is included; no security/rules changes, paid provider calls or deletion are authorized.
+- **Live baseline probes:** stable production `/` and `/studio` returned HTTP 200, and unauthenticated Gemini POST returned JSON 401. These do not prove real-account sign-in, persistence, provider output or iOS Safari. No new environment variables or rule releases are planned.
+- **Next action:** independently review and CI-verify the selector PR, then finish/review Calendar plus publishing honesty and telemetry, run combined gates and merge verified PR heads serially. Verify remote main, post-merge CI and the stable-domain serving deployment; update this checkpoint at each release transition.
+- **Later work:** full TypeScript strictness (currently only `strictNullChecks`), staging, monitoring/alerts, authenticated production persistence/provider/device checks and durable video export remain outstanding. The separate strategic investigation is research, not an approved product rebuild.
+
+## Historical checkpoint — Studio released; reviewed closeout PR #29
 
 - **Merged:** Studio PR #28 as `cda0108`, then documentation PR #15 as `8db7f83`. Remote `main` was independently fetched and inspected on November 4. Do not recreate or re-merge the Studio release branch.
 - **Production:** Vercel `creator-os`, deployment `dpl_DmLKAtQgCSSJ7YGFdyxZKitA6KXt`, reports READY, Production, source `8db7f83`, with the stable domain `creator-os-delta-lilac.vercel.app` assigned. HTTP probes of `/`, `/login`, `/studio`, `/studio/release-check`, and `/roadmap` returned 200 and the same entry asset; the asset returned 200. These are hosting/deep-link fallback checks, not authenticated browser journeys.
@@ -179,7 +192,7 @@ Week 5 D7-A work landed here (file-based TanStack Router routes under `src/route
         - Unit tests (`npm run test:unit`): 32/32 test files passed, 290/290 tests passed ✅
     - Next: push release branch, open PR, verify required CI checks, deploy rules and Vercel release.
 
-## Next action
+## Historical next action — November 4 (superseded above)
 
 1. Close out reviewed PR #29 (`chore/studio-release-closeout`): final documentation CI, merge, verify remote main and the new stable-domain Vercel release. Source commit `1fafaaa` already passed every CI check; approved rules are deployed and independently read back for both targets. Do not repeat the already merged PR #28 or blindly replay preserved primary-checkout patches.
 2. F5.2 Zustand slices and F5.4 LandingPage/CalendarView decomposition already merged in PR #22 (`ca143fe`). Its PR labels the LandingPage split F5.3, but F5.3 in the plan of record means strict TypeScript: the actual config enables `strictNullChecks`, not full `strict`/`noImplicitAny`.

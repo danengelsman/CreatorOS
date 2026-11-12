@@ -79,6 +79,9 @@ jobs:
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Workspace selector browser regression (offline)
+        run: node tests/workspaceProjectSelector.browser.mjs
+
       - name: Run e2e suite (emulators + mocked APIs)
         run: npx playwright test --project=chromium
 
