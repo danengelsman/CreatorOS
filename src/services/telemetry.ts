@@ -104,13 +104,37 @@ export type TelemetrySignals = {
 
 const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
 
-function isDraft(project: Project): boolean {
-  return project.status === 'draft';
+// Studio persists statuses capitalized ('Draft' / 'Published'), so compare
+// case-insensitively — a literal lowercase check reads every real draft as
+// published and misses every real published project in the momentum bonus.
+function normalizedStatus(project: Project): string {
+  return typeof project?.status === 'string' ? project.status.toLowerCase() : '';
 }
 
-function scoreOf(project: Project): number {
+function isDraft(project: Project): boolean {
+  return normalizedStatus(project) === 'draft';
+}
+
+function isPublished(project: Project): boolean {
+  return normalizedStatus(project) === 'published';
+}
+
+// A missing or non-numeric score means "not measured yet", not a measured
+// zero — treating it as zero fires retention warnings for unscored work.
+function scoreOf(project: Project): number | null {
   const score = project?.data?.score;
-  return typeof score === 'number' && Number.isFinite(score) ? score : 0;
+  return typeof score === 'number' && Number.isFinite(score) ? score : null;
+}
+
+function hasLowScore(project: Project): boolean {
+  const score = scoreOf(project);
+  return score !== null && score < 40;
+}
+
+// Unscored work ranks below every measured score when picking the best
+// performer to repurpose.
+function sortScoreOf(project: Project): number {
+  return scoreOf(project) ?? -1;
 }
 
 /**
@@ -132,7 +156,7 @@ export function computeOneLever(projects: Project[], _brand: any): OneLever {
 
   // Published = shipped. A low-scoring shipped piece hurts retention most → fix it first.
   const published = list.filter((project) => !isDraft(project));
-  const lowScore = published.find((project) => scoreOf(project) < 40);
+  const lowScore = published.find(hasLowScore);
   if (lowScore) {
     return {
       lever: `Improve "${lowScore.data?.title || lowScore.name}"`,
@@ -154,7 +178,7 @@ export function computeOneLever(projects: Project[], _brand: any): OneLever {
   }
 
   // Otherwise compound the best performer (draft or shipped).
-  const best = [...list].sort((a, b) => scoreOf(b) - scoreOf(a))[0];
+  const best = [...list].sort((a, b) => sortScoreOf(b) - sortScoreOf(a))[0];
   return {
     lever: `Repurpose "${best.data?.title || best.name}"`,
     action: 'repurpose',
@@ -180,15 +204,16 @@ export function computeMomentumBar(projects: Project[], recentActivity: any[]): 
   // Volume of work: +5 per project, capped at 10 projects.
   score += Math.min(list.length, 10) * 5;
 
-  // Average quality of the body of work: 0-25.
-  const scores = list.map(scoreOf).filter((s) => s > 0);
+  // Average quality of the body of work: 0-25. Unscored work is excluded,
+  // same as before — only measured positive scores count toward the average.
+  const scores = list.map(scoreOf).filter((s): s is number => s !== null && s > 0);
   if (scores.length > 0) {
     const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
     score += Math.round((avg / 100) * 25);
   }
 
   // Shipped work compounds: +2 per published project, capped at 5.
-  const published = list.filter((project) => project.status === 'published').length;
+  const published = list.filter(isPublished).length;
   score += Math.min(published, 5) * 2;
 
   // Recent activity is a leading indicator: +1 per action, capped at 15.
@@ -219,18 +244,17 @@ export function computeSignals(projects: Project[], brand: any): TelemetrySignal
     });
   } else {
     // Retention dip on low-scoring pieces is the highest-priority signal.
-    list
-      .filter((project) => scoreOf(project) < 40)
-      .forEach((project) => {
-        signals.push({
-          id: `retention-${project.id}`,
-          type: 'retention',
-          title: `Improve "${project.data?.title || project.name}"`,
-          description: 'Low retention score — review the hook and script.',
-          priority: 'high',
-          actionable: true,
-        });
+    // Only measured scores qualify — unscored pieces get no warning.
+    list.filter(hasLowScore).forEach((project) => {
+      signals.push({
+        id: `retention-${project.id}`,
+        type: 'retention',
+        title: `Improve "${project.data?.title || project.name}"`,
+        description: 'Low retention score — review the hook and script.',
+        priority: 'high',
+        actionable: true,
       });
+    });
 
     // Drafts are ready to ship.
     list.filter(isDraft).forEach((project) => {
@@ -245,7 +269,7 @@ export function computeSignals(projects: Project[], brand: any): TelemetrySignal
     });
 
     // Always offer a growth path via the best performer.
-    const best = [...list].sort((a, b) => scoreOf(b) - scoreOf(a))[0];
+    const best = [...list].sort((a, b) => sortScoreOf(b) - sortScoreOf(a))[0];
     signals.push({
       id: `repurpose-${best.id}`,
       type: 'repurpose',
