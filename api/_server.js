@@ -1,6 +1,11 @@
 // server.ts
 import express from "express";
 import { randomUUID } from "node:crypto";
+
+// src/lib/publishing.ts
+var PUBLISH_UNAVAILABLE_MESSAGE = "Publishing from CreatorOS is not available. Publish directly on the destination platform instead.";
+
+// server.ts
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -1650,69 +1655,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
     if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
       return res.status(400).json({ error: "No target platforms specified" });
     }
-    try {
-      const results = {};
-      const accounts = (await listIntegrations(req.user.uid)).map((a) => ({
-        platform: a.platform,
-        profile_data: a.profile_data,
-        // F1.4 — decrypt at rest tokens (legacy plaintext passes through + upgrades)
-        access_token: decryptToken(a.access_token, {
-          update: (enc) => {
-            void updateIntegrationFields(req.user.uid, a.platform, { access_token: enc }).catch(
-              (err) => console.error("[f1.4] lazy token upgrade failed:", err)
-            );
-          }
-        })
-      }));
-      for (const platform of platforms) {
-        const lowerPlatform = platform.toLowerCase();
-        const account = accounts.find((a) => a.platform === lowerPlatform);
-        if (!account) {
-          results[platform] = {
-            status: "error",
-            message: `Platform ${platform} is not connected via OAuth. Please connect it in the Integrations tab first.`
-          };
-          continue;
-        }
-        const profile = JSON.parse(account.profile_data || "{}");
-        if (lowerPlatform === "youtube") {
-          const channelId = profile.id || "UC" + Math.random().toString(36).substring(2, 12).toUpperCase();
-          results[platform] = {
-            status: "success",
-            message: `Successfully synchronized and pushed to channel "${profile.name || "YouTube"}"!`,
-            url: `https://studio.youtube.com/channel/${channelId}/community`
-          };
-        } else if (lowerPlatform === "tiktok") {
-          results[platform] = {
-            status: "success",
-            message: `Successfully pushed content draft container to TikTok! Ready for mobile review.`,
-            url: `https://www.tiktok.com/creator-academy`
-          };
-        } else if (lowerPlatform === "instagram") {
-          results[platform] = {
-            status: "success",
-            message: `Successfully synchronized post caption and media guidelines to Meta Creator Studio!`,
-            url: `https://business.facebook.com/creatorstudio`
-          };
-        } else if (lowerPlatform === "twitter" || lowerPlatform === "x") {
-          results[platform] = {
-            status: "success",
-            message: `Successfully pushed content draft and scheduled post container to X!`,
-            url: `https://x.com/home`
-          };
-        } else {
-          results[platform] = {
-            status: "success",
-            message: `Successfully synced content to ${platform}!`,
-            url: "#"
-          };
-        }
-      }
-      res.json({ success: true, results });
-    } catch (err) {
-      console.error("Publish API Error:", err);
-      res.status(500).json({ error: err.message || "Failed to sync content" });
-    }
+    return res.status(501).json({ error: PUBLISH_UNAVAILABLE_MESSAGE });
   });
   app.get("/api/analytics/youtube", authenticateUser, async (req, res) => {
     const account = await getIntegration(req.user.uid, "youtube");

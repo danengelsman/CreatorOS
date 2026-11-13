@@ -71,6 +71,13 @@ afterEach(() => {
 });
 
 describe('apiFetch — request shaping', () => {
+  it('propagates the publish 501 guidance without retrying', async () => {
+    const message =
+      'Publishing from CreatorOS is not available. Publish directly on the destination platform instead.';
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: message }, 501));
+    await expect(apiFetch('/api/publish', { method: 'POST', body: '{}' })).rejects.toThrow(message);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it('attaches the Bearer token and a JSON content-type to /api requests', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
 

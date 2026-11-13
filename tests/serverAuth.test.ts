@@ -207,6 +207,33 @@ describe('authenticateUser middleware (via GET /api/accounts)', () => {
   });
 });
 
+describe('POST /api/publish', () => {
+  it('requires authentication and preserves platform validation', async () => {
+    expect((await postJson('/api/publish', { platforms: ['youtube'] })).status).toBe(401);
+    for (const platforms of [undefined, [], 'youtube']) {
+      const res = await postJson('/api/publish', { platforms }, 'valid.publisher');
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'No target platforms specified' });
+    }
+  });
+
+  it('reports publishing unavailable even for connected platforms', async () => {
+    fsState.listIntegrations.mockResolvedValue([
+      { platform: 'youtube', access_token: null, profile_data: '{"id":"channel"}' },
+      { platform: 'tiktok', access_token: null, profile_data: '{}' },
+    ]);
+    for (const platforms of [['youtube'], ['tiktok', 'unconnected']]) {
+      const res = await postJson('/api/publish', { platforms }, 'valid.publisher');
+      expect(res.status).toBe(501);
+      expect(await res.json()).toEqual({
+        error:
+          'Publishing from CreatorOS is not available. Publish directly on the destination platform instead.',
+      });
+    }
+    expect(fsState.listIntegrations).not.toHaveBeenCalled();
+  });
+});
+
 describe('protectAIRoute middleware (AI routes)', () => {
   it('401s with "Authentication required" when the header is missing', async () => {
     const res = await postJson('/api/gemini/generate', { model: 'gemini-3.8-flash' });

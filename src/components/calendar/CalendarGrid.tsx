@@ -3,7 +3,7 @@ import { format, isSameMonth, isSameDay, isToday } from 'date-fns';
 import { Plus, Clock, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CalendarBlock, HeatmapMode } from './calendarTypes';
-import { getPlatformStyle, getHeatmapClass, isAutoPublished } from './calendarHelpers';
+import { getPlatformStyle, getHeatmapClass, isCalendarPublished } from './calendarHelpers';
 
 interface CalendarGridProps {
   days: Date[];
@@ -108,7 +108,7 @@ export default function CalendarGrid({
                 {dayEvents.map((event) => {
                   const style = getPlatformStyle(event.platform || event.data?.platform);
                   const title = event.name || event.data?.title || 'Draft Content';
-                  const isPublished = isAutoPublished(event);
+                  const isPublished = isCalendarPublished(event);
 
                   return (
                     <div
@@ -150,14 +150,12 @@ export default function CalendarGrid({
                       <div className="flex items-center justify-between gap-1 mt-1 border-t border-[var(--separator)]/20 pt-1 text-[8px] font-bold">
                         {isPublished ? (
                           <span className="text-emerald-500 flex items-center gap-0.5">
-                            <CheckCircle size={8} /> Auto-Published
-                          </span>
-                        ) : event.autoPublish ? (
-                          <span className="text-[var(--accent)] flex items-center gap-0.5">
-                            <Clock size={8} /> Auto-Publish
+                            <CheckCircle size={8} /> Recorded Published
                           </span>
                         ) : (
-                          <span className="text-[var(--label-tertiary)]">Draft</span>
+                          <span className="text-[var(--label-tertiary)] flex items-center gap-0.5">
+                            <Clock size={8} /> Planned
+                          </span>
                         )}
                       </div>
                     </div>
