@@ -154,6 +154,54 @@ describe('computeSignals priority ordering', () => {
   });
 });
 
+describe('real Studio casing and missing scores', () => {
+  it('treats capitalized Draft statuses as drafts for the publish lever', () => {
+    const projects = [
+      proj({ id: 'a', data: { title: 'Draft A', score: 0 }, status: 'Draft' }),
+      proj({ id: 'b', data: { title: 'Draft B', score: 10 }, status: 'Draft' }),
+    ];
+    const result = computeOneLever(projects, brand);
+    expect(result.action).toBe('publish');
+    expect(result.lever).toContain('Draft A');
+  });
+
+  it('treats capitalized Published statuses as shipped for retention', () => {
+    const projects = [
+      proj({ id: 'a', data: { title: 'Draft A', score: 0 }, status: 'Draft' }),
+      proj({ id: 'b', data: { title: 'Low scorer', score: 20 }, status: 'Published' }),
+    ];
+    const result = computeOneLever(projects, brand);
+    expect(result.action).toBe('improve-retention');
+    expect(result.lever).toContain('Low scorer');
+  });
+
+  it('does not flag an unscored published project as a retention problem', () => {
+    const projects = [proj({ id: 'a', data: { title: 'Unscored' }, status: 'Published' })];
+    const result = computeOneLever(projects, brand);
+    expect(result.action).toBe('repurpose');
+    expect(result.lever).toContain('Unscored');
+  });
+
+  it('counts capitalized Published projects in the momentum bonus', () => {
+    const draftBar = computeMomentumBar([proj({ status: 'Draft', data: { score: 50 } })], []);
+    const publishedBar = computeMomentumBar(
+      [proj({ status: 'Published', data: { score: 50 } })],
+      [],
+    );
+    expect(publishedBar).toBe(draftBar + 2);
+  });
+
+  it('emits publish signals for Draft projects and no retention signal for unscored work', () => {
+    const projects = [
+      proj({ id: 'a', data: { title: 'Unscored' }, status: 'Published' }),
+      proj({ id: 'b', data: { title: 'Draft B', score: 90 }, status: 'Draft' }),
+    ];
+    const { signals } = computeSignals(projects, brand);
+    expect(signals.some((s) => s.type === 'retention')).toBe(false);
+    expect(signals.some((s) => s.type === 'publish' && s.id === 'publish-b')).toBe(true);
+  });
+});
+
 function rank(priority: 'high' | 'medium' | 'low'): number {
   return { high: 0, medium: 1, low: 2 }[priority];
 }
