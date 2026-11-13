@@ -1,8 +1,19 @@
 # CreatorOS — Project State & Handoff
 
-**Updated:** 2026-11-12 · **Purpose:** lossless handoff for any fresh conversation. Read this plus `PRODUCTION_READINESS_PLAN.md` before doing anything. The current checkpoint below supersedes historical in-progress entries.
+**Updated:** 2026-11-13 · **Purpose:** lossless handoff for any fresh conversation. Read this plus `PRODUCTION_READINESS_PLAN.md` before doing anything. The current checkpoint below supersedes historical in-progress entries.
 
-## Current checkpoint — November 12 repair wave
+## Current checkpoint — November 13: repair wave merged
+
+- **Verified baseline:** remote main is `653a87e` (PR #34 merge, Nov 13). Merged since the November 12 checkpoint: #35 selector stability (`0e2d3fd`, Nov 12), #33 Calendar split + publishing honesty (`f557466`, Nov 13), #34 telemetry service (`653a87e`, Nov 13). PR #36 was opened and closed unmerged within minutes on Nov 13 (stale release PR from the already-merged #28 branch). Zero open PRs and zero open issues, verified Nov 13. Do not repeat these releases.
+- **PR #34 fixes (Codex P2s):** status comparisons normalized to the stored `Draft`/`Published` casing in three places, so an unshipped backlog is no longer treated as published; a missing quality score is treated as unmeasured instead of zero. 5 new regression tests; 17/17 telemetry tests pass locally. All 5 CI checks green on head `cd94889` (run `43403306764`): E2E smoke, typecheck/lint/build/artifact gate, Firestore rules, Prettier, Vercel preview.
+- **Telemetry is foundation only:** nothing on main imports `computeOneLever`, `computeMomentumBar`, or `computeSignals` yet. Wiring them into Dashboard/SignalCard is future work, not part of this merge.
+- **Publishing honesty shipped:** `/api/publish` now returns honest HTTP 501 unavailability; simulated success and automatic Published writes are removed; recorded plans are preserved. Real social publishing is still not implemented.
+- **Stale-section correction:** the "In progress — Project-centric Studio (local only)" section below is stale history. That work merged via PR #28 (`cda0108`); do not treat the section as current status.
+- **Later work (unchanged):** full TypeScript strictness (currently only `strictNullChecks`), staging, monitoring/alerts, authenticated production persistence/provider/device checks, and durable video export remain outstanding. Video contracts (#31) do not constitute a finished durable script-to-video/export workflow. The separate strategic investigation is research, not an approved product rebuild.
+- **Pending decisions (owner: Dan):** the 8-item UI scope-completion pass (Creator Hub community wiring, global assistant shortcut, Canvas autosave, orphaned-route redirects, headline rebrand, AI Mentor chat panel, legacy dashboard removal) is unanswered and unstarted; the iPhone Google sign-in retry after PR #30 is still outstanding; $19/month billing is not implemented.
+- **Next action:** verify the post-merge production deployment on the stable domain; resolve the pending decisions above before selecting the next implementation chunk. Update this checkpoint at each release transition.
+
+## Historical checkpoint — November 12 repair wave (superseded)
 
 - **Verified baseline:** remote main is `85084b5` (PR #32). Studio release/closeout #28/#29, Google redirect errors #30, video Phase 0 contracts #31 and Zustand/focus slices #32 are merged. Do not repeat those releases. Video contracts do not constitute a finished durable script-to-video/export workflow.
 - **Baseline checks:** main CI run `42790153660` passed typecheck, lint, build, artifact freshness, formatting, 308 unit tests in 34 files, Chromium UI E2E (106 passed, 2 skipped; APIs mocked), and 4 isolated actual-rules tests. The general UI suite is not production authorization or provider evidence.
@@ -30,7 +41,7 @@
 
 ## Repo state
 
-- Canonical repository: `danengelsman/CreatorOS`, production branch `main`; latest verified remote checkpoint `8db7f83`. Active closeout worktree: `CreatorOS_wt_release_closeout`. The original `CreatorOS_Repo` checkout is behind with preserved local edits. Earlier sections retain historical SHAs.
+- Canonical repository: `danengelsman/CreatorOS`, production branch `main`; latest verified remote checkpoint `653a87e`. Active closeout worktree: `CreatorOS_wt_release_closeout`. The original `CreatorOS_Repo` checkout is behind with preserved local edits. Earlier sections retain historical SHAs.
 - Git identity fixed (repo-local + global): `Daniel Engelsman <danengelsman@gmail.com>` — OpenClaw commits now attribute correctly
 - History rewrite (2026-10-03): all 51 commits on `main` are Daniel as author+committer; content verified byte-identical (tree `b6bbdb47…`)
 - **Safety backup:** `C:\Users\ADMIN\Documents\CreatorOS_Repo_backup_pre-rewrite_20261003.bundle` (full pre-rewrite history). Delete after ~2 stable weeks in production.
