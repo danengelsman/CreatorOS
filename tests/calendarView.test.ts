@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getPlatformStyle,
   getHeatmapClass,
-  isAutoPublished,
+  isCalendarPublished,
 } from '../src/components/calendar/calendarHelpers';
 
 describe('CalendarView modular architecture (F5.4)', () => {
@@ -41,20 +41,20 @@ describe('CalendarView modular architecture (F5.4)', () => {
     expect(getHeatmapClass(tuesday, [], 'time', monthStart)).toBe('bg-emerald-500/20');
   });
 
-  it('determines auto-published state accurately', () => {
+  it('determines published state from explicit signals', () => {
     const pastDate = new Date(Date.now() - 10000);
     const futureDate = new Date(Date.now() + 100000);
 
     expect(
-      isAutoPublished({
+      isCalendarPublished({
         id: '1',
         scheduledDate: pastDate,
         autoPublish: true,
       }),
-    ).toBe(true);
+    ).toBe(false);
 
     expect(
-      isAutoPublished({
+      isCalendarPublished({
         id: '2',
         scheduledDate: futureDate,
         autoPublish: true,
@@ -62,10 +62,29 @@ describe('CalendarView modular architecture (F5.4)', () => {
     ).toBe(false);
 
     expect(
-      isAutoPublished({
+      isCalendarPublished({
         id: '3',
         status: 'published',
       }),
     ).toBe(true);
   });
+});
+
+it.each([true, false])(
+  'legacy scheduled autoPublish=%s is not publication evidence',
+  (autoPublish) => {
+    for (const scheduledDate of [new Date(2020, 0, 1), new Date(2099, 0, 1)]) {
+      expect(
+        isCalendarPublished({ id: 'legacy', status: 'Scheduled', autoPublish, scheduledDate }),
+      ).toBe(false);
+    }
+  },
+);
+it.each([
+  { published: true },
+  { status: 'Published' },
+  { status: ' published ' },
+  { status: 'published' },
+])('recognizes explicit publication %#', (signal) => {
+  expect(isCalendarPublished({ id: 'manual', ...signal })).toBe(true);
 });

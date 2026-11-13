@@ -99,9 +99,8 @@ window.run=kind=>{
  if(kind==='stage')return updateStudioStage(db,ref,'alice','production',()=>window.current);
  if(kind==='legacy-save')return updateOwnedContentProject(db,ref,'alice',{'data.body':'Saved by Alice'},()=>window.current);
  if(kind==='delete')return deleteOwnedContentProject(db,ref,'alice',()=>window.current);
- if(kind==='publish')return window.detail.onSyncToPlatforms();
  if(kind==='schedule')return scheduleProject(db,ref,'alice',{status:'Draft'},{scheduledDate:new Date('2027-01-01T00:00:00Z'),publishTime:'12:00',autoPublish:true});
- return unscheduleProject(db,ref,'alice',{scheduledDate:new Date('2027-01-01T00:00:00Z'),publishTime:'12:00',autoPublish:true});
+ return unscheduleProject(db,ref,'alice',{status:'Scheduled',scheduledDate:new Date('2027-01-01T00:00:00Z'),publishTime:'12:00',autoPublish:true});
 };
 const root=createRoot(document.getElementById('root'));
 window.mount=async mode=>{
@@ -123,9 +122,7 @@ export function asBob(){db._authCredentials.token=tokenB;auth.currentUser={uid:'
 export {serverTimestamp};
 export async function authorizedFetch(url,options,owner){
  if(url==='/api/accounts')return [];
- if(url!=='/api/publish')throw Error('Unexpected API');
- if(!owner||owner.uid!=='alice'||!owner.isCurrent())throw Error('Account changed');
- window.publishOwner=owner.uid;return {success:true,results:{youtube:{status:'success'}}};
+ throw Error('Unexpected API: publication must not dispatch');
 }
 export const apiFetch=async()=>{throw Error('Unexpected API')};`;
 const wrapper = `import * as real from 'real-firestore';export * from 'real-firestore';
@@ -292,7 +289,10 @@ try {
         assert.equal(saved.unknown.stringValue, 'keep-project-field');
         assert.equal(saved.data.mapValue.fields.keep.stringValue, 'keep-nested-field');
         if (kind === 'stage') assert.equal(saved.studioStage.stringValue, 'production');
-        if (kind === 'schedule') assert.equal(saved.status.stringValue, 'Scheduled');
+        if (kind === 'schedule') {
+          assert.equal(saved.status.stringValue, 'Draft');
+          assert.equal(saved.autoPublish, undefined);
+        }
         if (kind === 'unschedule') assert.equal(saved.scheduledDate.nullValue, null);
         if (kind === 'legacy-save')
           assert.equal(saved.data.mapValue.fields.body.stringValue, 'Saved by Alice');
@@ -372,46 +372,31 @@ try {
   pristine(await read('first_dollar_journeys/alice'));
   cases++;
   await editor.close();
-  for (const mode of ['valid', 'missing', 'malformed'])
-    for (const swap of mode === 'malformed' ? [false] : [true, false]) {
-      await seed(mode);
-      const before = await read('projects/browser-p'),
-        journey = await read('first_dollar_journeys/alice'),
-        calendar = await fresh();
-      await calendar.evaluate(() => window.mount('calendar'));
-      await calendar.waitForFunction(() => window.grid);
-      await calendar.evaluate(() => window.grid.onSelectEvent(window.event));
-      await calendar.waitForFunction(() => window.detail);
-      await calendar.evaluate(() => window.detail.setSelectedSyncPlatforms(['youtube']));
-      await calendar.waitForFunction(() => window.detail.selectedSyncPlatforms.length === 1);
-      await start(calendar, 'publish', swap);
-      if (swap) await swapAndRelease(calendar);
-      await finish(calendar);
-      assert.equal(await calendar.evaluate(() => window.publishOwner), 'alice');
-      if (swap || mode === 'malformed') {
-        assert.deepEqual(await read('projects/browser-p'), before);
-        assert.deepEqual(await read('first_dollar_journeys/alice'), journey);
-        if (swap)
-          assert.equal(
-            await calendar.evaluate(() => window.lastTransactionCode),
-            'permission-denied',
-          );
-        else
-          assert.match(
-            await calendar.getByRole('alert').innerText(),
-            /contact support.*Publishing may already have succeeded/,
-          );
-      } else {
-        assert.equal((await read('projects/browser-p')).status.stringValue, 'Published');
-        const j = await read('first_dollar_journeys/alice');
-        if (mode === 'missing') pristine(j);
-        else assert.deepEqual(j, journey);
-      }
-      cases++;
-      await calendar.close();
-    }
+  // Publication is unavailable. The actual Calendar parent must expose no dispatcher,
+  // and opening it must not write either the project or its companion journey.
+  for (const mode of ['valid', 'missing', 'malformed']) {
+    await seed(mode);
+    const before = await read('projects/browser-p'),
+      journey = await read('first_dollar_journeys/alice'),
+      calendar = await fresh();
+    await calendar.evaluate(() => window.mount('calendar'));
+    await calendar.waitForFunction(() => window.grid);
+    await calendar.evaluate(() => window.grid.onSelectEvent(window.event));
+    await calendar.waitForFunction(() => window.detail);
+    assert.deepEqual(
+      await calendar.evaluate(() => ({
+        sync: typeof window.detail.onSyncToPlatforms,
+        published: typeof window.detail.onPublished,
+      })),
+      { sync: 'undefined', published: 'undefined' },
+    );
+    assert.deepEqual(await read('projects/browser-p'), before);
+    assert.deepEqual(await read('first_dollar_journeys/alice'), journey);
+    cases++;
+    await calendar.close();
+  }
   console.log(
-    `PASS ${cases} real-SDK/rules cases: admin bypass control; post-callback B denied; A allowed; missing journey initialized atomically; concurrent initialization retried; malformed data/timestamps/unknown fields retained; actual canvas draft recovery and Calendar publish handler covered.`,
+    `PASS ${cases} real-SDK/rules cases: admin bypass control; post-callback B denied; A allowed; missing journey initialized atomically; concurrent initialization retried; malformed data/timestamps/unknown fields retained; actual canvas draft recovery and absence of Calendar publication dispatch covered.`,
   );
 } finally {
   await browser.close();

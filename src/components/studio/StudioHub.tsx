@@ -3,6 +3,8 @@ import { collection, doc } from 'firebase/firestore';
 import { Plus, ArrowRight } from '@phosphor-icons/react';
 import { db } from '../../firebase';
 import ContentIdeaGenerator from '../ContentIdeaGenerator';
+import PublicationNotice from '../calendar/PublicationNotice';
+import { clearSchedulingMessage } from '../../lib/publishing';
 import ViralTemplatesLibrary from '../ViralTemplatesLibrary';
 import {
   contentProjects,
@@ -42,7 +44,12 @@ const columns: { id: PipelineColumn; title: string; empty: string }[] = [
     title: 'In Production',
     empty: 'Projects in progress, scheduled content, and ready projects appear here.',
   },
-  { id: 'published', title: 'Published', empty: 'Published content appears here.' },
+  {
+    id: 'published',
+    title: 'Recorded Published',
+    empty:
+      'Items with a saved Published claim appear here; destination publication is not verified.',
+  },
 ];
 const focus =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2';
@@ -420,18 +427,26 @@ export function StudioHubContent({
                         )}
                         {column.id === 'published' ? (
                           <p className="mt-3 text-xs text-[var(--label-secondary)]">
-                            Publication status is managed outside the Studio workflow.
+                            This saved publication claim is not verified. Check the destination
+                            platform or explicitly correct the record below.
                           </p>
                         ) : isScheduleManaged(project) ? (
                           <div className="mt-3 flex flex-wrap items-center gap-2">
                             <p className="w-full text-xs text-[var(--label-secondary)]">
-                              This project is scheduled or has auto-publish enabled. Manage it in
-                              Calendar before changing its stage here.
+                              This project has saved scheduling metadata. Dates are manual plans;
+                              historical auto-publish flags do not trigger posting.
                             </p>
                             <button
                               type="button"
                               disabled={updating[project.id]}
                               onClick={async () => {
+                                if (
+                                  statusLocks.current.has(project.id) ||
+                                  !(isCurrentOwner?.() ?? true) ||
+                                  !window.confirm(clearSchedulingMessage(project))
+                                )
+                                  return;
+                                statusLocks.current.add(project.id);
                                 try {
                                   setUpdating((prev) => ({ ...prev, [project.id]: true }));
                                   setStatusErrors((prev) => ({ ...prev, [project.id]: '' }));
@@ -444,19 +459,23 @@ export function StudioHubContent({
                                     doc(db, 'projects', project.id),
                                     user.uid,
                                     project,
+                                    isCurrentOwner,
                                   );
                                 } catch (err: any) {
+                                  if (!(isCurrentOwner?.() ?? true)) return;
                                   setStatusErrors((prev) => ({
                                     ...prev,
                                     [project.id]: err?.message || 'Failed to unschedule project.',
                                   }));
                                 } finally {
-                                  setUpdating((prev) => ({ ...prev, [project.id]: false }));
+                                  statusLocks.current.delete(project.id);
+                                  if (isCurrentOwner?.() ?? true)
+                                    setUpdating((prev) => ({ ...prev, [project.id]: false }));
                                 }
                               }}
                               className={`${button} border border-[var(--separator)] disabled:opacity-50 text-xs`}
                             >
-                              Unschedule
+                              Clear scheduling
                             </button>
                           </div>
                         ) : (
@@ -496,6 +515,11 @@ export function StudioHubContent({
                             )}
                           </div>
                         )}
+                        <PublicationNotice
+                          project={project}
+                          user={user}
+                          isCurrentOwner={isCurrentOwner}
+                        />
                         {updating[project.id] && (
                           <p role="status" className="mt-2 text-xs">
                             Saving stage...

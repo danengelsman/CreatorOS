@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
-import { X, Clock, Sparkles, Check } from 'lucide-react';
+import { X, Clock, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CalendarBlock } from './calendarTypes';
 import { getPlatformStyle } from './calendarHelpers';
@@ -12,8 +12,6 @@ interface AutoPublishModalProps {
   selectedDate: Date | null;
   publishTime: string;
   setPublishTime: (time: string) => void;
-  autoPublishEnabled: boolean;
-  setAutoPublishEnabled: (enabled: boolean) => void;
   error: string;
   isScheduling: boolean;
   onClose: () => void;
@@ -26,8 +24,6 @@ export default function AutoPublishModal({
   selectedDate,
   publishTime,
   setPublishTime,
-  autoPublishEnabled,
-  setAutoPublishEnabled,
   error,
   isScheduling,
   onClose,
@@ -47,7 +43,7 @@ export default function AutoPublishModal({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-[18px] font-bold tracking-tight text-[var(--label-primary)]">
-              Configure Auto-Publish
+              Plan Content
             </h3>
             <p className="text-[13px] text-[var(--label-secondary)] mt-0.5">
               For {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : ''}
@@ -78,7 +74,9 @@ export default function AutoPublishModal({
             >
               {getPlatformStyle(draggedBlock.platform || draggedBlock.data?.platform).name}
             </span>
-            <span className="text-[11px] text-[var(--label-tertiary)] font-bold">Draft Block</span>
+            <span className="text-[11px] text-[var(--label-tertiary)] font-bold">
+              Content Block
+            </span>
           </div>
           <h4 className="text-[14px] font-bold text-[var(--label-primary)]">
             {draggedBlock.name || draggedBlock.data?.title || 'Untitled'}
@@ -94,7 +92,7 @@ export default function AutoPublishModal({
         <div className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold tracking-wider text-[var(--label-secondary)] uppercase pl-1 flex items-center gap-1.5">
-              <Clock size={13} /> Select Publishing Time
+              <Clock size={13} /> Select Planned Time
             </label>
             <input
               type="time"
@@ -105,34 +103,9 @@ export default function AutoPublishModal({
             />
           </div>
 
-          {/* Auto Publish Trigger Toggle */}
-          <div className="flex items-center justify-between p-3.5 bg-[var(--bg-secondary)]/50 rounded-2xl border border-[var(--separator)]/40">
-            <div className="space-y-0.5 pr-4">
-              <span className="text-[13px] font-bold text-[var(--label-primary)] flex items-center gap-1.5">
-                <Sparkles size={14} className="text-[var(--accent)]" /> Enable Auto-Publish
-              </span>
-              <p className="text-[11px] text-[var(--label-secondary)] font-medium leading-tight">
-                Link this block to the API auto-publisher to schedule automated posting.
-              </p>
-            </div>
-            <button
-              aria-label="Enable Auto-Publish"
-              aria-pressed={autoPublishEnabled}
-              disabled={isScheduling}
-              onClick={() => setAutoPublishEnabled(!autoPublishEnabled)}
-              className={cn(
-                'w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer',
-                autoPublishEnabled ? 'bg-[var(--accent)]' : 'bg-gray-300 dark:bg-zinc-700',
-              )}
-            >
-              <div
-                className={cn(
-                  'bg-white w-4 h-4 rounded-full shadow-md transform transition-transform',
-                  autoPublishEnabled ? 'translate-x-5' : 'translate-x-0',
-                )}
-              />
-            </button>
-          </div>
+          <p className="text-[12px] text-[var(--label-secondary)]">
+            This date is for planning only. Publish directly on the destination platform.
+          </p>
         </div>
 
         {error && (

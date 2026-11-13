@@ -2,6 +2,7 @@ import React from 'react';
 import { Youtube, Instagram, Twitter, Smartphone, Video } from 'lucide-react';
 import { isSameMonth } from 'date-fns';
 import { PlatformStyle, HeatmapMode, CalendarBlock } from './calendarTypes';
+import { isPublished } from '../studio/studioHubHelpers';
 
 export const getPlatformStyle = (platform?: string): PlatformStyle => {
   const p = platform?.toLowerCase() || '';
@@ -118,10 +119,6 @@ export const getHeatmapClass = (
   return '';
 };
 
-export const isAutoPublished = (event: CalendarBlock): boolean => {
-  return (
-    event.published === true ||
-    event.status === 'published' ||
-    (event.autoPublish && event.scheduledDate && new Date(event.scheduledDate) <= new Date())
-  );
+export const isCalendarPublished = (event: CalendarBlock): boolean => {
+  return isPublished(event);
 };
