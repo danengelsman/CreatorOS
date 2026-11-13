@@ -79,6 +79,9 @@ jobs:
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Workspace selector browser regression (offline)
+        run: node tests/workspaceProjectSelector.browser.mjs
+
       - name: Offline Calendar form and lifecycle regressions
         run: |
           node tests/calendarEventCreation.browser.mjs
