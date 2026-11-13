@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, Lightning } from '@phosphor-icons/react';
 import { Link } from '@tanstack/react-router';
-import { Signal } from '@/services/telemetry';
+import { LegacySignal as Signal } from '@/services/telemetry';
 
 export default function SignalCard({ signal }: { signal: Signal }) {
   return (
