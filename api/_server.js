@@ -1,0 +1,2007 @@
+// server.ts
+import express from "express";
+import { randomUUID } from "node:crypto";
+
+// src/lib/publishing.ts
+var PUBLISH_UNAVAILABLE_MESSAGE = "Publishing from CreatorOS is not available. Publish directly on the destination platform instead.";
+
+// server.ts
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { google } from "googleapis";
+import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
+import admin4 from "firebase-admin";
+import axios from "axios";
+
+// src/server/oauth-state.ts
+import crypto from "crypto";
+import admin from "firebase-admin";
+var STATE_TTL_MS = 10 * 60 * 1e3;
+var AUD = "oauth";
+function b64url(buf) {
+  return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function fromB64url(s) {
+  return Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+}
+function secret() {
+  const s = process.env.OAUTH_STATE_SECRET;
+  if (!s) throw new Error("OAUTH_STATE_SECRET is not set");
+  return s;
+}
+function createOAuthState(uid, platform) {
+  const now = Date.now();
+  const payload = {
+    uid,
+    platform,
+    iat: now,
+    exp: now + STATE_TTL_MS,
+    jti: crypto.randomUUID(),
+    aud: AUD
+  };
+  const body = b64url(Buffer.from(JSON.stringify(payload), "utf8"));
+  const sig = b64url(crypto.createHmac("sha256", secret()).update(body).digest());
+  return `${body}.${sig}`;
+}
+async function verifyAndConsumeOAuthState(state) {
+  const fail = (msg) => {
+    const err = new Error(msg);
+    err.oauthStateReason = msg;
+    throw err;
+  };
+  if (typeof state !== "string" || state.length === 0 || state.length > 4096) {
+    return fail("invalid state");
+  }
+  const dot = state.indexOf(".");
+  if (dot <= 0 || dot === state.length - 1) return fail("invalid state");
+  const body = state.slice(0, dot);
+  const givenSig = state.slice(dot + 1);
+  const expected = b64url(crypto.createHmac("sha256", secret()).update(body).digest());
+  const a = Buffer.from(givenSig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return fail("invalid state signature");
+  }
+  let payload;
+  try {
+    payload = JSON.parse(fromB64url(body).toString("utf8"));
+  } catch {
+    return fail("invalid state payload");
+  }
+  if (!payload || typeof payload.uid !== "string" || typeof payload.platform !== "string") {
+    return fail("invalid state payload");
+  }
+  if (payload.aud !== AUD) return fail("invalid state audience");
+  if (typeof payload.exp !== "number" || payload.exp < Date.now()) {
+    return fail("state expired");
+  }
+  const consumed = await getStore().consume(payload.jti);
+  if (!consumed) return fail("state already used");
+  return payload;
+}
+var _store = null;
+function getStore() {
+  if (_store) return _store;
+  if (admin.apps.length === 0) {
+    throw new Error("Firebase admin not initialized \u2014 cannot enforce OAuth state single-use");
+  }
+  const firestore = admin.firestore();
+  const states = firestore.collection("oauth_states");
+  _store = {
+    async consume(jti) {
+      return firestore.runTransaction(async (tx) => {
+        const ref = states.doc(jti);
+        const doc = await tx.get(ref);
+        if (!doc.exists || doc.data()?.consumed === true) return false;
+        tx.set(ref, {
+          uid: doc.data()?.uid ?? null,
+          createdAt: doc.data()?.createdAt ?? Date.now(),
+          consumed: true
+        });
+        return true;
+      });
+    }
+  };
+  return _store;
+}
+
+// src/server/crypto.ts
+import crypto2 from "crypto";
+var CURRENT_KEY_VERSION = "v1";
+var ENVELOPE_MARKER = '"v":1';
+function loadKey() {
+  const raw = process.env.TOKEN_ENCRYPTION_KEY;
+  if (!raw) {
+    throw new Error("TOKEN_ENCRYPTION_KEY is not set \u2014 cannot encrypt/decrypt tokens");
+  }
+  const buffer = decodeKey(raw);
+  if (buffer.length !== 32) {
+    throw new Error(`TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes (got ${buffer.length})`);
+  }
+  return buffer;
+}
+function decodeKey(raw) {
+  const trimmed = raw.trim();
+  if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+    return Buffer.from(trimmed, "hex");
+  }
+  const b64 = trimmed.includes("-") || trimmed.includes("_") ? trimmed.replace(/-/g, "+").replace(/_/g, "/") : trimmed;
+  return Buffer.from(b64, "base64");
+}
+function looksEncrypted(value) {
+  return typeof value === "string" && value.startsWith("{") && value.includes(ENVELOPE_MARKER) && value.includes('"ciphertext"');
+}
+function b64u(buf) {
+  return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function fromB64u(s) {
+  return Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+}
+function encryptToken(plaintext) {
+  if (plaintext === null || plaintext === void 0 || plaintext === "") return plaintext;
+  const key = loadKey();
+  const iv = crypto2.randomBytes(12);
+  const cipher = crypto2.createCipheriv("aes-256-gcm", key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  return JSON.stringify({
+    v: 1,
+    ciphertext: b64u(ciphertext),
+    iv: b64u(iv),
+    tag: b64u(cipher.getAuthTag()),
+    keyVersion: CURRENT_KEY_VERSION
+  });
+}
+function decryptToken(serialized, legacy) {
+  if (serialized === null || serialized === void 0 || serialized === "") {
+    return serialized ?? null;
+  }
+  if (typeof serialized !== "string") return null;
+  if (!looksEncrypted(serialized)) {
+    if (legacy && !process.env.VERCEL) {
+      try {
+        legacy.update(encryptToken(serialized));
+      } catch (err) {
+        console.error("token re-encryption failed:", err);
+      }
+    }
+    return serialized;
+  }
+  try {
+    const envelope = JSON.parse(serialized);
+    const key = loadKey();
+    const decipher = crypto2.createDecipheriv("aes-256-gcm", key, fromB64u(envelope.iv));
+    decipher.setAuthTag(fromB64u(envelope.tag));
+    const plaintext = Buffer.concat([
+      decipher.update(fromB64u(envelope.ciphertext)),
+      decipher.final()
+    ]);
+    return plaintext.toString("utf8");
+  } catch (err) {
+    console.error("token decryption failed:", err);
+    return null;
+  }
+}
+
+// src/server/firestore.ts
+import admin2 from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
+var INTEGRATIONS_COLLECTION = "integrations";
+function serverFirestore() {
+  if (admin2.apps.length === 0) {
+    throw new Error("Firebase admin not initialized \u2014 cannot access Firestore");
+  }
+  return admin2.firestore();
+}
+var _projectsDbs = /* @__PURE__ */ new Map();
+function projectsFirestore(databaseId) {
+  let instance = _projectsDbs.get(databaseId);
+  if (!instance) {
+    if (admin2.apps.length === 0) {
+      throw new Error("Firebase admin not initialized \u2014 cannot access Firestore");
+    }
+    instance = getFirestore(admin2.app(), databaseId);
+    _projectsDbs.set(databaseId, instance);
+  }
+  return instance;
+}
+function integrationDocId(uid, platform) {
+  return `${uid}_${platform}`;
+}
+function integrationCol() {
+  return serverFirestore().collection(INTEGRATIONS_COLLECTION);
+}
+function rowFromDoc(id, data) {
+  return {
+    platform: typeof data?.platform === "string" ? data.platform : id.slice(id.lastIndexOf("_") + 1),
+    access_token: typeof data?.access_token === "string" ? data.access_token : null,
+    refresh_token: typeof data?.refresh_token === "string" ? data.refresh_token : null,
+    expiry_date: typeof data?.expiry_date === "number" ? data.expiry_date : null,
+    profile_data: typeof data?.profile_data === "string" ? data.profile_data : null,
+    updated_at: typeof data?.updated_at === "string" ? data.updated_at : ""
+  };
+}
+async function upsertIntegration(input) {
+  const ref = integrationCol().doc(integrationDocId(input.uid, input.platform));
+  await ref.set(
+    {
+      uid: input.uid,
+      platform: input.platform,
+      access_token: input.access_token ?? null,
+      refresh_token: input.refresh_token ?? null,
+      expiry_date: typeof input.expiry_date === "number" ? input.expiry_date : null,
+      profile_data: input.profile_data ?? null,
+      updated_at: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    { merge: true }
+  );
+}
+async function updateIntegrationFields(uid, platform, patch) {
+  const ref = integrationCol().doc(integrationDocId(uid, platform));
+  await ref.set({ ...patch, updated_at: (/* @__PURE__ */ new Date()).toISOString() }, { merge: true });
+}
+async function getIntegration(uid, platform) {
+  const snap = await integrationCol().doc(integrationDocId(uid, platform)).get();
+  if (!snap.exists) return null;
+  return rowFromDoc(snap.id, snap.data());
+}
+async function listIntegrations(uid) {
+  const snap = await integrationCol().where("uid", "==", uid).get();
+  const rows = [];
+  snap.forEach((doc) => rows.push(rowFromDoc(doc.id, doc.data())));
+  return rows;
+}
+async function firestorePing() {
+  await integrationCol().doc("_health_ping").get();
+}
+
+// src/server/quotaLedger.ts
+import admin3 from "firebase-admin";
+var DAILY_BUDGET_DEFAULT = 25e4;
+var ROUTE_COST_ESTIMATES = {
+  "/api/gemini/generate": 4e3,
+  // typical chat/script generation
+  "/api/gemini/analyze-video": 3e4,
+  // video upload = expensive
+  "/api/gemini/generate-image": 5e3,
+  "/api/gemini/generate-video": 6e4,
+  // most expensive per call
+  "/api/gemini/video-status": 50,
+  // status poll, cheap
+  "/api/gemini/video-download": 50,
+  // download, no generation
+  "/api/onboarding/niche-sparks": 1500
+};
+var DAY_MS = 24 * 60 * 60 * 1e3;
+function dayKeyFor(now = /* @__PURE__ */ new Date()) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+function msUntilLocalMidnight(now = /* @__PURE__ */ new Date()) {
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  return Math.max(1, tomorrow.getTime() - now.getTime());
+}
+function quotaDocIdFor(uid, now = /* @__PURE__ */ new Date()) {
+  const k = dayKeyFor(now);
+  const compact = `${k.slice(0, 4)}${k.slice(5, 7)}${k.slice(8, 10)}`;
+  return `${uid}_${compact}`;
+}
+var QuotaLedger = class {
+  constructor(deps) {
+    this.getDailyBudget = deps.getDailyBudget ?? (() => {
+      const raw = Number(process.env.DAILY_AI_BUDGET_TOKENS);
+      return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DAILY_BUDGET_DEFAULT;
+    });
+    this.nowFn = deps.now ?? (() => /* @__PURE__ */ new Date());
+    this.store = deps.firestore ? new FirestoreQuotaStore(deps.firestore) : null;
+  }
+  getStore() {
+    if (!this.store) this.store = defaultStore();
+    return this.store;
+  }
+  /** Sum of tokens used today. Store failures propagate to the caller. */
+  async usedToday(userId) {
+    return this.getStore().readUsedToday(userId, this.nowFn());
+  }
+  /**
+   * Gate check used by quotaGuardMiddleware. Fail-closed: on any store error
+   * the user is reported NOT allowed with the usedToday = -1 sentinel.
+   */
+  async check(userId) {
+    const dailyBudget = this.getDailyBudget();
+    const now = this.nowFn();
+    const retryAfterSeconds = Math.ceil(msUntilLocalMidnight(now) / 1e3);
+    try {
+      const usedToday = await this.getStore().readUsedToday(userId, now);
+      return { allowed: usedToday < dailyBudget, usedToday, dailyBudget, retryAfterSeconds };
+    } catch (err) {
+      console.error("quota ledger read failed (fail-closed):", err);
+      return { allowed: false, usedToday: -1, dailyBudget, retryAfterSeconds };
+    }
+  }
+  /**
+   * Debit the ledger. `tokens` may come from real Gemini usageMetadata or the
+   * per-route estimate. Transactional create-or-increment in Firestore.
+   * Best-effort: swallows its own errors (fail-open).
+   */
+  record(userId, route, tokens) {
+    const safeTokens = Math.max(0, Math.min(Math.floor(Number(tokens) || 0), 5e6));
+    const day = dayKeyFor(this.nowFn());
+    this.getStore().increment(userId, day, route, safeTokens).catch((err) => console.error("quota ledger record failed (fail-open):", err));
+  }
+  /** Admin/diagnostics snapshot for one user (today), tokens-descending. */
+  async snapshot(userId) {
+    try {
+      const doc = await this.getStore().readDoc(userId, this.nowFn());
+      return Object.entries(doc?.routes || {}).map(([route, row]) => ({ route, calls: row.calls, tokens: row.tokens })).sort((a, b) => b.tokens - a.tokens);
+    } catch {
+      return [];
+    }
+  }
+};
+var FirestoreQuotaStore = class {
+  constructor(firestore) {
+    this.firestore = firestore;
+  }
+  col() {
+    return this.firestore.collection("ai_quota");
+  }
+  async readDoc(userId, now) {
+    const snap = await this.col().doc(quotaDocIdFor(userId, now)).get();
+    if (!snap || !snap.exists) return null;
+    return normalizeQuotaDoc(userId, dayKeyFor(now), snap.data());
+  }
+  async readUsedToday(userId, now) {
+    const doc = await this.readDoc(userId, now);
+    return doc ? doc.usedToday : 0;
+  }
+  async increment(userId, day, route, tokens) {
+    const ref = this.col().doc(quotaDocIdFor(userId, /* @__PURE__ */ new Date()));
+    await this.firestore.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap || !snap.exists) {
+        tx.set(ref, {
+          uid: userId,
+          day,
+          usedToday: tokens,
+          routes: { [route]: { calls: 1, tokens } },
+          updated_at: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        return;
+      }
+      const doc = normalizeQuotaDoc(userId, day, snap.data());
+      const row = doc.routes[route] || { calls: 0, tokens: 0 };
+      const routes = { ...doc.routes };
+      routes[route] = { calls: row.calls + 1, tokens: row.tokens + tokens };
+      const usedToday = Object.values(routes).reduce((a, r) => a + r.tokens, 0);
+      tx.update(ref, { usedToday, routes, updated_at: (/* @__PURE__ */ new Date()).toISOString() });
+    });
+  }
+};
+function normalizeQuotaDoc(uid, day, data) {
+  const routes = {};
+  const raw = data?.routes && typeof data.routes === "object" ? data.routes : {};
+  for (const [route, row] of Object.entries(raw)) {
+    routes[route] = { calls: Number(row?.calls) || 0, tokens: Number(row?.tokens) || 0 };
+  }
+  const summed = Object.values(routes).reduce((a, r) => a + r.tokens, 0);
+  const used = Number(data?.usedToday);
+  return {
+    uid: typeof data?.uid === "string" ? data.uid : uid,
+    day: typeof data?.day === "string" ? data.day : day,
+    usedToday: Number.isFinite(used) ? used : summed,
+    routes,
+    updated_at: typeof data?.updated_at === "string" ? data.updated_at : ""
+  };
+}
+function defaultStore() {
+  if (admin3.apps.length === 0) {
+    throw new Error("Firebase admin not initialized \u2014 quota ledger unavailable");
+  }
+  return new FirestoreQuotaStore(admin3.firestore());
+}
+function quotaGuardMiddleware(ledger) {
+  return async function quotaGuard(req, res, next) {
+    const uid = req.user?.uid;
+    if (!uid) return next();
+    const check = await ledger.check(uid);
+    res.setHeader("X-Quota-Limit", String(check.dailyBudget));
+    res.setHeader("X-Quota-Used", check.usedToday >= 0 ? String(check.usedToday) : "unknown");
+    if (!check.allowed) {
+      res.setHeader("Retry-After", String(check.retryAfterSeconds));
+      const overBudget = check.usedToday >= 0;
+      return res.status(429).json({
+        error: overBudget ? "Daily AI quota exhausted. Your allowance resets at midnight." : "Daily AI quota check temporarily unavailable. Please retry shortly.",
+        retryAfterSeconds: check.retryAfterSeconds,
+        usedToday: overBudget ? check.usedToday : 0,
+        dailyBudget: check.dailyBudget,
+        ...overBudget ? {} : { reason: "quota_store_unavailable" }
+      });
+    }
+    next();
+  };
+}
+function extractTokensUsed(response) {
+  const usage = response?.usageMetadata ?? response?.usage_metadata ?? null;
+  const total = usage?.totalTokenCount ?? usage?.total_token_count ?? null;
+  return typeof total === "number" && Number.isFinite(total) && total > 0 ? Math.floor(total) : null;
+}
+
+// src/server/sessionAuth.ts
+var SESSION_COOKIE_NAME = "creatoros_session";
+var SESSION_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
+function extractSessionToken(req) {
+  const raw = req.cookies?.[SESSION_COOKIE_NAME];
+  return typeof raw === "string" && raw.length > 0 ? raw : void 0;
+}
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    maxAge: SESSION_MAX_AGE_SECONDS * 1e3,
+    path: "/"
+  };
+}
+function setSessionCookie(res, cookieValue) {
+  res.cookie(SESSION_COOKIE_NAME, cookieValue, sessionCookieOptions());
+}
+function createSessionExchangeHandler(adminAuth) {
+  return async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const idToken = authHeader.slice("Bearer ".length).trim();
+    if (!idToken) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    try {
+      await adminAuth.verifyIdToken(idToken);
+      const sessionCookie = await adminAuth.createSessionCookie(idToken, {
+        expiresIn: SESSION_MAX_AGE_SECONDS * 1e3
+      });
+      setSessionCookie(res, sessionCookie);
+      return res.status(200).json({ ok: true, expiresIn: SESSION_MAX_AGE_SECONDS });
+    } catch (error) {
+      console.error("Session exchange failed:", error);
+      return res.status(401).json({ error: "Invalid token" });
+    }
+  };
+}
+function createRevokeAllHandler(adminAuth) {
+  return async (req, res) => {
+    const uid = req.user?.uid;
+    if (!uid) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    try {
+      await adminAuth.revokeRefreshTokens(uid);
+      return res.status(200).json({
+        ok: true,
+        message: "Refresh tokens revoked. Existing credentials may remain valid until expiration."
+      });
+    } catch (error) {
+      console.error("Revoke-all failed:", error);
+      return res.status(500).json({ error: "Could not revoke sessions. Please try again." });
+    }
+  };
+}
+
+// server.ts
+import { fileURLToPath } from "url";
+var createViteServer = null;
+dotenv.config();
+var firestoreDbId = void 0;
+var projectId = "gen-lang-client-0282443702";
+try {
+  const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(firebaseConfigPath)) {
+    const config = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf8"));
+    firestoreDbId = config.firestoreDatabaseId;
+    if (config.projectId) {
+      projectId = config.projectId;
+    }
+  }
+} catch (err) {
+  console.error("Error reading firebase-applet-config.json:", err);
+}
+if (process.env.FIREBASE_AUTH_EMULATOR_HOST || process.env.FIRESTORE_EMULATOR_HOST) {
+  projectId = "demo-creatoros";
+}
+if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+  const problems = [];
+  const warnings = [];
+  if (!process.env.GEMINI_API_KEY) problems.push("GEMINI_API_KEY is missing");
+  if (!process.env.APP_URL) problems.push("APP_URL is missing");
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    problems.push("FIREBASE_SERVICE_ACCOUNT is missing (base64 service-account JSON)");
+  } else {
+    try {
+      JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8"));
+    } catch {
+      problems.push("FIREBASE_SERVICE_ACCOUNT is not valid base64-encoded JSON");
+    }
+  }
+  if (!process.env.TOKEN_ENCRYPTION_KEY) {
+    problems.push("TOKEN_ENCRYPTION_KEY is missing (32-byte hex or base64)");
+  } else {
+    let keyBuf = null;
+    try {
+      const k = process.env.TOKEN_ENCRYPTION_KEY.trim();
+      keyBuf = /^[0-9a-fA-F]{64}$/.test(k) ? Buffer.from(k, "hex") : Buffer.from(k.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+    } catch {
+      keyBuf = null;
+    }
+    if (!keyBuf || keyBuf.length !== 32) {
+      problems.push("TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes");
+    }
+  }
+  if (!process.env.OAUTH_STATE_SECRET) {
+    problems.push("OAUTH_STATE_SECRET is missing (HMAC secret for OAuth state)");
+  }
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    warnings.push("GOOGLE_CLIENT_ID/SECRET missing \u2014 YouTube connect will fail");
+  }
+  if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET) {
+    warnings.push("TIKTOK_CLIENT_KEY/SECRET missing \u2014 TikTok connect will fail");
+  }
+  console.log("\u2500\u2500 CreatorOS boot: credential check \u2500\u2500");
+  console.log(`GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? "present" : "MISSING"}`);
+  console.log(
+    `FIREBASE_SERVICE_ACCOUNT: ${process.env.FIREBASE_SERVICE_ACCOUNT ? "present" : "MISSING"}`
+  );
+  console.log(`APP_URL: ${process.env.APP_URL || "MISSING"}`);
+  console.log(`TOKEN_ENCRYPTION_KEY: ${process.env.TOKEN_ENCRYPTION_KEY ? "present" : "MISSING"}`);
+  console.log(`OAUTH_STATE_SECRET: ${process.env.OAUTH_STATE_SECRET ? "present" : "MISSING"}`);
+  console.log(`projectId: ${projectId}`);
+  warnings.forEach((w) => console.warn(`warn: ${w}`));
+  if (problems.length > 0) {
+    console.error("FATAL: production credential check failed:");
+    problems.forEach((p) => console.error(`  - ${p}`));
+    process.exit(1);
+  }
+}
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    const svc = JSON.parse(
+      Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8")
+    );
+    admin4.initializeApp({ credential: admin4.credential.cert(svc), projectId });
+  } else {
+    admin4.initializeApp({ projectId });
+  }
+} catch (e) {
+  console.error("admin init failed:", e);
+}
+var oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  `${process.env.APP_URL}/api/auth/google/callback`
+);
+var TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
+var TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
+var TIKTOK_REDIRECT_URI = `${process.env.APP_URL}/api/auth/tiktok/callback`;
+var __filename = fileURLToPath(import.meta.url);
+function formatGeminiError(error) {
+  let errorMessage = error.message || "Unknown API Error";
+  try {
+    const parsed = JSON.parse(errorMessage);
+    if (parsed.error && parsed.error.message) {
+      errorMessage = parsed.error.message;
+    }
+  } catch (e) {
+  }
+  if (errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("prepayment credits are depleted") || error.status === 429) {
+    return "Your API credits are depleted. Please go to AI Studio to manage your billing settings.";
+  }
+  return errorMessage;
+}
+async function startServer() {
+  const app = express();
+  globalThis.__creatoros_app = app;
+  const PORT = 3e3;
+  const ALLOWED_ORIGINS = [process.env.APP_URL, "https://creator-os-delta-lilac.vercel.app"].filter(
+    Boolean
+  );
+  const vercelPreviewOrigin = /^https:\/\/creator-os-[a-z0-9-]+\.vercel\.app$/;
+  app.use("/api", (req, res, next) => {
+    const requestId = randomUUID();
+    req.requestId = requestId;
+    res.setHeader("X-Request-Id", requestId);
+    const startedAt = Date.now();
+    res.on("finish", () => {
+      const cleanPath = String(req.originalUrl || req.url).replace(/[\r\n\t]+/g, " ");
+      console.log(
+        `[api] ${requestId} ${req.method} ${cleanPath} -> ${res.statusCode} (${Date.now() - startedAt}ms)`
+      );
+    });
+    next();
+  });
+  app.use("/api", (req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      if (ALLOWED_ORIGINS.includes(origin) || vercelPreviewOrigin.test(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Vary", "Origin");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      } else {
+        return res.status(403).json({ error: "Origin not allowed" });
+      }
+    }
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+  });
+  app.use(express.json({ limit: "25mb" }));
+  app.use(express.urlencoded({ limit: "25mb", extended: true }));
+  app.use(cookieParser());
+  const authenticateUser = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    const sessionToken = extractSessionToken(req);
+    const hasBearer = Boolean(authHeader?.startsWith("Bearer "));
+    if (!hasBearer && !sessionToken) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const token = hasBearer ? authHeader.split("Bearer ")[1] : sessionToken;
+    try {
+      const decodedToken = hasBearer ? await admin4.auth().verifyIdToken(token) : await admin4.auth().verifySessionCookie(token, true);
+      req.user = decodedToken;
+      next();
+    } catch (error) {
+      console.error("Auth Error:", error);
+      res.status(401).json({ error: "Invalid token" });
+    }
+  };
+  const AI_RATE_LIMITS = {
+    "/api/gemini/generate": 30,
+    "/api/gemini/analyze-video": 10,
+    "/api/gemini/generate-image": 10,
+    "/api/gemini/generate-video": 3,
+    "/api/gemini/video-status": 60,
+    "/api/gemini/video-download": 10,
+    "/api/onboarding/niche-sparks": 20
+  };
+  const AI_DEFAULT_LIMIT = 20;
+  const RATE_WINDOW_MS = 6e4;
+  const MAX_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024;
+  const ALLOWED_GEMINI_MODELS = /* @__PURE__ */ new Set([
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3.1-pro-preview",
+    "gemini-flash-latest",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro"
+  ]);
+  const rateBuckets = /* @__PURE__ */ new Map();
+  const MAX_RATE_BUCKETS = 1e4;
+  function consumeRateLimit(userId, route) {
+    const now = Date.now();
+    const limit = AI_RATE_LIMITS[route] ?? AI_DEFAULT_LIMIT;
+    const key = `${route}:${userId}`;
+    const current = rateBuckets.get(key);
+    if (!current || current.resetAt <= now) {
+      if (!rateBuckets.has(key) && rateBuckets.size >= MAX_RATE_BUCKETS) {
+        const nowMs = now;
+        for (const [k, v] of rateBuckets) {
+          if (v.resetAt <= nowMs) rateBuckets.delete(k);
+        }
+        if (rateBuckets.size >= MAX_RATE_BUCKETS) {
+          return { allowed: true, retryAfter: 60 };
+        }
+      }
+      rateBuckets.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
+      return { allowed: true, retryAfter: 60 };
+    }
+    if (current.count >= limit) {
+      return { allowed: false, retryAfter: Math.max(1, Math.ceil((current.resetAt - now) / 1e3)) };
+    }
+    current.count += 1;
+    return { allowed: true, retryAfter: Math.max(1, Math.ceil((current.resetAt - now) / 1e3)) };
+  }
+  function isAllowedGeminiUri(value) {
+    if (typeof value !== "string" || value.length === 0 || value.length > 2048) return false;
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:") return false;
+      const hostname = url.hostname.toLowerCase();
+      return hostname === "generativelanguage.googleapis.com" || hostname.endsWith(".googleapis.com") || hostname.endsWith(".googleusercontent.com") || hostname === "replicate.delivery" || hostname.endsWith(".replicate.delivery");
+    } catch {
+      return false;
+    }
+  }
+  const quotaLedger = new QuotaLedger({ firestore: serverFirestore() });
+  const quotaGuard = quotaGuardMiddleware(quotaLedger);
+  const protectAIRoute = async (req, res, next) => {
+    const route = req.path;
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const token = authHeader.slice("Bearer ".length).trim();
+    if (!token) return res.status(401).json({ error: "Authentication required" });
+    try {
+      const decodedToken = await admin4.auth().verifyIdToken(token);
+      req.user = decodedToken;
+      const rate = consumeRateLimit(decodedToken.uid, route);
+      res.setHeader("X-RateLimit-Limit", String(AI_RATE_LIMITS[route] ?? AI_DEFAULT_LIMIT));
+      if (!rate.allowed) {
+        res.setHeader("Retry-After", String(rate.retryAfter));
+        return res.status(429).json({
+          error: "Rate limit exceeded. Please wait before trying again.",
+          retryAfterSeconds: rate.retryAfter
+        });
+      }
+      if (route === "/api/gemini/generate" && req.body?.model && !ALLOWED_GEMINI_MODELS.has(req.body.model)) {
+        return res.status(400).json({ error: "Unsupported Gemini model." });
+      }
+      if (route === "/api/gemini/analyze-video") {
+        const contentLength = Number(req.headers["content-length"] || 0);
+        if (contentLength > MAX_VIDEO_UPLOAD_BYTES) {
+          return res.status(413).json({ error: "Video upload exceeds the 50 MB limit." });
+        }
+      }
+      if (route === "/api/gemini/video-download" && !isAllowedGeminiUri(req.body?.uri)) {
+        return res.status(400).json({ error: "Invalid video resource URI." });
+      }
+      quotaGuard(req, res, next);
+    } catch (error) {
+      console.error("AI route auth error:", error);
+      return res.status(401).json({ error: "Invalid authentication token" });
+    }
+  };
+  const recordQuota = (req, route, response) => {
+    try {
+      if (!req.user?.uid) return;
+      const tokens = extractTokensUsed(response) ?? ROUTE_COST_ESTIMATES[route] ?? 1e3;
+      quotaLedger.record(req.user.uid, route, tokens);
+    } catch {
+    }
+  };
+  let _ai = null;
+  const getAI = async () => {
+    if (!_ai) {
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error("GEMINI_API_KEY is not set in environment variables");
+      }
+      const { GoogleGenAI } = await import("@google/genai");
+      _ai = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY
+      });
+    }
+    return _ai;
+  };
+  async function executeWithModelCascade(ai, payload, models = [
+    "gemini-3.8-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3.1-pro-preview",
+    "gemini-flash-latest"
+  ]) {
+    for (const model of models) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await ai.models.generateContent({
+            model,
+            ...payload
+          });
+          if (res?.text) {
+            return res.text;
+          }
+        } catch (err) {
+          const status = err?.status || err?.code;
+          const msg = String(err?.message || "");
+          const isTransient = status === 503 || msg.includes("503") || msg.includes("high demand") || msg.includes("UNAVAILABLE") || status === 429;
+          if (attempt === 0 && isTransient) {
+            const jitter = 250 + Math.floor(Math.random() * 150);
+            await new Promise((resolve) => setTimeout(resolve, jitter));
+            continue;
+          }
+          break;
+        }
+      }
+    }
+    return null;
+  }
+  const upload = multer({
+    dest: "/tmp/uploads/",
+    limits: { fileSize: MAX_VIDEO_UPLOAD_BYTES }
+  });
+  app.post(
+    "/api/gemini/analyze-video",
+    protectAIRoute,
+    upload.single("video"),
+    async (req, res) => {
+      try {
+        const file = req.file;
+        if (!file) {
+          return res.status(400).json({ error: "No video file provided" });
+        }
+        const aiInstance = await getAI();
+        const uploadResult = await aiInstance.files.upload({
+          file: file.path,
+          mimeType: file.mimetype
+        });
+        const { prompt } = req.body;
+        const response = await aiInstance.models.generateContent({
+          model: "gemini-3.8-flash",
+          contents: [uploadResult, { text: prompt || "Analyze this video." }]
+        });
+        recordQuota(req, "/api/gemini/analyze-video", response);
+        try {
+          fs.unlinkSync(file.path);
+        } catch (e) {
+        }
+        res.json({ text: response.text });
+      } catch (error) {
+        console.error("Video Analysis Error:", error);
+        res.status(500).json({ error: formatGeminiError(error) });
+      }
+    }
+  );
+  app.post("/api/gemini/generate", protectAIRoute, async (req, res) => {
+    try {
+      const { contents, config } = req.body;
+      let { model } = req.body;
+      if (!model || model === "gemini-2.5-flash") {
+        model = "gemini-3.8-flash";
+      }
+      const ai = await getAI();
+      let response;
+      try {
+        response = await ai.models.generateContent({
+          model,
+          contents,
+          config
+        });
+        recordQuota(req, "/api/gemini/generate", response);
+      } catch (firstAttemptError) {
+        const isTransientOrRetired = firstAttemptError?.status === 503 || firstAttemptError?.status === 404 || firstAttemptError?.message?.includes("high demand") || firstAttemptError?.message?.includes("no longer available");
+        if (isTransientOrRetired && model !== "gemini-3.1-flash-lite") {
+          console.warn(
+            `Model ${model} unavailable (${firstAttemptError.message}), cascading to gemini-3.1-flash-lite...`
+          );
+          response = await ai.models.generateContent({
+            model: "gemini-3.1-flash-lite",
+            contents,
+            config
+          });
+          recordQuota(req, "/api/gemini/generate", response);
+        } else {
+          throw firstAttemptError;
+        }
+      }
+      res.json({ text: response.text, candidates: response.candidates });
+    } catch (error) {
+      console.error("Gemini Generate Error:", error);
+      res.status(500).json({ error: formatGeminiError(error) });
+    }
+  });
+  app.post("/api/gemini/generate-image", protectAIRoute, async (req, res) => {
+    try {
+      const { prompt, aspectRatio } = req.body;
+      const response = await (await getAI()).models.generateContent({
+        model: "gemini-3.1-flash-lite-image",
+        contents: {
+          parts: [{ text: prompt }]
+        },
+        config: {
+          imageConfig: {
+            aspectRatio: aspectRatio || "1:1"
+          }
+        }
+      });
+      recordQuota(req, "/api/gemini/generate-image", response);
+      let base64EncodeString = "";
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          base64EncodeString = part.inlineData.data;
+          break;
+        }
+      }
+      if (!base64EncodeString) {
+        throw new Error("No image generated");
+      }
+      const imageUrl = `data:image/png;base64,${base64EncodeString}`;
+      res.json({ imageUrl });
+    } catch (error) {
+      console.error("Gemini Generate Image Error:", error);
+      res.status(500).json({ error: formatGeminiError(error) });
+    }
+  });
+  app.post("/api/onboarding/chat", authenticateUser, async (req, res) => {
+    const { messages } = req.body;
+    const buildDeterministicFallback = () => {
+      const userMsgs = (messages || []).filter((m) => m.role === "user");
+      const count = userMsgs.length;
+      const latestUserText = userMsgs[count - 1]?.content || "";
+      if (count <= 1) {
+        return {
+          message: "Fantastic direction! That's a high-potential space. Next, who is your dream viewer or target audience for these videos?",
+          isComplete: false
+        };
+      } else if (count === 2) {
+        return {
+          message: "Got it! That gives us a really clear target. Lastly, what should the style and mood of your content feel like? (e.g., friendly and easy to follow, calm and aesthetic, or energetic and bold?)",
+          isComplete: false
+        };
+      } else {
+        const niche = userMsgs[0]?.content?.replace(/^I'd love to make videos about:\s*/i, "") || "Content Creation";
+        const audience = userMsgs[1]?.content || "Curious Learners & Creators";
+        const vibe = latestUserText || "Friendly, Authentic & Engaging";
+        return {
+          message: `Fantastic! We have everything needed to architect your custom Creator Profile for ${niche}. Click 'Build My Brand Kit' below to unlock your custom colors, voice, templates, and video ideas!`,
+          isComplete: true,
+          summary: { niche, audience, vibe }
+        };
+      }
+    };
+    try {
+      const systemInstruction = `You are a friendly, expert brand architect conducting a highly encouraging and conversational 3-question interview for a new creator starting their content creation journey.
+      
+      CRITICAL: You MUST speak in simple, clear, beginner-friendly language with absolutely NO professional jargon. For example:
+      - Use "Channel Style" instead of "Brand Identity" or "Brand Kit"
+      - Use "Dream Viewers" instead of "Target Audience"
+      - Use "Mood" or "Feel" instead of "Brand Archetype"
+      
+      Keep your responses extremely short (max 2-3 sentences per response). Focus on building confidence.
+      
+      Your goal is to guide the user to discover:
+      1. What topic/niche they want to make videos about.
+      2. Who their dream viewer is.
+      3. What the mood or feel of their content should be (e.g. funny, calm, friendly, bold).
+      
+      Based on the previous conversation history:
+      - If this is the start of the interview (messages is empty), warmly ask: "Welcome! Let's build your perfect Creator Profile together. To start, what topic or niche excites you the most for your channel?"
+      - If they have answered the first topic, acknowledge it warmly and ask: "Amazing choice! Now, who is your dream viewer? Who are we creating these videos for?"
+      - If they have answered the second topic, acknowledge it and ask: "Got it! Finally, what should the style and mood of your content feel like? (e.g., friendly and easy to follow, calm and aesthetic, or energetic and bold?)"
+      - If they have answered all three topics, summarize their choices in a neat, exciting paragraph, and say: "Fantastic! I have all the details I need to build your custom Creator Profile. Click 'Build My Brand Kit' below to unlock your custom colors, voice, templates, and video ideas!"
+      
+      Determine if all 3 questions have been answered. If so, return a JSON object with isComplete: true and a brief summary. Otherwise, return a JSON object with isComplete: false.`;
+      const contents = (messages || []).map((m) => ({
+        role: m.role === "assistant" ? "model" : m.role,
+        parts: [{ text: m.content }]
+      }));
+      const ai = await getAI();
+      const config = {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            message: {
+              type: "STRING",
+              description: "Your next chat response or final encouraging summary"
+            },
+            isComplete: {
+              type: "BOOLEAN",
+              description: "True if all 3 questions (niche, audience, vibe) have been answered and summarized"
+            },
+            summary: {
+              type: "OBJECT",
+              properties: {
+                niche: { type: "STRING" },
+                audience: { type: "STRING" },
+                vibe: { type: "STRING" }
+              }
+            }
+          },
+          required: ["message", "isComplete"]
+        }
+      };
+      const requestPayload = {
+        contents: [{ role: "user", parts: [{ text: systemInstruction }] }, ...contents],
+        config
+      };
+      const responseText = await executeWithModelCascade(ai, requestPayload, [
+        "gemini-3.8-flash",
+        "gemini-3.1-flash-lite",
+        "gemini-3.1-pro-preview",
+        "gemini-flash-latest"
+      ]);
+      if (responseText) {
+        try {
+          const parsed = JSON.parse(responseText);
+          return res.json(parsed);
+        } catch (parseErr) {
+          return res.json(buildDeterministicFallback());
+        }
+      }
+      return res.json(buildDeterministicFallback());
+    } catch (error) {
+      return res.json(buildDeterministicFallback());
+    }
+  });
+  app.post("/api/onboarding/generate-brand", authenticateUser, async (req, res) => {
+    const { niche, audience, vibe } = req.body;
+    const buildFallbackBrandKit = () => {
+      const cleanNiche = niche || "Content Creation";
+      const words = cleanNiche.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+      const brandName = `${words.slice(0, 2).join("")} Studio`;
+      return {
+        name: brandName,
+        tagline: `Making ${cleanNiche.toLowerCase()} simple, engaging, and impactful.`,
+        archetype: "The Empowering Guide",
+        personality: "Warm, Resourceful, Clear, Motivating",
+        colors: {
+          primary: "#18181B",
+          secondary: "#7C3AED",
+          accent: "#F59E0B",
+          background: "#FAFAFA"
+        },
+        typography: {
+          heading: "Plus Jakarta Sans",
+          body: "Inter"
+        },
+        visual_style: "Clean high-contrast layouts, minimal screen clutter, and crisp typography highlights.",
+        thumbnail_style: "Punchy vibrant accents, high-contrast expressive faces, and 3-word bold topic hooks.",
+        content_hooks: [
+          `If you've been struggling to master ${cleanNiche.toLowerCase()}, here is the 60-second fix.`,
+          `The single biggest mistake beginner creators make in ${cleanNiche.toLowerCase()} (and how to avoid it).`,
+          `3 simple tools that completely changed the way I create ${cleanNiche.toLowerCase()} content.`
+        ],
+        catchphrases: [
+          "Create with intention, grow with momentum.",
+          "Keep building, one video at a time.",
+          "See you in the next one!"
+        ]
+      };
+    };
+    try {
+      const userInput = `Niche/Topic: ${niche}. Dream Viewers/Audience: ${audience}. Channel Vibe/Style: ${vibe}.`;
+      const prompt = `Generate a complete, beautiful Channel Style profile for a content creator based on this description: ${userInput}. 
+Select a specific creator archetype (e.g., 'The Educator', 'The Entertainer', 'The Analyst', 'The Storyteller', 'The Guide', 'The Visionary').
+Provide granular options for visual styles, cohesive color palettes (with hex codes), and specific Google Fonts for typography (e.g., Space Grotesk, Outfit, Inter, Playfair Display, Fira Code, JetBrains Mono). 
+Ensure these elements are cohesive and generate a distinct brand identity. Keep terminology extremely beginner-friendly and simple.`;
+      const ai = await getAI();
+      const config = {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            name: {
+              type: "STRING",
+              description: "A catchy, humble, and clear name for the channel (do not use complex brand jargon)"
+            },
+            tagline: {
+              type: "STRING",
+              description: "A simple and motivating tagline for the channel"
+            },
+            archetype: {
+              type: "STRING",
+              description: "A friendly label for their creator archetype (e.g. The Enthusiastic Guide, The Aesthetic Chef, The Simple Teacher)"
+            },
+            personality: {
+              type: "STRING",
+              description: "3-4 simple personality descriptors (e.g. friendly, calm, informative)"
+            },
+            colors: {
+              type: "OBJECT",
+              properties: {
+                primary: { type: "STRING", description: "HEX color code" },
+                secondary: { type: "STRING", description: "HEX color code" },
+                accent: { type: "STRING", description: "HEX color code" },
+                background: { type: "STRING", description: "HEX color code" }
+              },
+              required: ["primary", "secondary", "accent", "background"]
+            },
+            typography: {
+              type: "OBJECT",
+              properties: {
+                heading: {
+                  type: "STRING",
+                  description: "Clean Google Font name for titles"
+                },
+                body: { type: "STRING", description: "Clean Google Font name for text" }
+              },
+              required: ["heading", "body"]
+            },
+            visual_style: {
+              type: "STRING",
+              description: "Simple description of the channel's video style (e.g., clean, high-contrast text, minimal background clutter)"
+            },
+            thumbnail_style: {
+              type: "STRING",
+              description: "Simple and clear thumbnail style description (e.g., bright natural lighting, bold easy-to-read text, close-up face)"
+            },
+            content_hooks: {
+              type: "ARRAY",
+              items: { type: "STRING" },
+              description: "3 simple, engaging script opening templates tailored for their niche"
+            },
+            catchphrases: {
+              type: "ARRAY",
+              items: { type: "STRING" },
+              description: "2-3 short, catchy sayings or sign-offs to build community connection"
+            }
+          },
+          required: [
+            "name",
+            "tagline",
+            "archetype",
+            "personality",
+            "colors",
+            "typography",
+            "visual_style",
+            "thumbnail_style",
+            "content_hooks",
+            "catchphrases"
+          ]
+        }
+      };
+      const responseText = await executeWithModelCascade(
+        ai,
+        { contents: [{ role: "user", parts: [{ text: prompt }] }], config },
+        [
+          "gemini-3.8-flash",
+          "gemini-3.1-flash-lite",
+          "gemini-3.1-pro-preview",
+          "gemini-flash-latest"
+        ]
+      );
+      if (responseText) {
+        try {
+          const parsed = JSON.parse(responseText);
+          return res.json(parsed);
+        } catch {
+          return res.json(buildFallbackBrandKit());
+        }
+      }
+      return res.json(buildFallbackBrandKit());
+    } catch (error) {
+      return res.json(buildFallbackBrandKit());
+    }
+  });
+  app.get("/api/onboarding/niche-sparks", protectAIRoute, async (req, res) => {
+    const fallbackSparks = {
+      museMessage: "Take a breath\u2014day zero is the hardest step because the canvas is blank. You don't have to guess: here are high-momentum niches thriving right now.",
+      sparks: [
+        {
+          type: "trending",
+          badge: "Trending Today",
+          title: "AI Workflows for Solo Creators",
+          pitch: "Creators are booming by breaking down simple prompts, free AI tools, and everyday productivity shortcuts.",
+          dreamViewer: "Freelancers, students & creators saving time",
+          vibe: "Clear, actionable, and exciting"
+        },
+        {
+          type: "underserved",
+          badge: "Underserved Goldmine",
+          title: "Micro-Budget Studio Gear Reviews",
+          pitch: "Massive search volume with low competition: testing budget $30 microphones and smartphone lighting setups.",
+          dreamViewer: "Beginner creators who want quality without spending thousands",
+          vibe: "Honest, resourceful, and grounded"
+        },
+        {
+          type: "trending",
+          badge: "High Growth",
+          title: "Cozy Tech & Mindful Productivity",
+          pitch: "Audiences fatigued by hustle culture are loving desk setups, calm focus sessions, and intentional tech.",
+          dreamViewer: "Remote workers and students craving peace",
+          vibe: "Calm, aesthetic, and supportive"
+        }
+      ]
+    };
+    try {
+      const prompt = `You are an empathetic creative muse and brand strategist for a new video creator who is frozen with blank-page paralysis on their very first question.
+Generate 3 magnetic, beginner-friendly niches:
+- 2 that are currently viral / trending with high audience appetite
+- 1 that is an underserved "goldmine" niche (high search demand, but low competition / low saturation)
+
+Keep the descriptions inspiring, simple, and jargon-free.
+Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.`;
+      const ai = await getAI();
+      const config = {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            museMessage: { type: "STRING" },
+            sparks: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  type: { type: "STRING", description: "'trending' or 'underserved'" },
+                  badge: {
+                    type: "STRING",
+                    description: "Short badge like 'Trending Today' or 'Hidden Gem'"
+                  },
+                  title: { type: "STRING", description: "Concise niche title" },
+                  pitch: { type: "STRING", description: "1 punchy sentence why it works" },
+                  dreamViewer: { type: "STRING", description: "Who watches this" },
+                  vibe: { type: "STRING", description: "Suggested mood" }
+                },
+                required: ["type", "badge", "title", "pitch", "dreamViewer", "vibe"]
+              }
+            }
+          },
+          required: ["museMessage", "sparks"]
+        }
+      };
+      const responseText = await executeWithModelCascade(
+        ai,
+        { contents: [{ role: "user", parts: [{ text: prompt }] }], config },
+        [
+          "gemini-3.8-flash",
+          "gemini-3.1-flash-lite",
+          "gemini-3.1-pro-preview",
+          "gemini-flash-latest"
+        ]
+      );
+      recordQuota(
+        req,
+        "/api/onboarding/niche-sparks",
+        responseText ? { usageMetadata: null } : null
+      );
+      if (responseText) {
+        try {
+          const parsed = JSON.parse(responseText);
+          if (parsed.sparks && Array.isArray(parsed.sparks) && parsed.sparks.length > 0) {
+            return res.json(parsed);
+          }
+        } catch {
+          return res.json(fallbackSparks);
+        }
+      }
+      return res.json(fallbackSparks);
+    } catch {
+      return res.json(fallbackSparks);
+    }
+  });
+  const REPLICATE_API = "https://api.replicate.com/v1";
+  const getReplicateToken = () => process.env.REPLICATE_API_TOKEN || "";
+  const replicateHeaders = () => ({
+    Authorization: `Bearer ${getReplicateToken()}`,
+    "Content-Type": "application/json"
+  });
+  app.post("/api/gemini/generate-video", protectAIRoute, async (req, res) => {
+    try {
+      const { prompt, aspectRatio, durationSeconds } = req.body;
+      const requestedProvider = (process.env.VIDEO_PROVIDER || "").toLowerCase();
+      const hasGoogleModel = Boolean(
+        process.env.GOOGLE_VIDEO_MODEL || process.env.GEMINI_VIDEO_MODEL
+      );
+      const repToken = getReplicateToken();
+      const useGoogle = requestedProvider === "google" || requestedProvider === "gemini" || hasGoogleModel && requestedProvider !== "replicate" || !repToken && requestedProvider !== "replicate";
+      if (!useGoogle && repToken) {
+        const VIDEO_MODEL = process.env.REPLICATE_VIDEO_MODEL || "prunaai/p-video";
+        const seconds = Math.min(20, Math.max(1, Number(durationSeconds) || 5));
+        const input = VIDEO_MODEL.startsWith("prunaai/p-video") ? {
+          prompt,
+          aspect_ratio: aspectRatio === "9:16" ? "9:16" : "16:9",
+          resolution: "720p",
+          duration: seconds,
+          fps: 24
+        } : {
+          // wan-video/wan-2.2-t2v-fast: 81..121 frames @ 16fps -> 5s..7.5s
+          prompt,
+          aspect_ratio: aspectRatio === "9:16" ? "9:16" : "16:9",
+          num_frames: seconds >= 7 ? 113 : 81,
+          resolution: "480p"
+        };
+        const r = await fetch(`${REPLICATE_API}/models/${VIDEO_MODEL}/predictions`, {
+          method: "POST",
+          headers: replicateHeaders(),
+          body: JSON.stringify({ input })
+        });
+        const text = await r.text();
+        if (!r.ok) throw new Error(`Render provider error (${r.status}): ${text.slice(0, 300)}`);
+        const pred = JSON.parse(text);
+        recordQuota(req, "/api/gemini/generate-video", null);
+        return res.json({
+          done: false,
+          provider: "replicate",
+          operationName: `replicate:${pred.id}`,
+          renderStatus: pred.status,
+          startedAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+      }
+      const googleModel = process.env.GOOGLE_VIDEO_MODEL || process.env.GEMINI_VIDEO_MODEL || "veo-2.0-generate-001";
+      const ai = await getAI();
+      if (googleModel.toLowerCase().includes("veo")) {
+        const seconds = Math.min(20, Math.max(5, Number(durationSeconds) || 5));
+        const operation = await ai.models.generateVideos({
+          model: googleModel,
+          prompt,
+          config: {
+            numberOfVideos: 1,
+            aspectRatio: aspectRatio === "9:16" ? "9:16" : "16:9",
+            durationSeconds: seconds
+          }
+        });
+        recordQuota(req, "/api/gemini/generate-video", operation);
+        if (operation.done) {
+          const video = operation.response?.generatedVideos?.[0]?.video;
+          const data = video?.videoBytes ? `data:${video.mimeType || "video/mp4"};base64,${video.videoBytes}` : video?.uri || null;
+          return res.json({
+            done: true,
+            provider: "google",
+            model: googleModel,
+            data
+          });
+        }
+        return res.json({
+          done: false,
+          provider: "google",
+          model: googleModel,
+          operationName: `veo:${operation.name}`,
+          renderStatus: "processing",
+          startedAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+      }
+      const interaction = await ai.interactions.create(
+        {
+          model: googleModel,
+          input: prompt,
+          background: true,
+          store: true,
+          // required by the API for background interactions
+          stream: false,
+          response_format: {
+            type: "video",
+            aspect_ratio: aspectRatio || "16:9",
+            duration: durationSeconds ? `${durationSeconds}s` : "5s"
+          }
+        },
+        { timeout: 6e4 }
+      );
+      recordQuota(req, "/api/gemini/generate-video", interaction);
+      const videoPart = interaction.output_video;
+      if (interaction.status === "completed" && videoPart && (videoPart.data || videoPart.uri)) {
+        return res.json({
+          done: true,
+          provider: "google",
+          model: googleModel,
+          data: videoPart.data ? `data:${videoPart.mime_type || "video/mp4"};base64,${videoPart.data}` : videoPart.uri
+        });
+      }
+      res.json({
+        done: false,
+        provider: "google",
+        model: googleModel,
+        operationName: `interaction:${interaction.id}`,
+        renderStatus: interaction.status,
+        startedAt: interaction.created || (/* @__PURE__ */ new Date()).toISOString()
+      });
+    } catch (error) {
+      console.error("Video Generation Error:", error);
+      res.status(500).json({ error: formatGeminiError(error) });
+    }
+  });
+  app.post("/api/gemini/video-status", protectAIRoute, async (req, res) => {
+    try {
+      const { operationName } = req.body;
+      if (typeof operationName === "string" && operationName.startsWith("replicate:")) {
+        const predId = operationName.slice("replicate:".length);
+        const r = await fetch(`${REPLICATE_API}/predictions/${predId}`, {
+          headers: replicateHeaders()
+        });
+        const text = await r.text();
+        if (!r.ok) throw new Error(`Render provider error (${r.status}): ${text.slice(0, 300)}`);
+        const pred = JSON.parse(text);
+        let done2 = false;
+        let data2 = null;
+        let progressPercentage2 = null;
+        if (pred.status === "succeeded") {
+          done2 = true;
+          progressPercentage2 = 100;
+          const out = pred.output;
+          const url = Array.isArray(out) ? out[out.length - 1] : out;
+          data2 = typeof url === "string" ? url : null;
+        } else if (pred.status === "processing") {
+          const matches = [...String(pred.logs || "").matchAll(/(\d{1,3})%/g)];
+          if (matches.length)
+            progressPercentage2 = Math.min(99, parseInt(matches[matches.length - 1][1], 10));
+        } else if (pred.status === "starting") {
+          progressPercentage2 = 1;
+        } else if (["failed", "canceled"].includes(pred.status)) {
+          throw new Error(String(pred.error || `Render ${pred.status}`));
+        }
+        return res.json({
+          done: done2,
+          progressPercentage: progressPercentage2,
+          renderStatus: pred.status,
+          provider: "replicate",
+          startedAt: pred.created_at || null,
+          updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          data: data2
+        });
+      }
+      if (typeof operationName === "string" && (operationName.startsWith("veo:") || operationName.startsWith("operations/"))) {
+        const rawOpName = operationName.startsWith("veo:") ? operationName.slice("veo:".length) : operationName;
+        const ai = await getAI();
+        const op = await ai.operations.getVideosOperation({
+          operation: { name: rawOpName }
+        });
+        recordQuota(req, "/api/gemini/video-status", op);
+        const done2 = Boolean(op.done);
+        let data2 = null;
+        const renderStatus2 = done2 ? "completed" : "processing";
+        const progressPercentage2 = done2 ? 100 : null;
+        if (done2) {
+          if (op.error) {
+            throw new Error(
+              typeof op.error === "string" ? op.error : op.error?.message || `Veo render failed: ${JSON.stringify(op.error)}`
+            );
+          }
+          const video = op.response?.generatedVideos?.[0]?.video;
+          if (video?.videoBytes) {
+            data2 = `data:${video.mimeType || "video/mp4"};base64,${video.videoBytes}`;
+          } else if (video?.uri) {
+            data2 = video.uri;
+          }
+        }
+        return res.json({
+          done: done2,
+          progressPercentage: progressPercentage2,
+          renderStatus: renderStatus2,
+          provider: "google",
+          startedAt: null,
+          updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          data: data2
+        });
+      }
+      const rawInteractionId = typeof operationName === "string" && operationName.startsWith("interaction:") ? operationName.slice("interaction:".length) : operationName;
+      const interaction = await (await getAI()).interactions.get(rawInteractionId);
+      recordQuota(req, "/api/gemini/video-status", interaction);
+      let done = false;
+      let data = null;
+      const renderStatus = interaction.status;
+      const startedAt = interaction.created || null;
+      const updatedAt = interaction.updated || null;
+      let progressPercentage = null;
+      if (renderStatus === "completed") {
+        done = true;
+        progressPercentage = 100;
+        const videoPart = interaction.output_video;
+        if (videoPart && videoPart.data) {
+          data = `data:${videoPart.mime_type || "video/mp4"};base64,${videoPart.data}`;
+        } else if (videoPart && videoPart.uri) {
+          data = videoPart.uri;
+        }
+      } else if (["failed", "cancelled"].includes(renderStatus)) {
+        throw new Error(`Video generation ${renderStatus}`);
+      }
+      res.json({
+        done,
+        progressPercentage,
+        renderStatus,
+        provider: "google",
+        startedAt,
+        updatedAt,
+        data
+      });
+    } catch (error) {
+      console.error("Video Status Error:", error);
+      res.status(500).json({ error: formatGeminiError(error) });
+    }
+  });
+  app.post("/api/gemini/video-download", protectAIRoute, async (req, res) => {
+    try {
+      const { uri } = req.body;
+      if (!uri) return res.status(400).send("No URI");
+      const googleHost = /^https:\/\/([a-z0-9-]+\.)*(googleapis|google)\.com\//i.test(uri);
+      const videoRes = await fetch(uri, {
+        headers: googleHost ? { "x-goog-api-key": process.env.GEMINI_API_KEY } : {}
+      });
+      recordQuota(req, "/api/gemini/video-download", null);
+      res.setHeader("Content-Type", "video/mp4");
+      videoRes.body.pipeTo(
+        new WritableStream({
+          write(chunk) {
+            res.write(chunk);
+          },
+          close() {
+            res.end();
+          }
+        })
+      );
+    } catch (error) {
+      console.error("Video Download Error:", error);
+      res.status(500).json({ error: formatGeminiError(error) });
+    }
+  });
+  app.post("/api/auth/session", createSessionExchangeHandler(admin4.auth()));
+  app.post("/api/auth/revoke-all", authenticateUser, createRevokeAllHandler(admin4.auth()));
+  app.get("/api/auth/google/url", authenticateUser, (req, res) => {
+    const url = oauth2Client.generateAuthUrl({
+      access_type: "offline",
+      scope: [
+        "https://www.googleapis.com/auth/youtube.readonly",
+        "https://www.googleapis.com/auth/yt-analytics.readonly",
+        "https://www.googleapis.com/auth/userinfo.profile"
+      ],
+      state: createOAuthState(req.user.uid, "youtube"),
+      // F1.3 signed, single-use state
+      prompt: "consent"
+    });
+    res.json({ url });
+  });
+  app.get("/api/auth/google/callback", async (req, res) => {
+    const { code, state } = req.query;
+    let userId;
+    let statePlatform;
+    try {
+      const verified = await verifyAndConsumeOAuthState(state);
+      userId = verified.uid;
+      statePlatform = verified.platform;
+    } catch (err) {
+      console.error("OAuth state rejected:", err?.oauthStateReason || err?.message || err);
+      return res.status(400).send("Invalid or expired state");
+    }
+    if (statePlatform !== "youtube") return res.status(400).send("Platform mismatch");
+    if (!code) return res.status(400).send("Missing code");
+    try {
+      const { tokens } = await oauth2Client.getToken(code);
+      oauth2Client.setCredentials(tokens);
+      const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
+      const userInfo = await oauth2.userinfo.get();
+      const encAccessToken = tokens.access_token ? encryptToken(tokens.access_token) : null;
+      const encRefreshToken = tokens.refresh_token ? encryptToken(tokens.refresh_token) : null;
+      await upsertIntegration({
+        uid: userId,
+        platform: "youtube",
+        access_token: encAccessToken,
+        refresh_token: encRefreshToken,
+        expiry_date: typeof tokens.expiry_date === "number" ? tokens.expiry_date : null,
+        profile_data: JSON.stringify(userInfo.data)
+      });
+      res.send(`
+        <html>
+          <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #F9F9F8;">
+            <div style="text-align: center; padding: 40px; background: white; border-radius: 24px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);">
+              <h1 style="color: #141414;">YouTube Connected</h1>
+              <p style="color: #666;">Success! You can close this window.</p>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', platform: 'youtube' }, '*');
+                  window.close();
+                }
+              </script>
+            </div>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("OAuth Error:", error);
+      res.status(500).send("Authentication failed");
+    }
+  });
+  app.get("/api/auth/tiktok/url", authenticateUser, (req, res) => {
+    const scope = "user.info.basic,video.list";
+    const csrfState = createOAuthState(req.user.uid, "tiktok");
+    const url = `https://www.tiktok.com/v2/auth/authorize/?client_key=${TIKTOK_CLIENT_KEY}&scope=${scope}&response_type=code&redirect_uri=${encodeURIComponent(TIKTOK_REDIRECT_URI)}&state=${encodeURIComponent(csrfState)}`;
+    res.json({ url });
+  });
+  app.get("/api/auth/tiktok/callback", async (req, res) => {
+    const { code, state } = req.query;
+    let userId;
+    let statePlatform;
+    try {
+      const verified = await verifyAndConsumeOAuthState(state);
+      userId = verified.uid;
+      statePlatform = verified.platform;
+    } catch (err) {
+      console.error("OAuth state rejected:", err?.oauthStateReason || err?.message || err);
+      return res.status(400).send("Invalid or expired state");
+    }
+    if (statePlatform !== "tiktok") return res.status(400).send("Platform mismatch");
+    if (!code) return res.status(400).send("Missing code");
+    try {
+      const response = await axios.post(
+        "https://open.tiktokapis.com/v2/oauth/token/",
+        new URLSearchParams({
+          client_key: TIKTOK_CLIENT_KEY,
+          client_secret: TIKTOK_CLIENT_SECRET,
+          code,
+          grant_type: "authorization_code",
+          redirect_uri: TIKTOK_REDIRECT_URI
+        }).toString(),
+        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+      );
+      const { access_token, refresh_token, expires_in, open_id } = response.data;
+      const encAccessToken = access_token ? encryptToken(access_token) : null;
+      const encRefreshToken = refresh_token ? encryptToken(refresh_token) : null;
+      await upsertIntegration({
+        uid: userId,
+        platform: "tiktok",
+        access_token: encAccessToken,
+        refresh_token: encRefreshToken,
+        expiry_date: Date.now() + expires_in * 1e3,
+        profile_data: JSON.stringify({ open_id })
+      });
+      res.send(`
+        <html>
+          <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #F9F9F8;">
+            <div style="text-align: center; padding: 40px; background: white; border-radius: 24px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);">
+              <h1 style="color: #141414;">TikTok Connected</h1>
+              <p style="color: #666;">Success! You can close this window.</p>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', platform: 'tiktok' }, '*');
+                  window.close();
+                }
+              </script>
+            </div>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("TikTok OAuth Error:", error);
+      res.status(500).send("TikTok Authentication failed");
+    }
+  });
+  app.get("/api/accounts", authenticateUser, async (req, res) => {
+    try {
+      const accounts = await listIntegrations(req.user.uid);
+      res.json(
+        accounts.map((a) => ({
+          platform: a.platform,
+          profile: JSON.parse(a.profile_data || "{}")
+        }))
+      );
+    } catch (err) {
+      console.error("Accounts API Error:", err);
+      res.status(500).json({ error: err.message || "Failed to list connected accounts" });
+    }
+  });
+  app.post("/api/publish", authenticateUser, async (req, res) => {
+    const { platforms } = req.body;
+    if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
+      return res.status(400).json({ error: "No target platforms specified" });
+    }
+    return res.status(501).json({ error: PUBLISH_UNAVAILABLE_MESSAGE });
+  });
+  app.get("/api/analytics/youtube", authenticateUser, async (req, res) => {
+    const account = await getIntegration(req.user.uid, "youtube");
+    if (!account) return res.json({ views: 0, subscribers: 0, videos: 0 });
+    try {
+      const auth = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+      );
+      auth.setCredentials({
+        access_token: decryptToken(account.access_token, {
+          update: (enc) => {
+            void updateIntegrationFields(req.user.uid, "youtube", { access_token: enc }).catch(
+              (err) => console.error("[f1.4] lazy token upgrade failed:", err)
+            );
+          }
+        }),
+        refresh_token: decryptToken(account.refresh_token, {
+          update: (enc) => {
+            void updateIntegrationFields(req.user.uid, "youtube", { refresh_token: enc }).catch(
+              (err) => console.error("[f1.4] lazy token upgrade failed:", err)
+            );
+          }
+        }),
+        expiry_date: account.expiry_date ?? void 0
+      });
+      const youtube = google.youtube({ version: "v3", auth });
+      const response = await youtube.channels.list({
+        part: ["statistics"],
+        mine: true
+      });
+      const stats = response.data.items?.[0]?.statistics;
+      res.json({
+        views: parseInt(stats?.viewCount || "0"),
+        subscribers: parseInt(stats?.subscriberCount || "0"),
+        videos: parseInt(stats?.videoCount || "0")
+      });
+    } catch (error) {
+      console.error("YouTube Analytics Error:", error);
+      res.json({ views: 0, subscribers: 0, videos: 0 });
+    }
+  });
+  app.get("/api/analytics/tiktok", authenticateUser, async (req, res) => {
+    const account = await getIntegration(req.user.uid, "tiktok");
+    if (!account) return res.status(404).json({ available: false, reason: "not_connected" });
+    res.json({
+      available: false,
+      reason: "audit_pending",
+      message: "TikTok analytics unavailable \u2014 TikTok requires audit approval for data access."
+    });
+  });
+  app.get("/api/analytics/summary", authenticateUser, async (req, res) => {
+    try {
+      const userId = req.user.uid;
+      const accounts = await listIntegrations(userId);
+      const isYoutubeConnected = accounts.some((a) => a.platform === "youtube");
+      let youtubeStats = { views: 0, subscribers: 0, videos: 0 };
+      if (isYoutubeConnected) {
+        const ytAccount = accounts.find((a) => a.platform === "youtube");
+        if (ytAccount) {
+          try {
+            const auth = new google.auth.OAuth2(
+              process.env.GOOGLE_CLIENT_ID,
+              process.env.GOOGLE_CLIENT_SECRET
+            );
+            auth.setCredentials({
+              access_token: decryptToken(ytAccount.access_token, {
+                update: (enc) => {
+                  void updateIntegrationFields(userId, "youtube", { access_token: enc }).catch(
+                    (err) => console.error("[f1.4] lazy token upgrade failed:", err)
+                  );
+                }
+              }),
+              refresh_token: decryptToken(ytAccount.refresh_token, {
+                update: (enc) => {
+                  void updateIntegrationFields(userId, "youtube", { refresh_token: enc }).catch(
+                    (err) => console.error("[f1.4] lazy token upgrade failed:", err)
+                  );
+                }
+              }),
+              expiry_date: ytAccount.expiry_date ?? void 0
+            });
+            const youtube = google.youtube({ version: "v3", auth });
+            const response = await youtube.channels.list({
+              part: ["statistics"],
+              mine: true
+            });
+            const stats = response.data.items?.[0]?.statistics;
+            youtubeStats = {
+              views: parseInt(stats?.viewCount || "0"),
+              subscribers: parseInt(stats?.subscriberCount || "0"),
+              videos: parseInt(stats?.videoCount || "0")
+            };
+          } catch (err) {
+            console.error("YouTube stats fetch error in summary:", err);
+          }
+        }
+      }
+      const tiktokStats = { followers: 0, views: 0, likes: 0 };
+      let publishedCount = 0;
+      let scheduledCount = 0;
+      let draftCount = 0;
+      let grandTotal = 0;
+      try {
+        const projectsDb = projectsFirestore(firestoreDbId || "(default)");
+        const snap = await projectsDb.collection("projects").where("userId", "==", userId).get();
+        snap.forEach((doc) => {
+          if (doc.id.startsWith("brand_")) return;
+          const data = doc.data() || {};
+          const statusVal = String(data.status || "Draft");
+          const status = statusVal.toLowerCase();
+          if (status === "published") {
+            publishedCount++;
+          } else if (status === "scheduled") {
+            scheduledCount++;
+          } else {
+            draftCount++;
+          }
+        });
+        grandTotal = publishedCount + scheduledCount + draftCount;
+      } catch (err) {
+        console.error(
+          "Firestore projects aggregation failed in summary:",
+          err?.response?.data || err?.message || err
+        );
+      }
+      const totalFollowers = youtubeStats.subscribers + tiktokStats.followers;
+      const totalViews = youtubeStats.views + tiktokStats.views;
+      const totalLikes = tiktokStats.likes;
+      const engagementRate = totalViews > 0 ? parseFloat((totalLikes / totalViews * 100).toFixed(2)) : 0;
+      const milestoneBrandKit = false;
+      const milestonePostsPublished = publishedCount >= 5;
+      const milestoneFollowersReached = totalFollowers >= 100;
+      let completedMilestones = 0;
+      if (milestoneBrandKit) completedMilestones++;
+      if (milestonePostsPublished) completedMilestones++;
+      if (milestoneFollowersReached) completedMilestones++;
+      const goalsCompletionPercentage = Math.round(completedMilestones / 3 * 100);
+      const adsRevenue = isYoutubeConnected && youtubeStats.subscribers >= 1e3 ? Math.round(youtubeStats.views * 2e-3) : 0;
+      const affiliatesRevenue = totalFollowers > 10 ? 5 : 0;
+      const digitalProductsRevenue = publishedCount >= 2 ? 20 : 0;
+      const sponsorshipsRevenue = totalFollowers >= 5e3 ? 150 : 0;
+      const totalRevenue = adsRevenue + affiliatesRevenue + digitalProductsRevenue + sponsorshipsRevenue;
+      res.json({
+        success: true,
+        summary: {
+          youtube: youtubeStats,
+          tiktok: tiktokStats,
+          projects: {
+            total: grandTotal,
+            published: publishedCount,
+            scheduled: scheduledCount,
+            draft: draftCount
+          },
+          engagementRate,
+          totalFollowers,
+          totalViews,
+          totalRevenue,
+          goalsCompletionPercentage,
+          milestones: {
+            brandKit: milestoneBrandKit,
+            postsPublished: milestonePostsPublished,
+            followersReached: milestoneFollowersReached
+          },
+          revenueStreams: [
+            {
+              name: "Ads",
+              projected: `$${adsRevenue}`,
+              status: adsRevenue > 0 ? "Active" : "Locked",
+              progress: adsRevenue > 0 ? 100 : 10
+            },
+            {
+              name: "Affiliates",
+              projected: `$${affiliatesRevenue}`,
+              status: affiliatesRevenue > 0 ? "Active" : "Planning",
+              progress: affiliatesRevenue > 0 ? 100 : 20
+            },
+            {
+              name: "Sponsorships",
+              projected: `$${sponsorshipsRevenue}`,
+              status: sponsorshipsRevenue > 0 ? "Active" : "Locked",
+              progress: sponsorshipsRevenue > 0 ? 100 : 5
+            },
+            {
+              name: "Digital Products",
+              projected: `$${digitalProductsRevenue}`,
+              status: digitalProductsRevenue > 0 ? "Active" : "Planning",
+              progress: digitalProductsRevenue > 0 ? 100 : 40
+            }
+          ],
+          gamifiedRoadmap: [
+            {
+              id: 1,
+              title: "First 100 Followers",
+              status: milestoneFollowersReached ? "completed" : "in-progress",
+              progress: Math.min(100, Math.round(totalFollowers / 100 * 100))
+            },
+            {
+              id: 2,
+              title: "First 5 Published Posts",
+              status: milestonePostsPublished ? "completed" : "in-progress",
+              progress: Math.min(100, Math.round(publishedCount / 5 * 100))
+            },
+            {
+              id: 3,
+              title: "First Monetization Effort",
+              status: totalRevenue > 0 ? "completed" : "locked",
+              progress: totalRevenue > 0 ? 100 : 0
+            }
+          ]
+        }
+      });
+    } catch (err) {
+      console.error("Summary API Error:", err);
+      res.status(500).json({ error: err.message || "Failed to calculate real summary metrics" });
+    }
+  });
+  app.get("/api/diagnostics/check", authenticateUser, async (req, res) => {
+    const checks = {
+      database: { status: "unknown", latency: 0 },
+      firebase: { status: "unknown" },
+      gemini: { status: "unknown", latency: 0, error: null },
+      env: {
+        GEMINI_API_KEY: !!process.env.GEMINI_API_KEY,
+        GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET: !!process.env.GOOGLE_CLIENT_SECRET,
+        TIKTOK_CLIENT_KEY: !!process.env.TIKTOK_CLIENT_KEY,
+        TIKTOK_CLIENT_SECRET: !!process.env.TIKTOK_CLIENT_SECRET,
+        APP_URL: process.env.APP_URL || "http://localhost:3000"
+      }
+    };
+    try {
+      const start = Date.now();
+      await firestorePing();
+      checks.database.status = "healthy";
+      checks.database.latency = Date.now() - start;
+    } catch (err) {
+      checks.database.status = "unhealthy";
+      checks.database.error = err.message;
+    }
+    try {
+      if (admin4.apps.length > 0) {
+        checks.firebase.status = "healthy";
+      } else {
+        checks.firebase.status = "unhealthy";
+      }
+    } catch (err) {
+      checks.firebase.status = "unhealthy";
+      checks.firebase.error = err.message;
+    }
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const start = Date.now();
+        const aiInstance = await getAI();
+        const testGen = await aiInstance.models.generateContent({
+          model: "gemini-3.7-flash",
+          contents: "respond with 'healthy'"
+        });
+        checks.gemini.status = testGen.text ? "healthy" : "degraded";
+        checks.gemini.latency = Date.now() - start;
+      } catch (err) {
+        checks.gemini.status = "unhealthy";
+        checks.gemini.error = err.message || "Unknown error occurred during Gemini call";
+      }
+    } else {
+      checks.gemini.status = "missing_key";
+      checks.gemini.error = "GEMINI_API_KEY is not defined in .env";
+    }
+    res.json(checks);
+  });
+  app.get("/robots.txt", (req, res) => {
+    res.type("text/plain");
+    res.send("User-agent: *\nAllow: /");
+  });
+  app.get("/privacy", (req, res) => {
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Privacy Policy | CreatorOS</title>
+      </head>
+      <body>
+          <h1>Privacy Policy</h1>
+          <p>We use your connected social media data (YouTube, TikTok) solely to display analytics in your CreatorOS dashboard. We do not sell or share your data.</p>
+      </body>
+      </html>
+    `);
+  });
+  app.get("/terms", (req, res) => {
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Terms of Service | CreatorOS</title>
+      </head>
+      <body>
+          <h1>Terms of Service</h1>
+          <p>By connecting your YouTube or TikTok account, you grant CreatorOS permission to access your public profile and analytics data.</p>
+      </body>
+      </html>
+    `);
+  });
+  if (!process.env.VERCEL) {
+    if (process.env.NODE_ENV !== "production") {
+      if (!createViteServer) {
+        ({ createServer: createViteServer } = await import("vite"));
+      }
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa"
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*all", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
+}
+var _app = null;
+var _started = false;
+async function ensureApp() {
+  if (!_started) {
+    _started = true;
+    await startServer();
+    _app = globalThis.__creatoros_app;
+  }
+  return _app;
+}
+async function getApp() {
+  if (!process.env.VERCEL) process.env.VERCEL = "1";
+  return ensureApp();
+}
+if (!process.env.VERCEL) {
+  startServer();
+}
+export {
+  getApp
+};
+//# sourceMappingURL=_server.js.map

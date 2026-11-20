@@ -1,55 +1,181 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import {
-  getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot,
-  addDoc, updateDoc, deleteDoc, serverTimestamp, getDocFromServer
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  verifyPasswordResetCode,
+  confirmPasswordReset,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+  connectAuthEmulator,
+  User as FirebaseUser,
+} from 'firebase/auth';
+import {
+  getFirestore,
+  doc,
+  serverTimestamp,
+  getDocFromServer,
+  connectFirestoreEmulator,
 } from 'firebase/firestore';
 // Storage not available
 import firebaseConfig from '../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
+// Ensure the authDomain matches the active runtime host:
+// In Vercel deployments, use the configured Vercel domain with its /__/auth rewrites.
+// In dev preview/localhost, use the official Firebase domain to prevent iframe cross-origin locks.
+const resolvedAuthDomain =
+  typeof window !== 'undefined' &&
+  (window.location.hostname.includes('vercel.app') ||
+    window.location.hostname === firebaseConfig.authDomain)
+    ? firebaseConfig.authDomain || `${firebaseConfig.projectId}.firebaseapp.com`
+    : `${firebaseConfig.projectId}.firebaseapp.com`;
+
+// F4.5: Firebase Emulator Suite detection. vite.config.ts inlines the two
+// emulator host env vars at dev/build time (see its `define` block), so this
+// check is static in the browser bundle and needs no runtime `process` object.
+// When the vars are unset — local dev without emulators and every production
+// deployment — both are '' and the app talks to real Firebase exactly as before.
+const authEmulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+const firestoreEmulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
+const isEmulatorMode = Boolean(authEmulatorHost || firestoreEmulatorHost);
+// `demo-` prefix projects only ever exist inside the emulator suite.
+const EMULATOR_PROJECT_ID = 'demo-creatoros';
+
+const app = initializeApp({
+  ...firebaseConfig,
+  authDomain: resolvedAuthDomain,
+  ...(isEmulatorMode ? { projectId: EMULATOR_PROJECT_ID } : {}),
+});
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = isEmulatorMode
+  ? getFirestore(app) // the emulator only serves the (default) database
+  : getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
+if (authEmulatorHost) {
+  connectAuthEmulator(auth, `http://${authEmulatorHost}`, { disableWarnings: true });
+}
+if (firestoreEmulatorHost) {
+  const [fsHost, fsPort] = firestoreEmulatorHost.split(':');
+  connectFirestoreEmulator(db, fsHost, Number(fsPort) || 8080);
+}
+
 /**
- * Prefer the popup flow because it works reliably on third-party hosts such as
- * Vercel. If the browser blocks the popup, continue in the current tab instead
- * of surfacing Firebase's raw auth/popup-blocked error to the user.
+ * Mobile-aware Google sign-in:
+ * - On mobile browsers (especially iOS Safari), third-party storage restrictions
+ *   and ITP break popup postMessage communication (causing INVALID_IDP_RESPONSE).
+ *   Redirect-first is the official Firebase recommendation for mobile web.
+ * - On desktop, popup-first preserves app state, with a seamless redirect fallback
+ *   if popups are blocked or fail.
  */
 export const loginWithGoogle = async () => {
+  const isMobile =
+    typeof navigator !== 'undefined' &&
+    (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (typeof window !== 'undefined' && window.innerWidth <= 768));
+
+  if (isMobile) {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
+      window.history.replaceState(window.history.state, '', '/dashboard');
+    }
+    await signInWithRedirect(auth, googleProvider);
+    return null;
+  }
+
   try {
     return await signInWithPopup(auth, googleProvider);
   } catch (error: any) {
     if (
       error?.code === 'auth/popup-blocked' ||
-      error?.code === 'auth/cancelled-popup-request'
+      error?.code === 'auth/cancelled-popup-request' ||
+      error?.code === 'auth/popup-closed-by-user' ||
+      error?.code === 'auth/invalid-credential'
     ) {
-      // Vercel serves this SPA from `/`; returning directly to a client-side
-      // route such as `/login` would otherwise produce a platform 404.
-      if (window.location.pathname !== '/') {
-        window.history.replaceState(window.history.state, '', '/');
+      if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
+        window.history.replaceState(window.history.state, '', '/dashboard');
       }
-
       await signInWithRedirect(auth, googleProvider);
       return null;
     }
-
+    console.error('Google Auth failed:', error);
     throw error;
   }
 };
-/** Completes a pending full-page Google redirect after the app reloads. */
-export const completeGoogleRedirect = () => getRedirectResult(auth);
+/** Completes a pending full-page Google redirect after the app reloads with timeout safety.
+ * Resolves with the redirect result (or null when no redirect happened). Rejects when the
+ * redirect itself failed — callers must surface the error, because a silent null strands the
+ * user on the login screen with no explanation (notably on iOS, which uses the full-page
+ * redirect flow instead of a popup). */
+export const completeGoogleRedirect = async () => {
+  try {
+    const redirectPromise = getRedirectResult(auth);
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000));
+    const result = await Promise.race([redirectPromise, timeoutPromise]);
+    if (result?.user) {
+      console.log('Google redirect sign-in successful for:', result.user.email);
+    }
+    return result;
+  } catch (error) {
+    console.error('Redirect sign-in error:', error);
+    throw error;
+  }
+};
 
-export const loginWithEmail = (email: string, pass: string) => signInWithEmailAndPassword(auth, email, pass);
-export const registerWithEmail = (email: string, pass: string) => createUserWithEmailAndPassword(auth, email, pass);
+export const loginWithEmail = (email: string, pass: string) =>
+  signInWithEmailAndPassword(auth, email, pass);
+export const registerWithEmail = (email: string, pass: string) =>
+  createUserWithEmailAndPassword(auth, email, pass);
 export const logout = () => signOut(auth);
+
+/**
+ * Phase A — email-verification nudge (soft, never a hard block). Sent right
+ * after email/password signup and re-sendable from the in-app banner.
+ */
+export const sendVerificationEmail = (user: FirebaseUser) => sendEmailVerification(user);
+
+/**
+ * Phase A — password reset. Firebase returns a generic success even for
+ * unknown emails (anti-enumeration); callers must still catch
+ * auth/user-not-found (older configs) and show the SAME generic copy either
+ * way. See Login.tsx.
+ */
+export const sendResetEmail = async (email: string) => {
+  try {
+    if (typeof window !== 'undefined' && window.location.origin) {
+      return await sendPasswordResetEmail(auth, email, {
+        url: `${window.location.origin}/reset-password`,
+        handleCodeInApp: true,
+      });
+    }
+  } catch (err: any) {
+    if (err?.code === 'auth/unauthorized-continue-uri') {
+      return await sendPasswordResetEmail(auth, email);
+    }
+    throw err;
+  }
+  return await sendPasswordResetEmail(auth, email);
+};
+
+export const verifyResetCode = (code: string) => verifyPasswordResetCode(auth, code);
+export const confirmResetPassword = (code: string, newPass: string) =>
+  confirmPasswordReset(auth, code, newPass);
 
 /**
  * Compresses a base64 image string to ensure it fits within Firestore's 1MB limit.
  */
-export async function compressBase64Image(base64Str: string, maxWidth = 800, quality = 0.8): Promise<string> {
+export async function compressBase64Image(
+  base64Str: string,
+  maxWidth = 800,
+  quality = 0.8,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = base64Str;
@@ -103,7 +229,11 @@ export interface FirestoreErrorInfo {
   };
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null,
+) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -112,97 +242,65 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
       emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
       tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
+      providerInfo:
+        auth.currentUser?.providerData.map((provider) => ({
+          providerId: provider.providerId,
+          displayName: provider.displayName,
+          email: provider.email,
+          photoUrl: provider.photoURL,
+        })) || [],
     },
     operationType,
-    path
+    path,
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
-async function testConnection() {
+export async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log('Firestore connection established successfully.');
+    // Only perform diagnostic check if auth state confirms user is present
+    if (auth.currentUser) {
+      await getDocFromServer(doc(db, 'test', 'connection'));
+      console.log('Firestore connection established successfully.');
+    }
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes('the client is offline') || error.message.includes('unavailable')) {
-        console.error('Firestore connection failed: The client is offline or the service is unavailable. Please check your Firebase configuration and internet connection.');
-      } else if (error.message.toLowerCase().includes('permission') || (error as any).code === 'permission-denied') {
+      if (
+        error.message.includes('the client is offline') ||
+        error.message.includes('unavailable')
+      ) {
+        // Log info rather than error to avoid false positive error triggers when client is offline/reconnecting
+        console.info('Firestore operating in offline cache mode.');
+      } else if (
+        error.message.toLowerCase().includes('permission') ||
+        (error as any).code === 'permission-denied'
+      ) {
         console.log('Firestore connection established (Permission Denied as expected).');
       } else {
-        console.error('Firestore connection error:', error.message);
+        console.warn('Firestore connection check notice:', error.message);
       }
     }
   }
 }
-testConnection();
-
-/** Helper for authenticated API calls. */
-export async function authorizedFetch(url: string, options: RequestInit = {}) {
-  let user = auth.currentUser;
-  if (!user) {
-    await new Promise<void>((resolve) => {
-      const unsubscribe = onAuthStateChanged(auth, () => {
-        unsubscribe();
-        resolve();
-      });
-      setTimeout(() => {
-        unsubscribe();
-        resolve();
-      }, 2500);
-    });
-    user = auth.currentUser;
-  }
-  if (!user) throw new Error('User not authenticated');
-
-  const token = await user.getIdToken();
-  const cleanToken = token.replace(/[\r\n\t]/g, '').trim();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (options.headers instanceof Headers) {
-    options.headers.forEach((value, key) => { headers[key] = value; });
-  } else if (Array.isArray(options.headers)) {
-    options.headers.forEach(([key, value]) => { headers[key] = value; });
-  } else if (options.headers && typeof options.headers === 'object') {
-    Object.assign(headers, options.headers);
-  }
-  headers.Authorization = `Bearer ${cleanToken}`;
-
-  const response = await fetch(url, { ...options, headers });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Request failed with status ${response.status}`);
-  }
-  return response.json();
-}
 
 /**
- * Gemini routes are authenticated server-side. Existing CreatorOS service
- * functions use fetch() directly, so install a narrow browser interceptor that
- * attaches the current Firebase ID token only to /api/gemini/* requests.
+ * F1.7: Both helpers are now thin compatibility wrappers over the unified
+ * authenticated client in src/lib/apiClient.ts (Bearer token, single 401
+ * force-refresh retry, auth-expired event, typed 429 RateLimitError).
+ * Existing import sites keep working unchanged.
  */
-export async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
-  const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-  if (!requestUrl.startsWith('/api/gemini/')) {
-    return fetch(input, init);
-  }
+export { apiFetch, AuthExpiredError, RateLimitError, AUTH_EXPIRED_EVENT } from './lib/apiClient';
+import { apiFetch as unifiedApiFetch } from './lib/apiClient';
 
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error('User not authenticated');
-  }
-
-  const token = (await user.getIdToken()).replace(/[\r\n\t]/g, '').trim();
-  const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
-  headers.set('Authorization', `Bearer ${token}`);
-
-  return fetch(input, { ...init, headers });
+/** Legacy helper: authenticated fetch that parses JSON (throws on non-OK, including 401/429). */
+export async function authorizedFetch(
+  url: string,
+  options: RequestInit = {},
+  owner?: import('./lib/apiClient').ApiRequestOwner,
+) {
+  const response = await unifiedApiFetch(url, options, owner);
+  return response.json();
 }
 
 export { onAuthStateChanged, serverTimestamp, updateProfile };
