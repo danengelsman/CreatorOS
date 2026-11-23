@@ -10,6 +10,7 @@ Status: Phase 2 Deliverable (Pending Gate Approval)
 ## 1. Competitive Analysis & Evidence Matrix
 
 Apps Compared:
+
 1. vidIQ (Mobile iOS, Category: Productivity / Social Networking)
 2. TubeBuddy (Mobile iOS, Category: Productivity / Education)
 3. Captions: For Talking Videos (Mobile iOS, Category: Photo & Video)
@@ -18,36 +19,42 @@ Apps Compared:
 ### Comparison Across Key Dimensions
 
 Dimension 1: Core Journey
+
 - vidIQ: Channel statistics overview -> Daily AI idea suggestions -> Keyword research -> Tag optimization.
 - TubeBuddy: Real-time subscriber count -> Milestone badges -> Topic ideas -> Video tag management.
 - Captions: Script prompt -> Dynamic Island teleprompter recording -> AI caption generation -> Video export.
 - Notion: Generic page database -> Template selection -> Freeform typing / kanban dragging.
 
 Dimension 2: Onboarding Friction
+
 - vidIQ: Mandatory Google / YouTube OAuth connection upfront before value is shown. High initial hesitation for privacy-conscious users.
 - TubeBuddy: Mandatory YouTube channel login upfront; fails or glitches if channel has zero uploads or non-standard permissions.
 - Captions: Low initial friction; allows immediate recording/scripting, but delays the blocker until export.
 - Notion: Account creation required; steep learning curve to navigate databases on a small touchscreen.
 
 Dimension 3: Accessibility
+
 - vidIQ: Text-dense layouts, small font sizes in tag clouds; poor dynamic type support reported by users.
 - TubeBuddy: Low contrast on milestone text; small subscriber digits requiring zoom (cited in user reviews).
 - Captions: High visual polish, strong contrast, supports closed captioning presets natively.
 - Notion: Supports standard system font scaling, but nested database tables overflow viewport horizontally.
 
 Dimension 4: Paywall Transparency
+
 - vidIQ: Opaque credit consumption model. AI script iterations consume non-refundable credits even on bad outputs or timeouts. In-app upsell from $9.99/mo to $49+/mo without clear renewal reminder notices (Review: SP_Cali, Oct 2022; SimSalabimse, Mar 2024).
 - TubeBuddy: $2.99/mo entry tier, but mobile tier lacks core desktop features (bulk processing, advanced search). Users report paying without receiving advertised tools (Review: India, 2024).
 - Captions: Hard trap paywall. Lets users spend 20-30 minutes filming and captioning, then presents a non-dismissible paywall ($9.99/mo or $24.99/mo Max) upon clicking "Save to Camera Roll" (Review: Skyler Chui; Wassem, Mar 2025).
 - Notion: Generous free personal tier; clear block limits for teams.
 
 Dimension 5: Privacy & Permissions
+
 - vidIQ: Requests broad YouTube channel management and analytics scopes. Third-party data analytics integrated.
 - TubeBuddy: Requests full YouTube account viewing and editing permissions.
 - Captions: Requests Camera, Microphone, and Full Photo Library access. Processes audio on cloud servers.
 - Notion: Cloud sync; workspace content stored on Notion servers.
 
 Dimension 6: Observed User Complaints (Dated App Store Evidence)
+
 - TubeBuddy (Reviewer n8ture, Aug 2024): "Lost all my topic ideas... This latest update deleted all the video topic ideas I had created on the app. Months of work creating ideas are now gone."
 - TubeBuddy (Reviewer Alisha RG, Feb 2023): Milestone tracking glitches and loses cached milestones when reinstalling or updating.
 - vidIQ (Reviewer MrSippyMan, Nov 2025): Script ideation tool burns daily free attempts on rigid suggestions with no course correction, forcing upgrade before proving utility.
@@ -93,12 +100,14 @@ Journey Stages:
 ## 3. Low-Fidelity Screen Descriptions (Original UI Proposals)
 
 ### Screen 1: Niche Calibration & First-Run
+
 - Header: Subtle wordmark "CreatorOS", step indicator (1 of 3).
 - Content Area: High-contrast pill selectors for creator category and current production cadence.
 - Action: Fixed bottom button "Build My 30-Day Sprint".
 - Behavior: Clean transitions, supports Dynamic Type, zero paywall presented before core plan generation.
 
 ### Screen 2: "Today" Command Center (Zen Master View)
+
 - Top Navigation: Date header (e.g., "Monday, Oct 26"), subtle profile avatar top right.
 - Hero Card (Today's Primary Sprint Task):
   - Card with 12px rounded corners, neutral background border.
@@ -111,6 +120,7 @@ Journey Stages:
 - Bottom Tab Bar: [Today] (Active), [Sprints], [Script Studio], [Monetization], [Settings].
 
 ### Screen 3: Script Studio (Structured Production Canvas)
+
 - Segmented Control at Top: [Hook (15s)] | [Setup (30s)] | [Value Arc] | [Payoff & CTA].
 - Text Area: Distraction-free writing space with auto-expanding line height.
 - Assistant Drawer (Collapsible bottom sheet):
@@ -119,6 +129,7 @@ Journey Stages:
   - "Refine Button": Generates alternative hook variations without hidden credit penalties.
 
 ### Screen 4: Milestone & First Dollar Roadmap
+
 - Header: "Monetization Pathway".
 - Pathway List (Vertical step sequence):
   - Completed steps show solid monochrome checkmark.
@@ -128,6 +139,7 @@ Journey Stages:
 - Honest Data Guarantee: Shows verified user metrics only; no placeholder counters or fake community counts.
 
 ### Screen 5: Settings, Account & Data Preservation
+
 - Account Row: Local Mode vs Cloud Synced (Firebase/Google).
 - Subscription Row: Transparent status (e.g., "Free Starter Plan"), explicit link to iOS App Store subscription management, clear "Restore Purchases" button adhering to Apple guidelines.
 - Data Management Section:
@@ -139,11 +151,13 @@ Journey Stages:
 ## 4. Differentiated Value & Strategic Positioning
 
 Where Competitors Fail:
+
 - vidIQ & TubeBuddy treat mobile as an afterthought companion to sell desktop SEO upgrades, resulting in glitchy interfaces, deleted user ideas, and aggressive paywalls.
 - Captions traps users at the point of video export with unexpected paywalls and expensive weekly billing.
 - Notion requires hours of manual template configuration that invites procrastination.
 
 CreatorOS Differentiators:
+
 1. Zero Trap Paywalls: Clear separation of free utility and advanced AI features. No withholding created user work behind sudden paywalls.
 2. Anti-Data-Loss Architecture: Local-first persistence ensures script notes and ideas survive updates, offline sessions, or account sign-outs.
 3. Pre-Production Specialization: Focuses exclusively on the highest-leverage bottleneck for beginner creators: script structure, consistent production pacing, and reaching their first dollar of revenue.

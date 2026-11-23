@@ -50,12 +50,14 @@ Each implementation owner runs focused tests. One integration owner runs heavy f
 ## Task 1: Repair Calendar PR #33
 
 **Files:**
+
 - `src/components/calendar/EventCreationForm.tsx`
 - `src/components/CalendarView.tsx`
 - `tests/calendarViewSplit.test.ts`
 - Other extracted panels only if a focused regression proves a defect.
 
 **Steps:**
+
 1. Reproduce cancel-after-typing, then open a different day; write a failing regression requiring cleared title/body while preserving the intended platform/status behavior.
 2. Restore reset-on-open semantics without weakening owner guards or changing scheduling writes.
 3. Repair rendered-month/year and empty-account SyncPanel assertions to match actual component behavior; use fixed dates rather than the current month.
@@ -68,6 +70,7 @@ Each implementation owner runs focused tests. One integration owner runs heavy f
 ## Task 2: Repair telemetry PR #34
 
 **Files:**
+
 - `src/services/telemetry.ts`
 - `tests/telemetrySignals.test.ts`
 - `tests/telemetry.test.ts`
@@ -75,6 +78,7 @@ Each implementation owner runs focused tests. One integration owner runs heavy f
 - Inspect `e2e/studioAccountJourney.spec.ts` and failure artifacts; edit only if evidence establishes a test defect.
 
 **Steps:**
+
 1. Add failing cases for persisted `Draft`/`Published` statuses, supported legacy casing, scheduled work, absent score, measured zero, non-finite score and actual stored score fields.
 2. Normalize workflow status consistently; explicitly recognize published work instead of classifying every non-draft item as shipped.
 3. Require a finite measured score for low-retention warnings. Unknown must remain unknown; do not invent confidence or performance claims.
@@ -99,10 +103,12 @@ Each implementation owner runs focused tests. One integration owner runs heavy f
 ## Task 4: Recover and complete the remaining bounded video Phase 0 work
 
 **Existing worktrees:**
+
 - `CreatorOS_wt_video_truth` / `feat/video-phase0-truth`
 - `CreatorOS_wt_video_integration` / `feat/video-phase0-integration`
 
 **Files already changed:**
+
 - `src/components/VideoAnalyzer.tsx`
 - `e2e/studio-assistants.spec.ts`
 - `tests/videoAnalyzerUpload.browser.mjs` (untracked)
@@ -113,6 +119,7 @@ Each implementation owner runs focused tests. One integration owner runs heavy f
 Preserve and inspect these edits before reuse. Recover one owner per worktree, reconcile against current main and the merged video contract, and do not recreate work blindly. These two streams may run in parallel after the current wave is stable.
 
 **Acceptance:**
+
 - Analyzer states the actual 50 MB backend limit and rejects oversize picker/drop inputs before upload; valid inputs and retry remain usable.
 - Scores and scene plans identify their source script revision; later edits make prior output visibly stale without deleting it.
 - A late async response cannot overwrite newer results or cross an owner generation.
@@ -124,6 +131,7 @@ Preserve and inspect these edits before reuse. Recover one owner per worktree, r
 Before further refactors, inspect the live source to distinguish necessary work from duplicated November 7 plan items. Full strictness is a separate migration; listener consolidation needs a demonstrated lifecycle/ownership benefit, not merely fewer lines in AuthContext. Stage strictness after shared-file changes settle; preserve existing safety tests.
 
 For a useful video milestone, target: **script → shot plan → one generated clip → durable saved asset → playable export after reopen**. Do not start the storage/provider implementation until these decisions are explicit:
+
 - Provider/model and permitted commercial integration.
 - Real-test spending cap and who pays for rendering.
 - Media storage, retention, licensed inputs and output access controls.
