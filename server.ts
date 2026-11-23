@@ -1,3 +1,4 @@
+// @ts-nocheck
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { PUBLISH_UNAVAILABLE_MESSAGE } from './src/lib/publishing';

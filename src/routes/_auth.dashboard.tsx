@@ -8,7 +8,6 @@ import {
   selectProjects,
   selectProjectsLoading,
   selectProjectsError,
-  isWorkspaceTokenCurrent,
 } from '@/store/workspaceStore';
 
 export const Route = createFileRoute('/_auth/dashboard')({
@@ -26,7 +25,6 @@ export const Route = createFileRoute('/_auth/dashboard')({
       <LayoutShell user={auth.user}>
         <Dashboard
           user={auth.user}
-          userData={auth.userData}
           brand={brand}
           setActiveTab={(tab) =>
             navigate({
@@ -36,15 +34,6 @@ export const Route = createFileRoute('/_auth/dashboard')({
           projects={projects}
           isProjectsLoading={isProjectsLoading}
           projectsLoadError={projectsLoadError}
-          onOpenProject={(project) => {
-            if (
-              isWorkspaceTokenCurrent(useWorkspaceStore.getState(), token) &&
-              project.userId === token?.uid &&
-              project.type === 'content'
-            ) {
-              void navigate({ to: '/studio/$projectId', params: { projectId: project.id } });
-            }
-          }}
         />
       </LayoutShell>
     );

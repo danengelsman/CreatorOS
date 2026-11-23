@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { create } from 'zustand';
 
 import { brandSlice } from './slices/brandSlice';

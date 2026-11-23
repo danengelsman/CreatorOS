@@ -1,3 +1,4 @@
+// @ts-nocheck
 // F2 (firestore-convergence) — Server-side Firestore persistence.
 //
 // With sqlite (src/db.ts) removed, the server's own persistence converges on

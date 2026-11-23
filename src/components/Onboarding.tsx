@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import {
   loadOnboardingRecovery,

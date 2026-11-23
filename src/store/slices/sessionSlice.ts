@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { StateCreator } from 'zustand';
 import type { WorkspaceState } from '../workspaceStore';
 

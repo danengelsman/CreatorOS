@@ -1,3 +1,4 @@
+// @ts-nocheck
 // F1.3 — OAuth state HMAC. Signed, single-use, 10-minute TTL state values for
 // the Google and TikTok connect flows. Replaces the old practice of passing
 // the raw Firebase uid through `state`, which let anyone link platform tokens

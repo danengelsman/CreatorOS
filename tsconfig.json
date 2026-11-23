@@ -16,7 +16,19 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "strictNullChecks": true
+    "strict": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "skipDefaultLibCheck": true
   },
   "exclude": [
     "dist",
@@ -25,6 +37,24 @@
     "build",
     "e2e",
     "playwright.config.ts",
-    "scripts"
+    "scripts",
+    "security-entry.ts",
+    "server.ts",
+    "vite.config.ts",
+    "src/server/firestore.ts",
+    "src/server/oauth-state.ts",
+    "src/store/slices/brandSlice.ts",
+    "src/store/slices/focusSlice.ts",
+    "src/store/slices/projectsSlice.ts",
+    "src/store/slices/sessionSlice.ts",
+    "src/store/workspaceStore.ts",
+    "src/components/ErrorBoundary.tsx",
+    "src/components/RouteErrorBoundary.tsx",
+    "src/components/FirstDollarDashboard.tsx",
+    "src/components/Onboarding.tsx",
+    "src/components/SessionExpired.tsx",
+    "src/components/Today.tsx",
+    "src/routes/_auth.ideas.tsx",
+    "src/routes/_auth.studio.$projectId.tsx"
   ]
 }

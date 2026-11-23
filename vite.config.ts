@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 import path from 'path';
 import childProcess from 'child_process';
@@ -28,7 +29,16 @@ export default defineConfig(({ mode }) => {
     commitSha = '';
   }
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      visualizer({
+        filename: 'dist/stats.html',
+        open: false,
+        gzipSize: true,
+        brotliSize: true,
+      }),
+    ],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
       __GIT_COMMIT__: JSON.stringify(commitSha),
@@ -56,19 +66,16 @@ export default defineConfig(({ mode }) => {
       hmr: process.env.DISABLE_HMR !== 'true',
     },
     build: {
-      chunkSizeWarningLimit: 1500,
+      chunkSizeWarningLimit: 500,
       rollupOptions: {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('react-dom')) {
+              if (id.includes('react') || id.includes('react-dom') || id.includes('recharts') || id.includes('lucide-react') || id.includes('motion')) {
                 return 'vendor';
               }
               if (id.includes('firebase')) {
                 return 'firebase';
-              }
-              if (id.includes('recharts') || id.includes('lucide-react') || id.includes('motion')) {
-                return 'ui';
               }
             }
           },

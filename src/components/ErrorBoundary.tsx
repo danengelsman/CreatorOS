@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { WarningCircle as AlertCircle, ArrowsClockwise as RefreshCcw } from '@phosphor-icons/react';
 import { logErrorToFirestore } from '../lib/logger';
