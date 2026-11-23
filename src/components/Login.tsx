@@ -311,8 +311,6 @@ export default function Login({
           </motion.div>
         </div>
         <div className="relative z-10 flex items-center gap-4 text-[var(--label-tertiary)] text-[13px] font-bold uppercase tracking-widest">
-          <span>Trusted by 50K Creators</span>
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--separator)]" />
           <span>Join the Club</span>
         </div>
       </div>
