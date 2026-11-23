@@ -21,7 +21,7 @@ export const Route = createFileRoute('/_auth/ideas')({
           user={auth.user}
           brand={brand}
           setBrand={setBrand}
-          setActiveTab={(tab) =>
+          setActiveTab={(tab: string) =>
             navigate({ to: (tab === 'home' ? '/dashboard' : `/${tab}`) as any })
           }
           setSelectedIdea={setSelectedIdea}
