@@ -11,9 +11,9 @@ import { TEST_USER_PASSWORD, createEmulatorUser, uniqueEmulatorEmail } from './t
  * (niche → audience → vibe, /api/onboarding/chat mocked), builds the brand kit
  * via "Build my channel style first" (/api/onboarding/generate-brand mocked),
  * and asserts:
- *   1. the handoff to the logged-in Home view (Today primary; the Home studio
- *      content — including the first-creation mission — lives in a collapsed
- *      <details> the spec opens before asserting),
+ *   1. the handoff to the logged-in Home view (Today hero primary, with the
+ *      AI Mentor entry, the Creator Roadmap stepper, and the Content Studio
+ *      workflow),
  *   2. users/{uid}.onboardingAnswers landed in the EMULATOR Firestore
  *      (REST read with the user's ID token, same pattern as global-setup.ts),
  *   3. a reload does NOT remount onboarding (users/<uid> now exists).
@@ -34,8 +34,8 @@ const MOCK_ANSWERS = {
 };
 
 /** Kit returned by the mocked /api/onboarding/generate-brand. `tagline` feeds
- * users/{uid}.onboardingAnswers.summary; `content_ideas` lets the Home view
- * render its first-creation mission without another API call. */
+ * users/{uid}.onboardingAnswers.summary; `content_ideas` are stored with the
+ * brand project. The Home view no longer renders them. */
 const MOCK_BRAND_KIT = {
   name: 'E2E Test Brand',
   tagline: 'Fresh greens, zero guesswork',
@@ -211,20 +211,15 @@ test.describe('CreatorOS Onboarding → Dashboard handoff', () => {
     await expect(onboardingHeading).toHaveCount(0);
     const menuButton = page.locator('header button').first();
     await expect(menuButton).toBeVisible();
-    // Home leads with Today; the studio content (first-creation mission seeded
-    // from the mocked kit's content_ideas) sits in a collapsed panel.
-    const studioPanel = page.locator(
-      'details:has(summary:has-text("Explore your existing studio"))',
-    );
-    await studioPanel.locator('summary').click();
-    const missionSection = page.locator('section[aria-label="Your first creator mission"]');
-    await expect(missionSection).toBeVisible();
-    await expect(
-      missionSection.getByRole('heading', { name: 'Make one piece for your audience' }),
-    ).toBeVisible();
-    await expect(
-      missionSection.locator('button:has-text("Microgreens starter kit")'),
-    ).toBeVisible();
+    // Home leads with Today: the First Dollar hero, the AI Mentor entry, and
+    // the Creator Roadmap stepper.
+    await expect(page.getByRole('heading', { name: 'Make your next move.' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your Creator Roadmap' })).toBeVisible();
+    // The AI Mentor entry's region is aria-label="AI Mentor" exactly; the
+    // Dashboard also wraps it in a section labelled "AI mentor and
+    // contextual insights", which a substring name match would also catch,
+    // so the exact match is required for a unique locator.
+    await expect(page.getByRole('region', { name: 'AI Mentor', exact: true })).toBeVisible();
 
     // --- users/{uid}.onboardingAnswers landed in the EMULATOR Firestore. ---
     // handleBuildBrandKit awaits both setDocs before calling onComplete, so the
@@ -248,11 +243,7 @@ test.describe('CreatorOS Onboarding → Dashboard handoff', () => {
     // --- Reload: the existing users/<uid> profile must suppress onboarding. ---
     await page.reload();
     await expect(onboardingHeading).toHaveCount(0);
-    await page
-      .locator('details:has(summary:has-text("Explore your existing studio"))')
-      .locator('summary')
-      .click();
-    await expect(page.locator('section[aria-label="Your first creator mission"]')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Make your next move.' })).toBeVisible();
     await expect(menuButton).toBeVisible();
 
     // F4.5 assertions: the entire flow stayed on local emulators and mocks.
