@@ -16,6 +16,13 @@ interface ContentStudioWorkflowProps {
   onStageChange: (stageId: string) => void;
   onCreateContent: () => void;
   className?: string;
+  /**
+   * Compact rendering for the narrow (280px) side panel: smaller stage
+   * circles, no per-stage description line. The full pipeline (80px
+   * circles + 96px labels) is 280px+ wide and overflows the panel,
+   * clipping the Published circle and truncating every label.
+   */
+  compact?: boolean;
 }
 
 const stageConfig: Record<string, WorkflowStage> = {
@@ -61,6 +68,7 @@ export function ContentStudioWorkflow({
   onStageChange,
   onCreateContent,
   className,
+  compact = false,
 }: ContentStudioWorkflowProps) {
   const stageOrder = ['ideas', 'drafts', 'published'];
 
@@ -70,7 +78,7 @@ export function ContentStudioWorkflow({
       <div className="relative">
         {/* Connecting pipeline */}
         <div
-          className="absolute top-10 left-20 right-20 h-1 bg-[var(--separator)]"
+          className={`absolute ${compact ? 'top-7 left-14 right-14' : 'top-10 left-20 right-20'} h-1 bg-[var(--separator)]`}
           aria-hidden="true"
         >
           <motion.div
@@ -83,7 +91,7 @@ export function ContentStudioWorkflow({
         </div>
 
         {/* Stage nodes */}
-        <div className="relative flex items-center justify-between px-5">
+        <div className={`relative flex items-center justify-between ${compact ? 'px-2' : 'px-5'}`}>
           {stageOrder.map((stageId, index) => {
             const stage = stageConfig[stageId];
             const isActive = stageId === activeStage;
@@ -110,7 +118,7 @@ export function ContentStudioWorkflow({
                 {/* Stage circle */}
                 <motion.div
                   className={`
-                    relative flex h-20 w-20 items-center justify-center rounded-2xl
+                    relative flex ${compact ? 'h-14 w-14' : 'h-20 w-20'} items-center justify-center rounded-2xl
                     border-2 transition-all duration-300
                     ${
                       isActive
@@ -176,7 +184,7 @@ export function ContentStudioWorkflow({
                 </motion.div>
 
                 {/* Stage label */}
-                <div className="text-center w-24">
+                <div className={`text-center ${compact ? 'w-16' : 'w-28'}`}>
                   <motion.h4
                     className={`
                       text-caption font-semibold truncate transition-colors
@@ -188,17 +196,23 @@ export function ContentStudioWorkflow({
                   >
                     {stage.label}
                   </motion.h4>
-                  <motion.p
-                    className={`
-                      text-micro truncate transition-colors mt-0.5
+                  {/* Descriptions wrap to two lines instead of truncating
+                      mid-word ("CAPTURE & RE…"). Compact panels omit them
+                      entirely — the active-stage card below already shows
+                      the stage's description. */}
+                  {!compact && (
+                    <motion.p
+                      className={`
+                      text-micro line-clamp-2 leading-tight transition-colors mt-0.5
                       ${isActive ? `${stageColorClasses[stageId].text}` : 'text-[var(--label-tertiary)]'}
                     `}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: index * 0.1 + 0.2 }}
-                  >
-                    {stage.description}
-                  </motion.p>
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: index * 0.1 + 0.2 }}
+                    >
+                      {stage.description}
+                    </motion.p>
+                  )}
                 </div>
               </motion.button>
             );

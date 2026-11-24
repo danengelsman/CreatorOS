@@ -128,8 +128,13 @@ function TodaySession({ user, setActiveTab, token }: TodayProps & { token: Works
   const currentStepNumber = completedCount + 1;
 
   return (
-    <section aria-label="Today: First Dollar path" className="relative card-hero p-6 md:p-8">
-      {/* Ambient glow */}
+    <section
+      aria-label="Today: First Dollar path"
+      className="relative card-hero p-6 md:p-8 overflow-hidden"
+    >
+      {/* Ambient glow. overflow-hidden clips the glow at the card's edge:
+          it used to hang 80px past the card's right side (-right-20) and
+          widened the page, so the center column scrolled sideways. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[var(--accent-soft)] blur-[85px]"
