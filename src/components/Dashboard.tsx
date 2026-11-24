@@ -199,6 +199,66 @@ export default function Dashboard({
     journey?.activeMission,
   ]);
 
+  // Contextual insights based on state. This useMemo MUST stay above the
+  // loading/error early returns below: a hook called after an early return
+  // changes the hook count once loading finishes, and React throws
+  // "Rendered more hooks than during the previous render" — the onboarding
+  // handoff hit exactly that in CI, crashing Home to the error boundary.
+  const insights = useMemo(() => {
+    const items: Array<{
+      title: string;
+      description: string;
+      insightType: 'growth' | 'action' | 'observation' | 'milestone';
+      actionLabel?: string;
+      onAction?: () => void;
+    }> = [];
+
+    if (!milestoneBrandKit) {
+      items.push({
+        title: 'Define your brand system',
+        description: 'Lock in positioning, visual language, and voice before you publish.',
+        insightType: 'action',
+        actionLabel: 'Open Brand Studio',
+        onAction: () => setActiveTab('brand'),
+      });
+    } else if (projects.length === 0) {
+      items.push({
+        title: 'Create your first project',
+        description: 'Turn your brand strategy into a publish-ready piece of content.',
+        insightType: 'action',
+        actionLabel: 'Start creating',
+        onAction: () => setActiveTab('create'),
+      });
+    } else if (!hasSignal) {
+      items.push({
+        title: 'Connect a growth channel',
+        description: 'Bring live audience signals into your command center.',
+        insightType: 'action',
+        actionLabel: 'Connect channels',
+        onAction: () => setActiveTab('profile'),
+      });
+    } else {
+      items.push({
+        title: 'Build on your momentum',
+        description: 'Your foundation is active. Create the next piece that compounds your reach.',
+        insightType: 'growth',
+        actionLabel: 'Open studio',
+        onAction: () => setActiveTab('create'),
+      });
+    }
+
+    // Add progress insight
+    if (completedMilestones > 0) {
+      items.push({
+        title: `${completedMilestones} of 3 milestones complete`,
+        description: "You're building the system before the scale.",
+        insightType: 'milestone',
+      });
+    }
+
+    return items;
+  }, [milestoneBrandKit, projects.length, hasSignal, completedMilestones, setActiveTab]);
+
   if (isProjectsLoading || isJourneyLoading) {
     return (
       <p className="px-6 py-12 text-caption text-[var(--label-secondary)]" role="status">
@@ -309,62 +369,6 @@ export default function Dashboard({
       description: 'Live & performing',
     },
   ];
-
-  // Contextual insights based on state
-  const insights = useMemo(() => {
-    const items: Array<{
-      title: string;
-      description: string;
-      insightType: 'growth' | 'action' | 'observation' | 'milestone';
-      actionLabel?: string;
-      onAction?: () => void;
-    }> = [];
-
-    if (!milestoneBrandKit) {
-      items.push({
-        title: 'Define your brand system',
-        description: 'Lock in positioning, visual language, and voice before you publish.',
-        insightType: 'action',
-        actionLabel: 'Open Brand Studio',
-        onAction: () => setActiveTab('brand'),
-      });
-    } else if (projects.length === 0) {
-      items.push({
-        title: 'Create your first project',
-        description: 'Turn your brand strategy into a publish-ready piece of content.',
-        insightType: 'action',
-        actionLabel: 'Start creating',
-        onAction: () => setActiveTab('create'),
-      });
-    } else if (!hasSignal) {
-      items.push({
-        title: 'Connect a growth channel',
-        description: 'Bring live audience signals into your command center.',
-        insightType: 'action',
-        actionLabel: 'Connect channels',
-        onAction: () => setActiveTab('profile'),
-      });
-    } else {
-      items.push({
-        title: 'Build on your momentum',
-        description: 'Your foundation is active. Create the next piece that compounds your reach.',
-        insightType: 'growth',
-        actionLabel: 'Open studio',
-        onAction: () => setActiveTab('create'),
-      });
-    }
-
-    // Add progress insight
-    if (completedMilestones > 0) {
-      items.push({
-        title: `${completedMilestones} of 3 milestones complete`,
-        description: "You're building the system before the scale.",
-        insightType: 'milestone',
-      });
-    }
-
-    return items;
-  }, [milestoneBrandKit, projects.length, hasSignal, completedMilestones, setActiveTab]);
 
   const openProject = (project: any) => {
     if (project?.type === 'content' && onOpenProject) onOpenProject(project);

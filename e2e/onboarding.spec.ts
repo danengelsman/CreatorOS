@@ -215,7 +215,11 @@ test.describe('CreatorOS Onboarding → Dashboard handoff', () => {
     // the Creator Roadmap stepper.
     await expect(page.getByRole('heading', { name: 'Make your next move.' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Your Creator Roadmap' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'AI Mentor' })).toBeVisible();
+    // The AI Mentor entry's region is aria-label="AI Mentor" exactly; the
+    // Dashboard also wraps it in a section labelled "AI mentor and
+    // contextual insights", which a substring name match would also catch,
+    // so the exact match is required for a unique locator.
+    await expect(page.getByRole('region', { name: 'AI Mentor', exact: true })).toBeVisible();
 
     // --- users/{uid}.onboardingAnswers landed in the EMULATOR Firestore. ---
     // handleBuildBrandKit awaits both setDocs before calling onComplete, so the
