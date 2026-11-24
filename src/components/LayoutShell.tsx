@@ -365,12 +365,14 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
         {/* Phase A — soft email-verification nudge (never a hard block). */}
         <VerificationBanner user={user} />
 
-        {/* Three-Panel Desktop Layout */}
+        {/* Three-Panel Desktop Layout — engages only above 1440px, so at
+            1280px the shell falls back to the single-column layout and the
+            Studio kanban is not squeezed. */}
         {isThreePanelRoute ? (
-          <main className="flex-1 overflow-hidden flex lg:px-0 lg:py-0">
-            <div className="flex flex-1 h-full lg:grid lg:grid-cols-[280px_1fr_320px] lg:gap-4 lg:p-4 lg:h-full">
+          <main className="flex-1 overflow-hidden flex min-[1440px]:px-0 min-[1440px]:py-0">
+            <div className="flex flex-1 h-full min-[1440px]:grid min-[1440px]:grid-cols-[280px_1fr_320px] min-[1440px]:gap-4 min-[1440px]:p-4 min-[1440px]:h-full">
               {/* Left Panel - Content Studio */}
-              <aside className="hidden lg:flex flex-col h-full card-glass border border-white/10 overflow-hidden">
+              <aside className="hidden min-[1440px]:flex flex-col h-full card-glass border border-white/10 overflow-hidden">
                 <div className="p-4 border-b border-white/10 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <GridFour size={18} className="text-[var(--accent)]" />
@@ -391,7 +393,7 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
               </aside>
 
               {/* Center Panel - Main Workspace */}
-              <section className="flex-1 flex flex-col min-w-0 overflow-y-auto lg:overflow-y-auto">
+              <section className="flex-1 flex flex-col min-w-0 overflow-y-auto min-[1440px]:overflow-y-auto">
                 <RouteErrorBoundary
                   onGoHome={() => {
                     window.location.href = '/dashboard';
@@ -405,13 +407,13 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
                   <div className="flex-1 flex flex-col">{children}</div>
                 </RouteErrorBoundary>
 
-                <footer className="mt-16 pt-6 pb-2 border-t border-white/10 lg:border-t-0 lg:pt-0 lg:mt-0">
+                <footer className="mt-16 pt-6 pb-2 border-t border-white/10 min-[1440px]:border-t-0 min-[1440px]:pt-0 min-[1440px]:mt-0">
                   <MadeWithLove />
                 </footer>
               </section>
 
               {/* Right Panel - Roadmap */}
-              <aside className="hidden lg:flex flex-col h-full card-glass border border-white/10 overflow-hidden">
+              <aside className="hidden min-[1440px]:flex flex-col h-full card-glass border border-white/10 overflow-hidden">
                 <div className="p-4 border-b border-white/10 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Columns size={18} className="text-[var(--accent)]" />
