@@ -380,8 +380,11 @@ export default function Dashboard({
     .slice(0, 3);
 
   return (
-    <div className="relative isolate pb-20 pt-4 lg:pt-6 custom-scrollbar">
-      {/* Ambient studio lighting: warm amber and graphite */}
+    <div className="relative isolate pb-20 pt-4 lg:pt-6 custom-scrollbar overflow-x-clip">
+      {/* Ambient studio lighting: warm amber and graphite. The glow bleeds
+          8% past the container on each side; overflow-x-clip keeps that
+          bleed from widening the page (the center column scrolled
+          sideways because of it) without creating a nested scroller. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-[-8%] top-[-120px] -z-10 h-[620px] overflow-hidden"

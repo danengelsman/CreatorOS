@@ -99,6 +99,16 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
 
   const isThreePanelRoute = THREE_PANEL_ROUTES.some((route) => location.pathname.startsWith(route));
 
+  // Each side panel renders once, in one slot. The Studio route already
+  // renders its own ContentStudioWorkflow and the Roadmap route already
+  // renders its own steppers, so on those pages the matching aside is
+  // dropped instead of showing the same panel twice (the squeezed second
+  // copy is what read as empty/faded on the live site). Dashboard keeps
+  // both asides: there Today is the primary content and the panels are
+  // persistent navigation, not the page itself.
+  const showStudioPanel = isThreePanelRoute && location.pathname !== '/studio';
+  const showRoadmapPanel = isThreePanelRoute && location.pathname !== '/roadmap';
+
   const contentProjects = projects.filter((p) => p.type === 'content');
   const hasDrafts = contentProjects.some((p) => (p.status || 'Draft').toLowerCase() === 'draft');
   const hasBrand = !!brand;
@@ -362,38 +372,56 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
           </div>
         </header>
 
-        {/* Phase A — soft email-verification nudge (never a hard block). */}
-        <VerificationBanner user={user} />
+        {/* Phase A — soft email-verification nudge (never a hard block).
+            In-flow here (not the overlay the banner uses during onboarding)
+            so it pushes the workspace down instead of covering the top of
+            the side panels. */}
+        <VerificationBanner user={user} position="in-flow" />
 
         {/* Three-Panel Desktop Layout — engages only above 1440px, so at
             1280px the shell falls back to the single-column layout and the
-            Studio kanban is not squeezed. */}
+            Studio kanban is not squeezed. The center column uses
+            minmax(0,1fr) (not bare 1fr, which refuses to shrink below its
+            content's min-content width and pushed the grid past the
+            viewport) and the grid wrapper has min-w-0 so it can never grow
+            wider than the main area. */}
         {isThreePanelRoute ? (
           <main className="flex-1 overflow-hidden flex min-[1440px]:px-0 min-[1440px]:py-0">
-            <div className="flex flex-1 h-full min-[1440px]:grid min-[1440px]:grid-cols-[280px_1fr_320px] min-[1440px]:gap-4 min-[1440px]:p-4 min-[1440px]:h-full">
-              {/* Left Panel - Content Studio */}
-              <aside className="hidden min-[1440px]:flex flex-col h-full card-glass border border-white/10 overflow-hidden">
-                <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <GridFour size={18} className="text-[var(--accent)]" />
+            <div
+              className={`flex flex-1 h-full min-w-0 min-[1440px]:grid min-[1440px]:gap-4 min-[1440px]:p-4 min-[1440px]:h-full ${
+                showStudioPanel && showRoadmapPanel
+                  ? 'min-[1440px]:grid-cols-[280px_minmax(0,1fr)_320px]'
+                  : showStudioPanel
+                    ? 'min-[1440px]:grid-cols-[280px_minmax(0,1fr)]'
+                    : 'min-[1440px]:grid-cols-[minmax(0,1fr)_320px]'
+              }`}
+            >
+              {/* Left Panel - Content Studio (not on /studio: the route
+                  renders its own workflow there) */}
+              {showStudioPanel && (
+                <aside className="hidden min-[1440px]:flex flex-col h-full min-w-0 card-glass border border-white/10 overflow-hidden">
+                  <div className="p-4 border-b border-white/10 flex items-center gap-2">
+                    <GridFour size={18} className="text-[var(--accent)] shrink-0" />
                     <h3 className="font-semibold text-[var(--label-primary)]">Content Studio</h3>
                   </div>
-                  <span className="text-micro font-medium px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30">
-                    Ideas → Drafts → Published
-                  </span>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4">
-                  <ContentStudioWorkflow
-                    stages={studioStages}
-                    activeStage={studioActiveStage}
-                    onStageChange={setStudioActiveStage}
-                    onCreateContent={() => void navigate({ to: '/create' })}
-                  />
-                </div>
-              </aside>
+                  <div className="flex-1 overflow-y-auto p-4">
+                    <ContentStudioWorkflow
+                      stages={studioStages}
+                      activeStage={studioActiveStage}
+                      onStageChange={setStudioActiveStage}
+                      onCreateContent={() => void navigate({ to: '/create' })}
+                      compact
+                    />
+                  </div>
+                </aside>
+              )}
 
-              {/* Center Panel - Main Workspace */}
-              <section className="flex-1 flex flex-col min-w-0 overflow-y-auto min-[1440px]:overflow-y-auto">
+              {/* Center Panel - Main Workspace. Below the lg breakpoint the
+                  fixed bottom nav overlays the page, so the column carries
+                  bottom padding that clears it (same clearance the
+                  single-panel branch already has); the footer must never
+                  sit underneath the nav. */}
+              <section className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden pb-[calc(env(safe-area-inset-bottom,0px)+80px)] lg:pb-0 min-[1440px]:overflow-y-auto">
                 <RouteErrorBoundary
                   onGoHome={() => {
                     window.location.href = '/dashboard';
@@ -404,7 +432,14 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
                       wrapper was capped at the section height, the page spilled
                       out over the footer, and the footer intercepted clicks on
                       the page (e.g. Studio's "New project" button). */}
-                  <div className="flex-1 flex flex-col">{children}</div>
+                  {/* The route root is a flex item of this column: without
+                      min-w-0 on a wrapper it keeps its min-content width
+                      (a long nowrap step title made /roadmap 522px wide at
+                      a 390px viewport, clipped at the right edge). The
+                      wrapper lets every route shrink to the column. */}
+                  <div className="flex-1 flex flex-col min-w-0">
+                    <div className="min-w-0">{children}</div>
+                  </div>
                 </RouteErrorBoundary>
 
                 <footer className="mt-16 pt-6 pb-2 border-t border-white/10 min-[1440px]:border-t-0 min-[1440px]:pt-0 min-[1440px]:mt-0">
@@ -412,72 +447,73 @@ export default function LayoutShell({ children, user }: { children: React.ReactN
                 </footer>
               </section>
 
-              {/* Right Panel - Roadmap */}
-              <aside className="hidden min-[1440px]:flex flex-col h-full card-glass border border-white/10 overflow-hidden">
-                <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Columns size={18} className="text-[var(--accent)]" />
+              {/* Right Panel - Roadmap (not on /roadmap: the route renders
+                  its own steppers there) */}
+              {showRoadmapPanel && (
+                <aside className="hidden min-[1440px]:flex flex-col h-full min-w-0 card-glass border border-white/10 overflow-hidden">
+                  <div className="p-4 border-b border-white/10 flex items-center gap-2">
+                    <Columns size={18} className="text-[var(--accent)] shrink-0" />
                     <h3 className="font-semibold text-[var(--label-primary)]">Roadmap</h3>
                   </div>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4">
-                  <RoadmapStepper
-                    steps={[
-                      {
-                        id: 'direction',
-                        title: 'Choose a direction',
-                        description:
-                          'Write down one skill, experience, or interest you could share.',
-                        phase: 'discover' as const,
-                      },
-                      {
-                        id: 'person',
-                        title: 'Name one person',
-                        description: 'Describe a specific person and one problem they have.',
-                        phase: 'discover' as const,
-                      },
-                      {
-                        id: 'small_offer',
-                        title: 'Sketch a small way to help',
-                        description: 'Describe one small, concrete thing you could make.',
-                        phase: 'build' as const,
-                      },
-                      {
-                        id: 'brand',
-                        title: 'Build brand system',
-                        description: 'Visual identity, voice, and positioning for your channel.',
-                        phase: 'build' as const,
-                      },
-                      {
-                        id: 'first_content',
-                        title: 'Create first content',
-                        description: 'Script, record, and publish your first piece.',
-                        phase: 'build' as const,
-                      },
-                      {
-                        id: 'audience',
-                        title: 'Grow audience',
-                        description: 'Consistent publishing and engagement.',
-                        phase: 'monetize' as const,
-                      },
-                      {
-                        id: 'offer',
-                        title: 'Design your offer',
-                        description: 'Productize your expertise into a paid offer.',
-                        phase: 'monetize' as const,
-                      },
-                      {
-                        id: 'launch',
-                        title: 'Launch & iterate',
-                        description: 'First dollar to sustainable revenue.',
-                        phase: 'monetize' as const,
-                      },
-                    ]}
-                    currentStepId={currentStepId}
-                    onStepClick={handleStepClick}
-                  />
-                </div>
-              </aside>
+                  <div className="flex-1 overflow-y-auto p-4">
+                    <RoadmapStepper
+                      steps={[
+                        {
+                          id: 'direction',
+                          title: 'Choose a direction',
+                          description:
+                            'Write down one skill, experience, or interest you could share.',
+                          phase: 'discover' as const,
+                        },
+                        {
+                          id: 'person',
+                          title: 'Name one person',
+                          description: 'Describe a specific person and one problem they have.',
+                          phase: 'discover' as const,
+                        },
+                        {
+                          id: 'small_offer',
+                          title: 'Sketch a small way to help',
+                          description: 'Describe one small, concrete thing you could make.',
+                          phase: 'build' as const,
+                        },
+                        {
+                          id: 'brand',
+                          title: 'Build brand system',
+                          description: 'Visual identity, voice, and positioning for your channel.',
+                          phase: 'build' as const,
+                        },
+                        {
+                          id: 'first_content',
+                          title: 'Create first content',
+                          description: 'Script, record, and publish your first piece.',
+                          phase: 'build' as const,
+                        },
+                        {
+                          id: 'audience',
+                          title: 'Grow audience',
+                          description: 'Consistent publishing and engagement.',
+                          phase: 'monetize' as const,
+                        },
+                        {
+                          id: 'offer',
+                          title: 'Design your offer',
+                          description: 'Productize your expertise into a paid offer.',
+                          phase: 'monetize' as const,
+                        },
+                        {
+                          id: 'launch',
+                          title: 'Launch & iterate',
+                          description: 'First dollar to sustainable revenue.',
+                          phase: 'monetize' as const,
+                        },
+                      ]}
+                      currentStepId={currentStepId}
+                      onStepClick={handleStepClick}
+                    />
+                  </div>
+                </aside>
+              )}
             </div>
           </main>
         ) : (

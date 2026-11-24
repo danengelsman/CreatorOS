@@ -60,7 +60,7 @@ export function RoadmapStepper({
               transition-all duration-300
               ${isCurrent ? 'accent-edge ring-1 ring-[var(--accent)]/30' : ''}
               ${isCompleted ? 'opacity-80' : ''}
-              ${isFuture ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:ring-1 hover:ring-white/10'}
+              ${isFuture ? 'opacity-75 cursor-not-allowed' : 'cursor-pointer hover:ring-1 hover:ring-white/10'}
               focus-ring
             `}
             role="listitem"
@@ -71,8 +71,11 @@ export function RoadmapStepper({
             transition={{ delay: index * 0.08 }}
             whileTap={{ scale: 0.98 }}
           >
-            {/* Connection line */}
-            <div className="relative flex-shrink-0 w-1 h-full">
+            {/* Connection line + step indicator. The column is exactly as
+                wide as the badge (w-10): it used to be w-1, so the 40px
+                badge bled 36px into the text column and covered the start
+                of every pill and title ("ISCOVER DIRECTION"). */}
+            <div className="relative flex-shrink-0 w-10 h-full">
               {index < steps.length - 1 && (
                 <motion.div
                   className="absolute top-8 left-1/2 -translate-x-1/2 w-0.5 h-full"
@@ -157,21 +160,23 @@ export function RoadmapStepper({
                 )}
               </div>
 
+              {/* Title wraps instead of truncating: `truncate` (nowrap)
+                  made the whole step button's min-content width the full
+                  title text (~490px), which forced /roadmap past a 390px
+                  viewport. A two-line title reads fully on a phone. */}
               <h3
                 className={`
-                text-title font-semibold truncate transition-colors
-                ${isFuture ? 'text-[var(--label-tertiary)]' : 'text-[var(--label-primary)]'}
+                text-title font-semibold leading-snug transition-colors
+                ${isFuture ? 'text-[var(--label-secondary)]' : 'text-[var(--label-primary)]'}
               `}
               >
                 {step.title}
               </h3>
 
-              <p
-                className={`
-                text-caption mt-1 line-clamp-2 transition-colors
-                ${isFuture ? 'text-[var(--label-tertiary)]' : 'text-[var(--label-secondary)]'}
-              `}
-              >
+              {/* Future steps stay dimmed via the button's opacity-75, but
+                  their text uses the secondary label (0.7) rather than the
+                  tertiary label (0.4): 0.75 x 0.4 was near-invisible. */}
+              <p className="text-caption mt-1 line-clamp-2 transition-colors text-[var(--label-secondary)]">
                 {step.description}
               </p>
             </div>

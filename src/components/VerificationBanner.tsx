@@ -8,8 +8,19 @@ import { sendVerificationEmail } from '@/firebase';
  * Rendered by LayoutShell for the workspace and by AppRoot during the
  * onboarding flow (where the router — and therefore LayoutShell — is not
  * mounted). Both instances share this one implementation.
+ *
+ * position: 'overlay' (default) pins the banner over the page — right for
+ * the onboarding flow, where there is no layout to flow inside. 'in-flow'
+ * renders it as a normal block inside LayoutShell's column, so it pushes
+ * the workspace down instead of covering the top of the side panels.
  */
-export default function VerificationBanner({ user }: { user: any }) {
+export default function VerificationBanner({
+  user,
+  position = 'overlay',
+}: {
+  user: any;
+  position?: 'overlay' | 'in-flow';
+}) {
   const [verificationSendState, setVerificationSendState] = useState<'idle' | 'sending' | 'sent'>(
     'idle',
   );
@@ -41,7 +52,11 @@ export default function VerificationBanner({ user }: { user: any }) {
 
   return (
     <div
-      className="fixed lg:absolute top-[calc(env(safe-area-inset-top,0px)+52px)] left-0 right-0 z-[55] px-4 lg:px-10"
+      className={
+        position === 'in-flow'
+          ? 'relative z-[55] px-4 lg:px-10 shrink-0'
+          : 'fixed lg:absolute top-[calc(env(safe-area-inset-top,0px)+52px)] left-0 right-0 z-[55] px-4 lg:px-10'
+      }
       data-testid="email-verification-banner"
     >
       <div className="max-w-[1400px] mx-auto mt-2 flex items-center justify-between gap-3 p-3 rounded-xl border border-[var(--separator)] bg-[var(--bg-secondary)] ios-card">
