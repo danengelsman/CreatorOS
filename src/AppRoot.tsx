@@ -16,6 +16,7 @@ import {
   type OnboardingAnswers,
   type OnboardingBrandKit,
 } from '@/lib/onboardingState';
+import { Analytics } from '@vercel/analytics/react';
 
 function RouterWrapper() {
   const auth = useAuth();
@@ -214,6 +215,7 @@ export default function AppRoot() {
     <AuthProvider>
       <SessionExpired />
       <RouterWrapper />
+      <Analytics />
     </AuthProvider>
   );
 }
