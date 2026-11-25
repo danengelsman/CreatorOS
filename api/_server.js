@@ -90,11 +90,13 @@ function getStore() {
   const firestore = admin.firestore();
   const states = firestore.collection("oauth_states");
   _store = {
+    // First use creates the record already marked consumed (createOAuthState
+    // never writes one at issuance); a second use finds it and is rejected.
     async consume(jti) {
       return firestore.runTransaction(async (tx) => {
         const ref = states.doc(jti);
         const doc = await tx.get(ref);
-        if (!doc.exists || doc.data()?.consumed === true) return false;
+        if (doc.exists && doc.data()?.consumed === true) return false;
         tx.set(ref, {
           uid: doc.data()?.uid ?? null,
           createdAt: doc.data()?.createdAt ?? Date.now(),
