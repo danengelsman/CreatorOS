@@ -283,7 +283,7 @@ async function startServer() {
     'gemini-3.6-flash',
     'gemini-3.5-flash',
     'gemini-3.1-flash-lite',
-    'gemini-3.1-pro-preview',
+    'gemini-4-hydrogen',
     'gemini-flash-latest',
     'gemini-2.5-flash',
     'gemini-2.5-pro',
@@ -439,7 +439,7 @@ async function startServer() {
     models: string[] = [
       'gemini-3.8-flash',
       'gemini-3.1-flash-lite',
-      'gemini-3.1-pro-preview',
+      'gemini-4-hydrogen',
       'gemini-flash-latest',
     ],
   ): Promise<string | null> {
@@ -705,7 +705,7 @@ async function startServer() {
       const responseText = await executeWithModelCascade(ai, requestPayload, [
         'gemini-3.8-flash',
         'gemini-3.1-flash-lite',
-        'gemini-3.1-pro-preview',
+        'gemini-4-hydrogen',
         'gemini-flash-latest',
       ]);
 
@@ -862,7 +862,7 @@ Ensure these elements are cohesive and generate a distinct brand identity. Keep 
         [
           'gemini-3.8-flash',
           'gemini-3.1-flash-lite',
-          'gemini-3.1-pro-preview',
+          'gemini-4-hydrogen',
           'gemini-flash-latest',
         ],
       );
@@ -964,7 +964,7 @@ Return a warm opening muse message (1-2 comforting sentences) plus the 3 sparks.
         [
           'gemini-3.8-flash',
           'gemini-3.1-flash-lite',
-          'gemini-3.1-pro-preview',
+          'gemini-4-hydrogen',
           'gemini-flash-latest',
         ],
       );
