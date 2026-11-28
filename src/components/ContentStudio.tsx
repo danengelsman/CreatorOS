@@ -62,6 +62,11 @@ import {
   updateOwnedContentProject,
   STUDIO_JOURNEY_UNAVAILABLE,
 } from './studio/studioOwnerFence';
+import {
+  createStudioAutosave,
+  STUDIO_AUTOSAVE_DELAY_MS,
+  type StudioAutosave,
+} from './studio/studioAutosave';
 
 export default function Create({
   brand,
@@ -167,6 +172,10 @@ export default function Create({
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
   const saveGeneration = useRef(0);
+  // Latest handlePublish, for the autosave scheduler created below. Assigned
+  // during render (like latestDraft) so the scheduler always calls the save
+  // routine with current state, never a stale closure.
+  const saveRequestRef = useRef<() => Promise<void>>(async () => {});
   const [isPolishing, setIsPolishing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -271,6 +280,53 @@ export default function Create({
     setStorageError(unavailable);
     onDirtyChange?.({ dirty, saving: isSaving, storageError: unavailable });
   }, [storageKey, dirty, title, body, platform, baseline, isSaving]);
+
+  // Debounced autosave (canvas only). The scheduler owns only the timing; it
+  // invokes handlePublish — the exact routine the Save button calls — and the
+  // gate snapshot below is re-read when the timer fires, so a conflict, an
+  // unresolved earlier save, or a lost project always wins over a timer set
+  // earlier. States that need an explicit user decision block autosave
+  // entirely and are left to the manual flow: a known conflict, pending
+  // writes with an unknown outcome, and a legacy recovered draft whose
+  // project name is unknown (baseline.name === undefined).
+  const autosaveGate = useRef({ contentDirty: false, blocked: true });
+  autosaveGate.current = {
+    contentDirty: !sameDraft(draft, baseline),
+    blocked:
+      !canvasMode ||
+      conflict ||
+      projectUnavailable ||
+      baseline.name === undefined ||
+      pendingSave.current.length > 0 ||
+      !user ||
+      !selectedProject?.id,
+  };
+  const writeChecksRef = useRef({ isCurrentOwner, canWriteProject });
+  writeChecksRef.current = { isCurrentOwner, canWriteProject };
+  const autosaveRef = useRef<StudioAutosave | null>(null);
+  if (autosaveRef.current === null) {
+    autosaveRef.current = createStudioAutosave({
+      delayMs: STUDIO_AUTOSAVE_DELAY_MS,
+      canSave: () =>
+        autosaveGate.current.contentDirty &&
+        !autosaveGate.current.blocked &&
+        (!writeChecksRef.current.isCurrentOwner || writeChecksRef.current.isCurrentOwner()) &&
+        (!writeChecksRef.current.canWriteProject || writeChecksRef.current.canWriteProject()),
+      isSaving: () => savingRef.current,
+      save: () => {
+        void saveRequestRef.current();
+      },
+    });
+  }
+  useEffect(() => {
+    if (!canvasMode) return;
+    const scheduler = autosaveRef.current;
+    if (!scheduler) return;
+    if (title !== baseline.title || body !== baseline.body || platform !== baseline.platform)
+      scheduler.schedule();
+    else scheduler.cancel();
+  }, [canvasMode, title, body, platform, baseline]);
+  useEffect(() => () => autosaveRef.current?.dispose(), []);
 
   const openStudioTab = (tab: any) => {
     if (canvasMode && (tab === 'retention' || tab === 'planner')) {
@@ -603,6 +659,7 @@ export default function Create({
       setIsSaving(false);
     }
   };
+  saveRequestRef.current = handlePublish;
 
   if (!brand && !canvasMode) {
     return (
@@ -686,11 +743,13 @@ export default function Create({
       )}
       {canvasMode && (
         <div role="status" className="text-sm text-[var(--label-secondary)]">
-          {dirty
-            ? storageError
-              ? 'Unsaved changes.'
-              : 'Unsaved changes — draft kept in this browser tab.'
-            : 'No unsaved changes.'}
+          {isSaving
+            ? 'Saving…'
+            : dirty
+              ? storageError
+                ? 'Unsaved changes.'
+                : 'Unsaved changes — draft kept in this browser tab.'
+              : 'No unsaved changes.'}
           {storageError &&
             (dirty
               ? ' Browser draft recovery is unavailable. This draft is in memory only and will be lost on reload or closing this tab; copy it now.'
