@@ -1,21 +1,8 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import Community from '@/components/Community';
-import LayoutShell from '@/components/LayoutShell';
-import { useAuth } from '@/contexts/AuthContext';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
+// The community now lives as the primary tab of the Creator Hub.
 export const Route = createFileRoute('/_auth/community')({
-  component: () => {
-    const auth = useAuth();
-    const navigate = useNavigate();
-
-    return (
-      <LayoutShell user={auth.user}>
-        <Community
-          user={auth.user}
-          userData={auth.userData}
-          setActiveTab={(tab) => navigate({ to: `/${tab}` as any })}
-        />
-      </LayoutShell>
-    );
+  beforeLoad: () => {
+    throw redirect({ to: '/hub' });
   },
 });
